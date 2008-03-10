@@ -1,4 +1,4 @@
-function PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
+function PRED_VALS=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %   PredictPatients
 %       Uses (leave-1/3)-out cross validation to determine the predictive
 %       power of the BASE_CALLS and ELM vectors in predicting patient
@@ -11,6 +11,7 @@ function PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %
 %
 
+DISPLAY_FLAG=false;
 
 LEAVE_IN_FRAC=0.66;
 MAX_FEATURES=10;
@@ -36,20 +37,21 @@ MAX_FEATURES=10;
 
 
 %%extract the RX data that indicates the start of the study
-mask=(temp_RX_data(:,1)==0);
+% mask=(temp_RX_data(:,1)==0);
+% 
+% temp_RX_data=temp_RX_data(mask,2:end);
+% temp_RX_inds=temp_RX_inds(mask);
+% 
+% %%%%%Pull out desired triple therapy
+% RX_names=PAT_STRUCT{1}.RX_names;
+% %wanted_drugs={'3TC','AZT','IDV'};
+% wanted_drugs={'3TC'};
+% wanted_drug_mask=ismember(RX_names,wanted_drugs);
+% 
+% %mask=sum(temp_RX_data==repmat(wanted_drug_mask',[size(temp_RX_data,1) 1]),2)==length(RX_names);
+% mask=temp_RX_data(:,find(wanted_drug_mask))&true;
 
-temp_RX_data=temp_RX_data(mask,2:end);
-temp_RX_inds=temp_RX_inds(mask);
-
-%%%%%Pull out desired triple therapy
-RX_names=PAT_STRUCT{1}.RX_names;
-%wanted_drugs={'3TC','AZT','IDV'};
-wanted_drugs={'3TC'};
-wanted_drug_mask=ismember(RX_names,wanted_drugs);
-
-%mask=sum(temp_RX_data==repmat(wanted_drug_mask',[size(temp_RX_data,1) 1]),2)==length(RX_names);
-mask=temp_RX_data(:,find(wanted_drug_mask))&true;
-
+mask=true(size(temp_RX_inds));
 temp_RX_data=temp_RX_data(mask,:);
 temp_RX_inds=temp_RX_inds(mask);
 
@@ -109,10 +111,11 @@ CORR_LABELS=cumsum([1 size(temp_RX_data,2) size(BASE_CALLS,2) size(temp_ELM_simp
 
 CLASS_PERF=classperf(RESP_VAR);
 
-
-%kNN_fig_handle=figure;
-%SVM_fig_handle=figure;
-SWR_fig_handle=figure;
+if DISPLAY_FLAG
+    %kNN_fig_handle=figure;
+    %SVM_fig_handle=figure;
+    SWR_fig_handle=figure;
+end
 
 kNN_CORR_SPOTS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
 kNN_TRAIN_CLASS_CORRECT=zeros(NUM_REPS,1);
@@ -120,6 +123,7 @@ kNN_TRAIN_CLASS_CORRECT=zeros(NUM_REPS,1);
 SWR_CORR_SPOTS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
 SWR_AUC_VALS=zeros(NUM_REPS,1);
 SWR_SPEC_VALS=zeros(NUM_REPS,length(WANTED_SENS));
+SWR_REG_VALS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
 
 
 for i=1:NUM_REPS
@@ -192,14 +196,19 @@ VALS=glmval([B_values(inmodel);0],TESTING_FEATURES(:,NAN_MASK(inmodel)),'identit
 SWR_AUC_VALS(i)=abs(temp_AUC-0.5);
 
 
-figure(SWR_fig_handle)
-% subplot(2,2,2), plot(mean(1-SWR_SPEC_VALS(i,:),1),WANTED_SENS,0:.1:1,0:.1:1)
-% title(['Mean AUC: ' num2str(mean(SWR_AUC_VALS(1:i)))])
+SWR_REG_VALS(i,NAN_MASK(inmodel))=sign(B_values(inmodel));
 
-AUC_VALS_HIST=hist(SWR_AUC_VALS(1:i),0:0.05:1);
-subplot(2,2,4), bar(0:0.05:1,AUC_VALS_HIST/i)
-axis([0 0.5 0 1])
+if DISPLAY_FLAG
+    figure(SWR_fig_handle)
+    subplot(2,2,2), bar(mean(SWR_REG_VALS(1:i,:),1))
+    axis([0 size(SWR_REG_VALS,2) -1.1 1.1])
+    % title(['Mean AUC: ' num2str(mean(SWR_AUC_VALS(1:i)))])
 
+    AUC_VALS_HIST=hist(SWR_AUC_VALS(1:i),0:0.05:1);
+    subplot(2,2,4), bar(0:0.05:1,AUC_VALS_HIST/i)
+    axis([0 0.5 0 1])
+    drawnow
+end
 
 
 
@@ -319,9 +328,11 @@ axis([0 0.5 0 1])
     %    subplot(2,2,4), bar(mean(CORR_SPOTS(1:i,:),1))
     %   set(gca,'xtick',CORR_LABELS)
 
-    drawnow
+
 
 end
+
+PRED_VALS=mean(SWR_REG_VALS,1);
 
     function [K_val F_num]=FindOptkNN(FEATURES,RESP)
 
@@ -383,7 +394,7 @@ end
 
 function [FINAL_INDS]=FindOptSWR(FEATURES,RESP)
 
-        NUM_OPT_REPS=100;
+        NUM_OPT_REPS=50;
         [NUM_OBSERVATIONS MAX_FEATURES]=size(FEATURES);
 
         OUTPUT_MAT=zeros(NUM_OPT_REPS,size(SWR_CORR_SPOTS,2));
@@ -416,18 +427,18 @@ function [FINAL_INDS]=FindOptSWR(FEATURES,RESP)
 
         SPOT_FREQ=mean(OUTPUT_MAT,1);
         AUC_NORM_SPOT_FREQ=mean(OUTPUT_MAT.*repmat(AUC_MAP,[1 size(OUTPUT_MAT,2)]),1);
-        
-        figure(SWR_fig_handle);
-        
-        subplot(2,2,1), bar(0:0.05:1,NORM_AUC)
-        axis([0 0.5 0 1])
-        ylabel('Frequency')
-        xlabel('AUC Val')
-        
-        subplot(2,2,3), barh([SPOT_FREQ',AUC_NORM_SPOT_FREQ']);
-        set(gca,'ytick',CORR_LABELS,'Yticklabel',{'RX Data','SNP Data','Simple ELM','Positional ELM'});
-        legend('SPOT OCCURANCE','AUC Normalized')
-        
+        if DISPLAY_FLAG
+            figure(SWR_fig_handle);
+
+            subplot(2,2,1), bar(0:0.05:1,NORM_AUC)
+            axis([0 0.5 0 1])
+            ylabel('Frequency')
+            xlabel('AUC Val')
+
+            subplot(2,2,3), barh([SPOT_FREQ',AUC_NORM_SPOT_FREQ']);
+            set(gca,'ytick',CORR_LABELS,'Yticklabel',{'RX Data','SNP Data','Simple ELM','Positional ELM'});
+            legend('SPOT OCCURANCE','AUC Normalized')
+        end
         [Y_val I_val]=sort(AUC_NORM_SPOT_FREQ,'descend');
         
         FINAL_INDS=I_val(1:10);
