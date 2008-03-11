@@ -11,7 +11,7 @@ function PRED_VALS=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %
 %
 
-DISPLAY_FLAG=true;
+DISPLAY_FLAG=false;
 
 LEAVE_IN_FRAC=0.66;
 MAX_FEATURES=10;
