@@ -23,7 +23,8 @@ try
     [Numeric_2 Text_2 Raw_2]=xlsread(EXCEL_FILENAME,2);
     
     LastRegimine=Numeric_2(end,:);
-    LastIND=size(RAW_2,1);
+    LastRegimine(LastRegimine==0)=NaN;
+    LastIND=size(Raw_2,1);
     
 catch
     
@@ -52,7 +53,7 @@ while(1)
     LastIND=LastIND+1;
     LastRegimine=NewRegimine;
     
-    fprintf('Finished Running Index %d',LastIND);
+    fprintf('Finished Running Index %d\n',LastIND);
 
 
 end
