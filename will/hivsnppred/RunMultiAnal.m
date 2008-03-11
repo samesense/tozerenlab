@@ -41,7 +41,7 @@ while(1)
 
     [NewRegimine RegimineInds]=BreakoutPatients(PAT_STRUCT,LastRegimine,200);
 
-    NewPreds=PredictPatients(PAT_STRUCT(RegimineInds),500);
+    NewPreds=PredictPatients(PAT_STRUCT(RegimineInds),100);
 
     Zero_regimine=NewRegimine;
     Zero_regimine(isnan(Zero_regimine))=0;
