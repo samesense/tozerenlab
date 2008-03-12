@@ -1,30 +1,125 @@
-function PRED_VALS=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
+function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %   PredictPatients
 %       Uses (leave-1/3)-out cross validation to determine the predictive
 %       power of the BASE_CALLS and ELM vectors in predicting patient
-%       response.  This method uses Nearest-Neighbor as defined by the
-%       'Hamming' distance.
+%       response.
+%
+%       [PRED_VALS PRED_NORM PRED_STD]=PredictPatients(PAT_STRUCT,NUM_REPS)
+%
+%       PAT_STRUCT          A patient structure for testing.
+%
+%       NUM_REPS            The number of independant replications of the
+%                           trianing/testing.
+%
+%       PRED_VALS           The average of the SIGNUM of each feature
+%                           variable.
+%
+%       PRED_NORM           The average magnitude of each feature variable.
+%       PRED_STD            The standard-deviation.
+%
+%       Optional Parameters
+%
+%       LeaveInFrac         The fraction of samples to use a training data
+%                           in each iteration. DEFAULT = 0.66
+%
+%       Display             Toggles a figure displaying the prediction
+%                           process as it happens. DEFAULT = false
+%
+%       NumCrossValid       The number of Cross-Validations to perform on
+%                           the training data to determine the seeds for
+%                           the training set. DEFAULT = 50
+%
+%       DistComputing       Toggles the use of distributed computing
+%                           toolbox. DEFAULT = true
+%
+%       Method              Which method to for classification:
+%                           'NearestNeighbor', 'kNN'
+%                           'StepWise Linear Regression','SWR'    DEFAULT
+%
+%                           'NearestNeighbor' only returns PRED_VAR
 %
 %
-%       MEAN_AUC=PredictPatients(PAT_STRUCT,NUM_REPS)
-%
+%       See also: RunMultiAnal, PatientStructHelper, knnclassify,
+%       stepwisefit, CalculateROC.
 %
 %
 
+
+
+%%%%%%%%%%%%%%%%%SET DEFAULT VALUES%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 DISPLAY_FLAG=false;
-
 LEAVE_IN_FRAC=0.66;
 MAX_FEATURES=10;
+NUM_OPT_REPS=50;
+USE_DISTCOMP_FLAG=true;
+kNN_FLAG=false;
+SWR_FLAG=true;
 
 
+
+%%%%%%%%%%%%%%%%%PARSE INPUTS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+if ~isempty(varargin)
+    for i=1:2:length(varargin)
+        switch lower(varargin{i})
+            
+            case 'leaveinfrac'
+                if isnumeric(varargin{i+1})&&isscalar(varargin{i+1})&&varargin{i+1}>0&&varargin{i+1}<1
+                    LEAVE_IN_FRAC=varargin{i+1};
+                else
+                    error('PredictPatients:BAD_LEAVEINFRAC','Arguement to LeaveInFrac must be a numeric-scalar between 0 and 1.')
+                end
+            
+            case 'numcrossvalid'
+                if isscalar(varargin{i+1})&&varargin{i+1}>0
+                    NUM_OPT_REPS=round(varargin{i+1});
+                else
+                    error('PredictPatients:BAD_NUMCROSSVALID','Arguement to NumCrossValis must be a scalar integer.')
+                end
+            
+            case 'display'
+                if islogical(varargin{i+1})&&isscalar(varargin{i+1})
+                    DISPLAY_FLAG=varargin{i+1};
+                else
+                    error('PredictPatients:BAD_DIPLAY','Arguement to Display must be a logical.')
+                end
+                
+            case 'distcomputing'
+                if islogical(varargin{i+1})&&isscalar(varargin{i+1})
+                    USE_DISTCOMP_FLAG=varargin{i+1};
+                else
+                    error('PredictPatients:BAD_DISTCOMP','Arguement to DistComputing must be a logical.')
+                end
+                
+            case 'method'
+                switch lower(varargin{i+1})
+                    case {'nearestneighbor', 'knn'}
+                        kNN_FLAG=true;
+                        SWR_FLAG=false;
+                        if nargout>1
+                            warning('PredictPatients:kNN_OUTPUT','NearestNeighbor only returns PRED_VAR')
+                        end
+                    case {'stepwise linear legression','swr'}
+                        kNN_FLAG=false;
+                        SWR_FLAG=true;
+                    otherwise
+                        error('PredictPatients:UNKNOWN_METHOD','An unknown Method was provided: %s',varargin{i+1})
+                end
+            
+            otherwise
+                error('PredictPatients:UNKNOWN_ARG','An unknown argument was provided: %s',varargin{i})
+        end
+    end
+end
+
+
+%%%%%%%%%%%%%%%%%%EXTRACT DATA FROM PATIENT STRUCTURE%%%%%%%%%%%%%%%%%%%%%%
 [temp_RX_data temp_RX_inds ...
     temp_resp_var RESP_inds ...
     temp_BASE_CALLS temp_BASE_CALLS_inds ...
     temp_CLINICAL temp_CLINICAL_inds ...
     temp_SNP_spots temp_SNP_spots_inds ...
     temp_ELM_simple temp_ELM_simple_inds...
-    temp_ELM_vec temp_ELM_vec_inds...
-    temp_ELM_annot temp_ELM_annot_inds]=...
+    temp_ELM_vec temp_ELM_vec_inds]=...
     PatientStructHelper(PAT_STRUCT,...
     {'RX_vals','explodenumeric'},...
     {'IS_RESPONDER','leaveNumeric'},...
@@ -32,36 +127,13 @@ MAX_FEATURES=10;
     {'NORM_CLINICAL_DATA','explodecells'},...
     {'SNP_SPOTS','explodeNumeric'},...
     {'ELM_simple','explodeNumeric'},...
-    {'ELM_vec','explodeNumeric'},...
-    {'ELM_annot','leaveCell'});
+    {'ELM_vec','explodeNumeric'});
 
-
-%%extract the RX data that indicates the start of the study
-% mask=(temp_RX_data(:,1)==0);
-%
-% temp_RX_data=temp_RX_data(mask,2:end);
-% temp_RX_inds=temp_RX_inds(mask);
-%
-% %%%%%Pull out desired triple therapy
-% RX_names=PAT_STRUCT{1}.RX_names;
-% %wanted_drugs={'3TC','AZT','IDV'};
-% wanted_drugs={'3TC'};
-% wanted_drug_mask=ismember(RX_names,wanted_drugs);
-%
-% %mask=sum(temp_RX_data==repmat(wanted_drug_mask',[size(temp_RX_data,1) 1]),2)==length(RX_names);
-% mask=temp_RX_data(:,find(wanted_drug_mask))&true;
-
-mask=true(size(temp_RX_inds));
-temp_RX_data=temp_RX_data(mask,:);
-temp_RX_inds=temp_RX_inds(mask);
 
 %%%%ensure that the indexes still match up properly
 PAT_IND_MATCHES=intersect(intersect(intersect(intersect(temp_RX_inds,RESP_inds),temp_BASE_CALLS_inds),temp_CLINICAL_inds),temp_ELM_simple_inds);
 
 BASE_CALLS=zeros(length(PAT_IND_MATCHES),size(temp_BASE_CALLS,2)*5);
-
-INITIAL_CLINICAL=cell2mat(cellfun(@(x)x(1,2:end),temp_CLINICAL(PAT_IND_MATCHES),'uniformoutput',false));
-FINAL_CLINICAL=cell2mat(cellfun(@(x)x(end,2:end),temp_CLINICAL(PAT_IND_MATCHES),'uniformoutput',false));
 
 m=size(BASE_CALLS,2);
 
@@ -73,35 +145,21 @@ unex_BASE_CALLS=temp_BASE_CALLS(PAT_IND_MATCHES,:);
 
 ELM_features=[temp_ELM_simple(PAT_IND_MATCHES,:) temp_ELM_vec(PAT_IND_MATCHES,:)];
 
+%Explode BASE_CALLS into a feature vector
 for i=1:length(PAT_IND_MATCHES)
     [TF LOC]=ismember(unex_BASE_CALLS(i,:),translate_vars);
     LOC(~TF)=6;
     BASE_CALLS(i,:)=reshape(translate_mat(LOC,:),[],m);
 end
 
-INITIAL_CLINICAL=cell2mat(cellfun(@(x)x(1,2:end),temp_CLINICAL(PAT_IND_MATCHES),'uniformoutput',false));
-FINAL_CLINICAL=cell2mat(cellfun(@(x)x(end,2:end),temp_CLINICAL(PAT_IND_MATCHES),'uniformoutput',false));
-
-ACTUAL_IMPROVED=(INITIAL_CLINICAL(:,1)-FINAL_CLINICAL(:,1))>0;
-
-%RESP_VAR=ACTUAL_IMPROVED;
-
 WANTED_SENS=0:0.01:1;
-
-
-% RESP_VAR=[true(30,1); false(30,1)];
-% test_data=double(rand(60,100)>0.5);
-% test_data(:,10)=[rand(30,1)+.4>0.5; rand(30,1)-.4>0.5];
-% test_data(:,15)=[rand(30,1)+.4>0.5; rand(30,1)-.4>0.5];
-% test_data(:,5)=[rand(30,1)-.2>0.5; rand(30,1)+.2>0.5];
-% CORR_SPOTS=zeros(NUM_REPS,size(test_data,2));
 
 CORR_LABELS=cumsum([1 size(temp_RX_data,2) size(BASE_CALLS,2) size(temp_ELM_simple,2) size(temp_ELM_vec,2)]);
 
 CLASS_PERF=classperf(RESP_VAR);
 
 if DISPLAY_FLAG
-    %kNN_fig_handle=figure;
+    kNN_fig_handle=figure;
     %SVM_fig_handle=figure;
     SWR_fig_handle=figure;
 end
@@ -109,18 +167,19 @@ end
 kNN_CORR_SPOTS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
 kNN_TRAIN_CLASS_CORRECT=zeros(NUM_REPS,1);
 
+
 SWR_CORR_SPOTS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
 SWR_AUC_VALS=zeros(NUM_REPS,1);
 SWR_SPEC_VALS=zeros(NUM_REPS,length(WANTED_SENS));
 SWR_REG_VALS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
+SWR_NORM_VALS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
+
 
 ALL_groups={'NR','R'};
 
 CLASSES=ALL_groups(RESP_VAR+1);
 
 for i=1:NUM_REPS
-
-
 
     [this_train_var this_test_var]=crossvalind('holdout',CLASSES,1-LEAVE_IN_FRAC,'classes',ALL_groups);
 
@@ -131,82 +190,78 @@ for i=1:NUM_REPS
     TESTING_FEATURES=[temp_RX_data(this_test_var,:) BASE_CALLS(this_test_var,:) ELM_features(this_test_var,:)];
     TESTING_RESP=RESP_VAR(this_test_var);
 
-    %     TRAINING_FEATURES=[test_data(shuffle_resp(1:num_resp_include),:); test_data(shuffle_non_resp(1:num_non_resp_include),:)];
-    %     TRAINING_RESP=[RESP_VAR(shuffle_resp(1:num_resp_include)); RESP_VAR(shuffle_non_resp(1:num_non_resp_include))];
-    %
-    %     TESTING_FEATURES=[test_data(shuffle_resp(num_resp_include+1:end),:); test_data(shuffle_non_resp(num_non_resp_include+1:end),:)];
-    %     TESTING_RESP=[RESP_VAR(shuffle_resp(num_resp_include+1:end)); RESP_VAR(shuffle_non_resp(num_non_resp_include+1:end))];
+    if kNN_FLAG
 
+        good_features=find(sum(isnan(TRAINING_FEATURES),1)==0);
 
-    %    [I Z]=rankfeatures(TRAINING_FEATURES',TRAINING_RESP);
-    %     RATIOS=RatioBSStoWSS(TRAINING_FEATURES,TRAINING_RESP,[0 1]);
+        [I Z]=rankfeatures(TRAINING_FEATURES(:,good_features)',TRAINING_RESP,'criterion','roc');
+        I=good_features(I);
+        [K NUM_FEATURES]=FindOptkNN(TRAINING_FEATURES(:,I),TRAINING_RESP);
+        kNN_CORR_SPOTS(i,I(1:NUM_FEATURES))=1;
 
-    %     [Y I]=sort(RATIOS,'descend');
-    %     spot=find(~isnan(Y),1);
+        Nearest_Testing_vals=knnclassify(TESTING_FEATURES(:,I(1:NUM_FEATURES)),TRAINING_FEATURES(:,I(1:NUM_FEATURES)),TRAINING_RESP,K,'hamming','consensus');
 
-    %    figure
+        CLASS_PERF=classperf(CLASS_PERF,Nearest_Testing_vals,[shuffle_resp(num_resp_include+1:end); shuffle_non_resp(num_non_resp_include+1:end)]);
+        kNN_TRAIN_CLASS_CORRECT(i)=CLASS_PERF.LastCorrectRate;
 
-    %
-    %
-    %    good_features=find(sum(isnan(TRAINING_FEATURES),1)==0);
-
-    %    [I Z]=rankfeatures(TRAINING_FEATURES(:,good_features)',TRAINING_RESP,'criterion','roc');
-    %    I=good_features(I);
-    %     [K NUM_FEATURES]=FindOptkNN(TRAINING_FEATURES(:,I),TRAINING_RESP);
-    %     kNN_CORR_SPOTS(i,I(1:NUM_FEATURES))=1;
-    %
-    %     Nearest_Testing_vals=knnclassify(TESTING_FEATURES(:,I(1:NUM_FEATURES)),TRAINING_FEATURES(:,I(1:NUM_FEATURES)),TRAINING_RESP,K,'hamming','consensus');
-    %
-    %     CLASS_PERF=classperf(CLASS_PERF,Nearest_Testing_vals,[shuffle_resp(num_resp_include+1:end); shuffle_non_resp(num_non_resp_include+1:end)]);
-    %     kNN_TRAIN_CLASS_CORRECT(i)=CLASS_PERF.LastCorrectRate;
-    %
-    %
-    %     figure(kNN_fig_handle)
-    %     subplot(2,2,4), barh(mean(kNN_CORR_SPOTS(1:i,:),1))
-    %     axis([0 1 0 size(kNN_CORR_SPOTS,2)])
-    %     set(gca,'ytick',CORR_LABELS,'Yticklabel',{'RX Data','SNP Data','Simple ELM','Positional ELM'});
-    %     xlabel('Frequency Picked')
-    %     subplot(2,2,3), hist(kNN_TRAIN_CLASS_CORRECT(1:i),0:0.01:1)
-    %     ylabel('Frequency')
-    %     xlabel('CorrectRate')
-
-
-    NAN_MASK=find(sum(isnan(TRAINING_FEATURES))==0);
-
-    intial_inds=FindOptSWR(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP);
-
-    [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP,'inmodel',ismember(NAN_MASK,intial_inds),'display','off');
-
-    %[AGG_OBV_TEST AGG_RESP_TEST]=AggregateResults(TESTING_FEATURES(:,I(inmodel)),TESTING_RESP);
-
-    VALS=glmval([B_values(inmodel);0],TESTING_FEATURES(:,NAN_MASK(inmodel)),'identity');
-
-    [temp_AUC SWR_SPEC_VALS(i,:)]=CalculateROC(VALS,TESTING_RESP,WANTED_SENS);
-
-    SWR_AUC_VALS(i)=abs(temp_AUC-0.5);
-
-
-    SWR_REG_VALS(i,NAN_MASK(inmodel))=sign(B_values(inmodel));
-
-    if DISPLAY_FLAG
-        figure(SWR_fig_handle)
-        subplot(2,2,2), bar(mean(SWR_REG_VALS(1:i,:),1))
-        axis([0 size(SWR_REG_VALS,2) -1.1 1.1])
-        % title(['Mean AUC: ' num2str(mean(SWR_AUC_VALS(1:i)))])
-
-        AUC_VALS_HIST=hist(SWR_AUC_VALS(1:i),0:0.05:1);
-        subplot(2,2,4), bar(0:0.05:1,AUC_VALS_HIST/i)
-        axis([0 0.5 0 1])
-        drawnow
+        if DISPLAY_FLAG
+            figure(kNN_fig_handle)
+            subplot(2,2,4), barh(mean(kNN_CORR_SPOTS(1:i,:),1))
+            axis([0 1 0 size(kNN_CORR_SPOTS,2)])
+            set(gca,'ytick',CORR_LABELS,'Yticklabel',{'RX Data','SNP Data','Simple ELM','Positional ELM'});
+            xlabel('Frequency Picked')
+            subplot(2,2,3), hist(kNN_TRAIN_CLASS_CORRECT(1:i),0:0.01:1)
+            ylabel('Frequency')
+            xlabel('CorrectRate')
+        end
     end
+    
+    if SWR_FLAG
+        NAN_MASK=find(sum(isnan(TRAINING_FEATURES))==0);
 
+        intial_inds=FindOptSWR(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP);
 
+        [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP,'inmodel',ismember(NAN_MASK,intial_inds),'display','off');
 
+        VALS=glmval([B_values(inmodel);0],TESTING_FEATURES(:,NAN_MASK(inmodel)),'identity');
 
+        [temp_AUC SWR_SPEC_VALS(i,:)]=CalculateROC(VALS,TESTING_RESP,WANTED_SENS);
 
+        SWR_AUC_VALS(i)=abs(temp_AUC-0.5);
+        SWR_REG_VALS(i,NAN_MASK(inmodel))=sign(B_values(inmodel));
+        SWR_NORM_VALS(i,NAN_MASK(inmodel))=abs(B_values(inmodel))/sum(abs(B_values(inmodel)));
+
+        if DISPLAY_FLAG
+            figure(SWR_fig_handle)
+            subplot(2,2,2), bar(mean(SWR_REG_VALS(1:i,:),1))
+            axis([0 size(SWR_REG_VALS,2) -1.1 1.1])
+            % title(['Mean AUC: ' num2str(mean(SWR_AUC_VALS(1:i)))])
+
+            AUC_VALS_HIST=hist(SWR_AUC_VALS(1:i),0:0.05:1);
+            subplot(2,2,4), bar(0:0.05:1,AUC_VALS_HIST/i)
+            axis([0 0.5 0 1])
+            drawnow
+        end
+    end
 end
 
-PRED_VALS=mean(SWR_REG_VALS,1);
+if SWR_FLAG
+    PRED_VALS=mean(SWR_REG_VALS,1);
+    PRED_NORM=mean(SWR_NORM_VALS,1);
+    PRED_STD=std(SWR_NORM_VALS,1);
+    
+    varargout=cell(3,1);
+    varargout{1}=PRED_VALS;
+    varargout{2}=PRED_NORM;
+    varargout{3}=PRED_STD;
+end
+
+if kNN_FLAG
+    varargout=cell(1);
+    varargout{1}=mean(kNN_CORR_SPOTS,1);
+end
+
+
 
     function [K_val F_num]=FindOptkNN(FEATURES,RESP)
 
@@ -267,37 +322,53 @@ PRED_VALS=mean(SWR_REG_VALS,1);
 
 
     function [FINAL_INDS]=FindOptSWR(FEATURES,RESP)
+        % Finds the optimal features for step-wise regression using
+        % cross validation on the training data.
 
-        NUM_OPT_REPS=50;
+        
         [NUM_OBSERVATIONS MAX_FEATURES]=size(FEATURES);
 
         OUTPUT_MAT=zeros(NUM_OPT_REPS,size(SWR_CORR_SPOTS,2));
         AUC_MAP=zeros(NUM_OPT_REPS,1);
 
+        
+        if USE_DISTCOMP_FLAG
+            parfor (IND = 1:NUM_OPT_REPS)
 
-        parfor (IND = 1:NUM_OPT_REPS)
+                groups={'NR','R'};
 
+                [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
+
+                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off');
+                VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
+
+                AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
+
+                OUTPUT_SLICE=zeros(1,size(SWR_CORR_SPOTS,2));
+                OUTPUT_SLICE(NAN_MASK(inmodel))=1;
+
+                OUTPUT_MAT(IND,:)=OUTPUT_SLICE;
+
+            end
+        else
             groups={'NR','R'};
+            for IND=1:NUM_OPT_REPS
 
-            [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
+                [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
 
-            %            [AGG_OBS AGG_RESP]=AggregateResults(FEATURES(this_train,:),RESP(this_train));
+                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off');
+                VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
 
+                AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
 
-            %            [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(AGG_OBS,AGG_RESP(:,1)-AGG_RESP(:,2),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off');
-            [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off');
-            VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
+                OUTPUT_SLICE=zeros(1,size(SWR_CORR_SPOTS,2));
+                OUTPUT_SLICE(NAN_MASK(inmodel))=1;
 
-            AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
-
-            OUTPUT_SLICE=zeros(1,size(SWR_CORR_SPOTS,2));
-            OUTPUT_SLICE(NAN_MASK(inmodel))=1;
-
-            OUTPUT_MAT(IND,:)=OUTPUT_SLICE;
-
+                OUTPUT_MAT(IND,:)=OUTPUT_SLICE;
+            end
         end
-
-
+        
+        
         auc=hist(AUC_MAP,0:0.05:1);
         NORM_AUC=auc/NUM_OPT_REPS;
 
