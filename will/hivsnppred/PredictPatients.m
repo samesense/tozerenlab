@@ -54,7 +54,7 @@ NUM_OPT_REPS=50;
 USE_DISTCOMP_FLAG=true;
 kNN_FLAG=false;
 SWR_FLAG=true;
-
+varargout=cell(3,1);
 
 
 %%%%%%%%%%%%%%%%%PARSE INPUTS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -95,12 +95,14 @@ if ~isempty(varargin)
                     case {'nearestneighbor', 'knn'}
                         kNN_FLAG=true;
                         SWR_FLAG=false;
+                        varargout=cell(1);
                         if nargout>1
                             warning('PredictPatients:kNN_OUTPUT','NearestNeighbor only returns PRED_VAR')
                         end
                     case {'stepwise linear legression','swr'}
                         kNN_FLAG=false;
                         SWR_FLAG=true;
+                        varargout=cell(3,1);
                     otherwise
                         error('PredictPatients:UNKNOWN_METHOD','An unknown Method was provided: %s',varargin{i+1})
                 end
@@ -128,6 +130,13 @@ end
     {'SNP_SPOTS','explodeNumeric'},...
     {'ELM_simple','explodeNumeric'},...
     {'ELM_vec','explodeNumeric'});
+
+
+if all(temp_resp_var)||all(~temp_resp_var)
+    warning('PredictPatients:SINGLE_CLASS','This dataset only contained One Class, Cannot classify.')
+
+end
+
 
 
 %%%%ensure that the indexes still match up properly
@@ -250,14 +259,13 @@ if SWR_FLAG
     PRED_NORM=mean(SWR_NORM_VALS,1);
     PRED_STD=std(SWR_NORM_VALS,1);
     
-    varargout=cell(3,1);
     varargout{1}=PRED_VALS;
     varargout{2}=PRED_NORM;
     varargout{3}=PRED_STD;
 end
 
 if kNN_FLAG
-    varargout=cell(1);
+
     varargout{1}=mean(kNN_CORR_SPOTS,1);
 end
 
