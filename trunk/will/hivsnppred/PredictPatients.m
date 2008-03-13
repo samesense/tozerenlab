@@ -134,7 +134,8 @@ end
 
 if all(temp_resp_var)||all(~temp_resp_var)
     warning('PredictPatients:SINGLE_CLASS','This dataset only contained One Class, Cannot classify.')
-
+    
+    return
 end
 
 

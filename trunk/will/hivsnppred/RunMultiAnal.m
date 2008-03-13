@@ -134,6 +134,9 @@ for I=LastIND:length(DR_Inds)
     tic
 
     [NewPreds NewMeans NewSTDs]=PredictPatients(PAT_STRUCT(DR_Inds{I}),NUM_PRED,PRED_PAT_OPT{:});
+    if isempty(NewPreds)
+        continue
+    end
 
     if EXCEL_FLAG
         xlswrite(FILENAME,DrugRegimine(I,:),1,['A' num2str(I+1)]);
