@@ -59,10 +59,12 @@ for i=start_I:NumCols
     if nnz(pat_mask)>=PatientCutoff
         INDS=RX_inds(pat_mask);
         RX_MASK(i)=1;
-        if all(isequalwithequalnans(RX_MASK,LAST_THERAPY))
-            continue
+        if ~all(isequalwithequalnans(RX_MASK,LAST_THERAPY))
+            return
+        else
+            RX_MASK=NaN(1,NumCols);
         end
-        return
+        
     end
     for j=start_J:i-1
         for k=start_K:j-1
@@ -70,10 +72,12 @@ for i=start_I:NumCols
             if nnz(pat_mask)>=PatientCutoff
                 INDS=RX_inds(pat_mask);
                 RX_MASK(nonzeros([i j k])')=1;
-                if all(isequalwithequalnans(RX_MASK,LAST_THERAPY))
-                    continue
+                if ~all(isequalwithequalnans(RX_MASK,LAST_THERAPY))
+                    return
+                else
+                    RX_MASK=NaN(1,NumCols);
+
                 end
-                return
             end
         end
         start_K=0;
