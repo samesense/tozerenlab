@@ -1,8 +1,8 @@
-function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
+function [varargout]=SUPER_PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %   PredictPatients
 %       Uses (leave-1/3)-out cross validation to determine the predictive
 %       power of the BASE_CALLS and ELM vectors in predicting patient
-%       response.
+%       response.  This method is set-up to be used by the BLADECENTER.
 %
 %       [PRED_VALS PRED_NORM PRED_STD]=PredictPatients(PAT_STRUCT,NUM_REPS)
 %
@@ -50,8 +50,8 @@ function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 DISPLAY_FLAG=false;
 LEAVE_IN_FRAC=0.66;
 MAX_FEATURES=10;
-NUM_OPT_REPS=50;
-USE_DISTCOMP_FLAG=true;
+NUM_OPT_REPS=20;
+USE_DISTCOMP_FLAG=false;
 kNN_FLAG=false;
 SWR_FLAG=true;
 varargout=cell(3,1);
@@ -256,9 +256,12 @@ for i=1:NUM_REPS
 end
 
 if SWR_FLAG
-    PRED_VALS=mean(SWR_REG_VALS,1);
-    PRED_NORM=mean(SWR_NORM_VALS,1);
-    PRED_STD=std(SWR_NORM_VALS,1);
+    SWR_REG_VALS(SWR_REG_VALS==0)=NaN;
+    SWR_NORM_VALS(SWR_NORM_VALS==0)=NaN;
+    
+    PRED_VALS=nanmean(SWR_REG_VALS,1);
+    PRED_NORM=nanmean(SWR_NORM_VALS,1);
+    PRED_STD=nanstd(SWR_NORM_VALS,1);
     
     varargout{1}=PRED_VALS;
     varargout{2}=PRED_NORM;
@@ -381,7 +384,7 @@ end
         auc=hist(AUC_MAP,0:0.05:1);
         NORM_AUC=auc/NUM_OPT_REPS;
 
-        SPOT_FREQ=mean(OUTPUT_MAT,1);
+        SPOT_FREQ=nanmean(OUTPUT_MAT,1);
         AUC_NORM_SPOT_FREQ=mean(OUTPUT_MAT.*repmat(AUC_MAP,[1 size(OUTPUT_MAT,2)]),1);
         if DISPLAY_FLAG
             figure(SWR_fig_handle);
