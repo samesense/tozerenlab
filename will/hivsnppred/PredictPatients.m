@@ -280,37 +280,37 @@ end
         OUTPUT_MAT=zeros(MAX_FEATURES,MAX_K);
 
 
-%         parfor (K_IND = 1:MAX_K)
-%             temp_CLASS_PERF=classperf(RESP);
-% 
-%             F_IND=1;
-%             OUTPUT_SLICE=OUTPUT_MAT(:,K_IND);
-% 
-%             break_var=true;
-%             while(F_IND<MAX_FEATURES&&break_var)
-%                 if numel(unique(reshape(FEATURES(:,1:F_IND),1,[])))==1
-%                     F_IND=F_IND+1;
-%                     continue
-%                 end
-% 
-%                 temp_mat=zeros(20,1);
-%                 for inside=1:20
-%                     [this_train this_test]=crossvalind('leaveMout',NUM_OBSERVATIONS,round(.1*NUM_OBSERVATIONS));
-%                     this_classified=knnclassify(FEATURES(this_test,1:F_IND),FEATURES(this_train,1:F_IND),RESP(this_train),K_IND,'hamming','consensus');
-%                     temp_CLASS_PERF=classperf(temp_CLASS_PERF,this_classified,this_test);
-%                 end
-% 
-%                 OUTPUT_SLICE(F_IND)=temp_CLASS_PERF.CorrectRate;
-% 
-%                 if F_IND>10&&(mean(diff(OUTPUT_SLICE(F_IND-4:F_IND)))<0.00001)%&&(rand*F_IND)/MAX_FEATURES>0.25)
-%                     break_var=false;
-%                 end
-%                 F_IND=F_IND+1;
-%             end
-% 
-%             OUTPUT_MAT(:,K_IND)=OUTPUT_SLICE;
-% 
-%         end
+        parfor (K_IND = 1:MAX_K)
+            temp_CLASS_PERF=classperf(RESP);
+
+            F_IND=1;
+            OUTPUT_SLICE=OUTPUT_MAT(:,K_IND);
+
+            break_var=true;
+            while(F_IND<MAX_FEATURES&&break_var)
+                if numel(unique(reshape(FEATURES(:,1:F_IND),1,[])))==1
+                    F_IND=F_IND+1;
+                    continue
+                end
+
+                temp_mat=zeros(20,1);
+                for inside=1:20
+                    [this_train this_test]=crossvalind('leaveMout',NUM_OBSERVATIONS,round(.1*NUM_OBSERVATIONS));
+                    this_classified=knnclassify(FEATURES(this_test,1:F_IND),FEATURES(this_train,1:F_IND),RESP(this_train),K_IND,'hamming','consensus');
+                    temp_CLASS_PERF=classperf(temp_CLASS_PERF,this_classified,this_test);
+                end
+
+                OUTPUT_SLICE(F_IND)=temp_CLASS_PERF.CorrectRate;
+
+                if F_IND>10&&(mean(diff(OUTPUT_SLICE(F_IND-4:F_IND)))<0.00001)%&&(rand*F_IND)/MAX_FEATURES>0.25)
+                    break_var=false;
+                end
+                F_IND=F_IND+1;
+            end
+
+            OUTPUT_MAT(:,K_IND)=OUTPUT_SLICE;
+
+        end
 
         figure(kNN_fig_handle);
         subplot(2,2,1), pcolor(OUTPUT_MAT(1:max(sum(OUTPUT_MAT>0)),:))
@@ -342,23 +342,23 @@ end
 
         
         if USE_DISTCOMP_FLAG
-%             parfor (IND = 1:NUM_OPT_REPS)
-% 
-%                 groups={'NR','R'};
-% 
-%                 [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
-% 
-%                 [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off');
-%                 VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
-% 
-%                 AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
-% 
-%                 OUTPUT_SLICE=zeros(1,size(SWR_CORR_SPOTS,2));
-%                 OUTPUT_SLICE(NAN_MASK(inmodel))=1;
-% 
-%                 OUTPUT_MAT(IND,:)=OUTPUT_SLICE;
-% 
-%             end
+            parfor (IND = 1:NUM_OPT_REPS)
+
+                groups={'NR','R'};
+
+                [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
+
+                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off');
+                VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
+
+                AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
+
+                OUTPUT_SLICE=zeros(1,size(SWR_CORR_SPOTS,2));
+                OUTPUT_SLICE(NAN_MASK(inmodel))=1;
+
+                OUTPUT_MAT(IND,:)=OUTPUT_SLICE;
+
+            end
         else
             groups={'NR','R'};
             for IND=1:NUM_OPT_REPS
