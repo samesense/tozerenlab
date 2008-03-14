@@ -35,7 +35,8 @@ function RunMultiAnal(PAT_STRUCT,FILENAME,varargin)
 %                       possible column. DEFAULT = false
 %
 %
-%
+%   SUPER               Option to toggle the use of the BLADECENTER for
+%                       parellelization. DEFAULT = false
 %
 %
 %
@@ -43,6 +44,7 @@ function RunMultiAnal(PAT_STRUCT,FILENAME,varargin)
 %
 
 EXCEL_FLAG=true;
+SUPER_FLAG=false;
 NUM_PRED=100;
 NUM_PAT=200;
 PRED_PAT_OPT={};
@@ -81,6 +83,14 @@ if ~isempty(varargin)
                     error('RunMultiAnal:BAD_CSVWRITE','Arguement for CSVWrite must be an logical.')
                 end
                 
+            case 'super'
+                if islogical(varargin{i+1})
+                    SUPER_FLAG=varargin{i+1};
+                else
+                    error('RunMultiAnal:BAD_SUPER','Arguement for SUPER must be an logical.')
+                end
+                
+                
             otherwise
                 error('RunMultiAnal:BAD_ARGUEMENT','An unknown arguement was provided to RunMultiAnal: %s', varargin{i})
                 
@@ -96,6 +106,39 @@ end
 if any(FILENAME=='.')
     FILENAME=FILENAME(1:find(FILENAME=='.',1)-1);
 end
+
+if SUPER_FLAG
+
+    [NUM_PRED_CELL{1,1:length(DR_Inds)}]=deal(NUM_PRED);
+    
+    PAT_CELL=cell(1,length(DR_Inds));
+    
+    for i=1:length(DR_Inds)
+        PAT_CELL{i}=PAT_STRUCT(DR_Inds{i});
+    end
+    
+    [data1 data2 data3] = dfeval(@SUPER_PredictPatients,...
+        PAT_CELL,NUM_PRED_CELL,...
+        'jobmanager','WDjobs','lookupURL','biomanageC',...
+        'FileDependencies',{'SUPER_PredictPatients','CalculateROC','PatientStructHelper'});
+    
+    mask=cellfun('isempty',data1);
+    
+    numcols=size(data1{find(~mask,1)},2);
+    
+    [data1{mask}]=deal(NaN(1,numcols));
+    [data2{mask}]=deal(NaN(1,numcols));
+    [data3{mask}]=deal(NaN(1,numcols));
+    
+    csvwrite([FILENAME '_DRUGS.csv'],[DrugRegimine cellfun('length',DR_Inds)])
+    csvwrite([FILENAME '_SIGNUM.csv'],cell2mat(data1));
+    csvwrite([FILENAME '_MEANMAG.csv'],cell2mat(data2));
+    csvwrite([FILENAME '_STDMAG.csv'],cell2mat(data3));
+    
+    return
+    
+end
+
 
 
 try
