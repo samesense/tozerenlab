@@ -117,7 +117,7 @@ if SUPER_FLAG
         PAT_CELL{i}=PAT_STRUCT(DR_Inds{i});
     end
     
-    [data1 data2 data3] = dfeval(@SUPER_PredictPatients,...
+    [data1 data2 data3 data4] = dfeval(@SUPER_PredictPatients,...
         PAT_CELL,NUM_PRED_CELL,...
         'jobmanager','WDjobs','lookupURL','biomanageC',...
         'FileDependencies',{'SUPER_PredictPatients','CalculateROC','PatientStructHelper'});
@@ -129,11 +129,13 @@ if SUPER_FLAG
     [data1{mask}]=deal(NaN(1,numcols));
     [data2{mask}]=deal(NaN(1,numcols));
     [data3{mask}]=deal(NaN(1,numcols));
+    [data4{mask}]=deal(NaN(1,numcols));
     
     csvwrite([FILENAME '_DRUGS.csv'],[DrugRegimine cellfun('length',DR_Inds)])
     csvwrite([FILENAME '_SIGNUM.csv'],cell2mat(data1));
     csvwrite([FILENAME '_MEANMAG.csv'],cell2mat(data2));
     csvwrite([FILENAME '_STDMAG.csv'],cell2mat(data3));
+    csvwrite([FILENAME '_COUNT.csv'],cell2mat(data4));
     
     return
     
