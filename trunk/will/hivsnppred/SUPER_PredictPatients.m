@@ -262,10 +262,12 @@ if SWR_FLAG
     PRED_VALS=nanmean(SWR_REG_VALS,1);
     PRED_NORM=nanmean(SWR_NORM_VALS,1);
     PRED_STD=nanstd(SWR_NORM_VALS,1);
+    PRED_COUNT=sum(~isnan(SWR_REG_VALS),1);
     
     varargout{1}=PRED_VALS;
     varargout{2}=PRED_NORM;
     varargout{3}=PRED_STD;
+    varargout{4}=PRED_COUNT;
 end
 
 if kNN_FLAG
