@@ -22,6 +22,10 @@ function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %       LeaveInFrac         The fraction of samples to use a training data
 %                           in each iteration. DEFAULT = 0.66
 %
+%       PredictiveFeatures  A cell-array of the features to be used for
+%                           prediction. DEFAULT = {'DrugRegimine',
+%                           'BaseCalls','SimpleELM','PositionalELM'}
+%
 %       Display             Toggles a figure displaying the prediction
 %                           process as it happens. DEFAULT = false
 %
@@ -39,8 +43,8 @@ function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %                           'NearestNeighbor' only returns PRED_VAR
 %
 %
-%       See also: RunMultiAnal, PatientStructHelper, knnclassify,
-%       stepwisefit, CalculateROC.
+%       See also: RunMultiAnal, PatientStructHelper, GetPatientFeatures,
+%               knnclassify, stepwisefit, CalculateROC.
 %
 %
 
@@ -54,7 +58,8 @@ NUM_OPT_REPS=50;
 USE_DISTCOMP_FLAG=true;
 kNN_FLAG=false;
 SWR_FLAG=true;
-varargout=cell(3,1);
+PRED_FEATURES={'DrugRegimine','BaseCalls','SimpleELM','PositionalELM'};
+varargout=cell(4,1);
 
 
 %%%%%%%%%%%%%%%%%PARSE INPUTS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -74,6 +79,13 @@ if ~isempty(varargin)
                     NUM_OPT_REPS=round(varargin{i+1});
                 else
                     error('PredictPatients:BAD_NUMCROSSVALID','Arguement to NumCrossValis must be a scalar integer.')
+                end
+                
+            case 'predictivefeatures'
+                if iscell(varargin{i+1})
+                    PRED_FEATURES=varargin{i+1};
+                else
+                    error('PredictPatients:BAD_PREDFEATURES','Arguement to PredictiveFeatures must be a cell-array.')
                 end
             
             case 'display'
@@ -115,56 +127,22 @@ end
 
 
 %%%%%%%%%%%%%%%%%%EXTRACT DATA FROM PATIENT STRUCTURE%%%%%%%%%%%%%%%%%%%%%%
-[temp_RX_data temp_RX_inds ...
-    temp_resp_var RESP_inds ...
-    temp_BASE_CALLS temp_BASE_CALLS_inds ...
-    temp_CLINICAL temp_CLINICAL_inds ...
-    temp_SNP_spots temp_SNP_spots_inds ...
-    temp_ELM_simple temp_ELM_simple_inds...
-    temp_ELM_vec temp_ELM_vec_inds]=...
-    PatientStructHelper(PAT_STRUCT,...
-    {'RX_vals','explodenumeric'},...
-    {'IS_RESPONDER','leaveNumeric'},...
-    {'BASE_CALLS','explodenumeric'},...
-    {'NORM_CLINICAL_DATA','explodecells'},...
-    {'SNP_SPOTS','explodeNumeric'},...
-    {'ELM_simple','explodeNumeric'},...
-    {'ELM_vec','explodeNumeric'});
 
+[ALL_FEATURES RESP_VAR PAT_IND_MATCHES FEATURE_NAMES CORR_LABELS]=...
+    GetPatientFeatures(PAT_STRUCT,[],PRED_FEATURES{:});
 
-if all(temp_resp_var)||all(~temp_resp_var)
+RESP_VAR=RESP_VAR==1;
+
+if all(RESP_VAR)||all(~RESP_VAR)
     warning('PredictPatients:SINGLE_CLASS','This dataset only contained One Class, Cannot classify.')
-    
     return
 end
 
 
 
-%%%%ensure that the indexes still match up properly
-PAT_IND_MATCHES=intersect(intersect(intersect(intersect(temp_RX_inds,RESP_inds),temp_BASE_CALLS_inds),temp_CLINICAL_inds),temp_ELM_simple_inds);
-
-BASE_CALLS=zeros(length(PAT_IND_MATCHES),size(temp_BASE_CALLS,2)*5);
-
-m=size(BASE_CALLS,2);
-
-translate_vars=[1 2 3 4 16];
-translate_mat=[1 0 0 0 0; 0 1 0 0 0; 0 0 1 0 0; 0 0 0 1 0; 0 0 0 0 1; NaN NaN NaN NaN NaN];
-
-RESP_VAR=temp_resp_var(PAT_IND_MATCHES)&1;
-unex_BASE_CALLS=temp_BASE_CALLS(PAT_IND_MATCHES,:);
-
-ELM_features=[temp_ELM_simple(PAT_IND_MATCHES,:) temp_ELM_vec(PAT_IND_MATCHES,:)];
-
-%Explode BASE_CALLS into a feature vector
-for i=1:length(PAT_IND_MATCHES)
-    [TF LOC]=ismember(unex_BASE_CALLS(i,:),translate_vars);
-    LOC(~TF)=6;
-    BASE_CALLS(i,:)=reshape(translate_mat(LOC,:),[],m);
-end
 
 WANTED_SENS=0:0.01:1;
 
-CORR_LABELS=cumsum([1 size(temp_RX_data,2) size(BASE_CALLS,2) size(temp_ELM_simple,2) size(temp_ELM_vec,2)]);
 
 CLASS_PERF=classperf(RESP_VAR);
 
@@ -174,15 +152,15 @@ if DISPLAY_FLAG
     SWR_fig_handle=figure;
 end
 
-kNN_CORR_SPOTS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
+kNN_CORR_SPOTS=zeros(NUM_REPS,size(ALL_FEATURES,2));
 kNN_TRAIN_CLASS_CORRECT=zeros(NUM_REPS,1);
 
 
-SWR_CORR_SPOTS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
+SWR_CORR_SPOTS=zeros(NUM_REPS,size(ALL_FEATURES,2));
 SWR_AUC_VALS=zeros(NUM_REPS,1);
 SWR_SPEC_VALS=zeros(NUM_REPS,length(WANTED_SENS));
-SWR_REG_VALS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
-SWR_NORM_VALS=zeros(NUM_REPS,size(temp_RX_data,2)+size(BASE_CALLS,2)+size(ELM_features,2));
+SWR_REG_VALS=zeros(NUM_REPS,size(ALL_FEATURES,2));
+SWR_NORM_VALS=zeros(NUM_REPS,size(ALL_FEATURES,2));
 
 
 ALL_groups={'NR','R'};
@@ -193,11 +171,10 @@ for i=1:NUM_REPS
 
     [this_train_var this_test_var]=crossvalind('holdout',CLASSES,1-LEAVE_IN_FRAC,'classes',ALL_groups);
 
-
-    TRAINING_FEATURES=[temp_RX_data(this_train_var,:) BASE_CALLS(this_train_var,:) ELM_features(this_train_var,:)];
+    TRAINING_FEATURES=ALL_FEATURES(this_train_var,:);
     TRAINING_RESP=RESP_VAR(this_train_var);
 
-    TESTING_FEATURES=[temp_RX_data(this_test_var,:) BASE_CALLS(this_test_var,:) ELM_features(this_test_var,:)];
+    TESTING_FEATURES=ALL_FEATURES(this_test_var,:);
     TESTING_RESP=RESP_VAR(this_test_var);
 
     if kNN_FLAG
@@ -256,13 +233,18 @@ for i=1:NUM_REPS
 end
 
 if SWR_FLAG
-    PRED_VALS=mean(SWR_REG_VALS,1);
-    PRED_NORM=mean(SWR_NORM_VALS,1);
-    PRED_STD=std(SWR_NORM_VALS,1);
+    SWR_REG_VALS(SWR_REG_VALS==0)=NaN;
+    SWR_NORM_VALS(SWR_NORM_VALS==0)=NaN;
+    
+    PRED_VALS=nanmean(SWR_REG_VALS,1);
+    PRED_NORM=nanmean(SWR_NORM_VALS,1);
+    PRED_STD=nanstd(SWR_NORM_VALS,1);
+    PRED_COUNT=sum(~isnan(SWR_REG_VALS),1);
     
     varargout{1}=PRED_VALS;
     varargout{2}=PRED_NORM;
     varargout{3}=PRED_STD;
+    varargout{4}=PRED_COUNT;
 end
 
 if kNN_FLAG
