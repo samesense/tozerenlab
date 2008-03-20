@@ -173,14 +173,14 @@ for i=1:NUM_REPS
 
         good_features=find(sum(isnan(TRAINING_FEATURES),1)==0);
 
-        [I Z]=rankfeatures(TRAINING_FEATURES(:,good_features)',TRAINING_RESP,'criterion','roc');
+        I=rankfeatures(TRAINING_FEATURES(:,good_features)',TRAINING_RESP,'criterion','roc');
         I=good_features(I);
         [K NUM_FEATURES]=FindOptkNN(TRAINING_FEATURES(:,I),TRAINING_RESP);
         kNN_CORR_SPOTS(i,I(1:NUM_FEATURES))=1;
 
         Nearest_Testing_vals=knnclassify(TESTING_FEATURES(:,I(1:NUM_FEATURES)),TRAINING_FEATURES(:,I(1:NUM_FEATURES)),TRAINING_RESP,K,'hamming','consensus');
 
-        CLASS_PERF=classperf(CLASS_PERF,Nearest_Testing_vals,[shuffle_resp(num_resp_include+1:end); shuffle_non_resp(num_non_resp_include+1:end)]);
+        CLASS_PERF=classperf(CLASS_PERF,Nearest_Testing_vals,TESTING_RESP);
         kNN_TRAIN_CLASS_CORRECT(i)=CLASS_PERF.LastCorrectRate;
 
         if DISPLAY_FLAG
@@ -246,7 +246,7 @@ end
 
 
 
-    function [K_val F_num]=FindOptkNN(FEATURES,RESP)
+    function [K_val F_num]=FindOptkNN(FEATURES,RESP) %#ok<INUSD>
 
         MAX_K=30;
         [NUM_OBSERVATIONS MAX_FEATURES]=size(FEATURES);
@@ -339,7 +339,7 @@ end
 
                 [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
 
-                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off');
+                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off'); %#ok<SETNU>
                 VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
 
                 AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
