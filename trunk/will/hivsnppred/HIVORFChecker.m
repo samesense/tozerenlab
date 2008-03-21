@@ -24,8 +24,26 @@ function [OUTPUT_SEQS MAPPING]=HIVORFChecker(HIV_REF,INPUT_SEQ,varargin)
 %       Use this when you are providing translated sequence.
 %
 %
+%   If INPUT_SEQ is a cell-array of multiple sequences then the function
+%   will recursively call itself and translate ALL sequences given.
 %
-%
+
+%%%%If many inputs are given to INPUT_SEQ then translate all and return
+%%%%them in nested cells.
+if iscell(INPUT_SEQ)&&length(INPUT_SEQ)>1
+    OUTPUT_SEQS=cell(length(INPUT_SEQ),1);
+    MAPPING=cell(length(INPUT_SEQ),1);
+    parfor (i=1:length(INPUT_SEQ))
+        try
+            [out1 out2]=HIVORFChecker(HIV_REF,INPUT_SEQ(i),varargin{:});
+            OUTPUT_SEQS{i}=out1;
+            MAPPING{i}=out2;
+        catch
+            warning('HIVORFChecker:BAD_ATTEMPT','While translating SEQ(%s) an error was encountered.  Trying to continue.',int2str(i));
+        end
+    end
+    return
+end
 
 
 
