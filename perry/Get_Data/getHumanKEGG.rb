@@ -5,8 +5,9 @@ pathways = serv.list_pathways('hsa')
 pathways.each do |path|
 	      genes = serv.get_genes_by_pathway(path.entry_id)
 	      genes.each do |gene|
-	      		 puts gene + ' ' + path.entry_id
+	      		 puts gene + "\t" + path.entry_id
 	      end
+	      # puts path.entry_id + "\t" + path.definition
 end
 
 #genes = serv.get_genes_by_organism('hsa', 0, 40000)
