@@ -197,19 +197,8 @@ end
         
         CurrentPWM=OriginalPWM;
         CurrentPWM(ChangeSpots)=INPUT_VALS;
-        %loop implemented in mexFunction PWMEvaluator
-%         tic
-%         for CELL_IND=1:length(INT_SEQS)
-%             temp_seq=INT_SEQS{CELL_IND};
-%             temp_mat=zeros(1,length(temp_seq));
-%             for SEQ_IND=1:length(temp_mat)-PWMLength
-%                 temp_mat(SEQ_IND)=sum(CurrentPWM(sub2ind(size(CurrentPWM),temp_seq(SEQ_IND:(SEQ_IND+PWMLength-1)),1:PWMLength)));
-%             end
-%             SeqVals{CELL_IND}=temp_mat;
-%         end
-%         toc
         
-        SeqVals=PWMEvaluator(CurrentPWM,INT_SEQS);
+        SeqVals=PWMEvaluator(CurrentPWM,INT_SEQS,'TRUST_INPUT');
         
         MatchedVals=cellfun(@(x,y)(x(y)),SeqVals,this_MatchedSpots,'uniformoutput',false);
         NonMatchedVals=cellfun(@(x,y)(x(~y)),SeqVals,this_MatchedSpots,'uniformoutput',false);

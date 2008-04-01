@@ -126,14 +126,14 @@ if SETUP_TRUST_FLAG
     return
 end
 
-varargout{1}=PWMEvaluatorFAST(PWM_mat,NormalizedSeqs);
+varargout{1}=PWMEvaluatorFAST(PWM_mat,NormalizedSeqs(:));
 
 
 
     function input_seq=ReviseSeq(input_seq)
         %remove the bad values and replace them with an index into the last
         %column
-        input_seq(input_seq==0|input_seq>size(PWM_mat,2))=size(PWM_mat,2);
+        input_seq(input_seq==0|input_seq>size(PWM_mat,2))=size(PWM_mat,1);
     end
 end
 
