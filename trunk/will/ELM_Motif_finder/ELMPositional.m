@@ -44,12 +44,22 @@ function [POSITIONAL_CALL ELM_vec ELM_annot]=ELMPositional(SEQS,MAPPING_CELL,ELM
 %                       removed.  Good for batch processing and nested
 %                       functions.
 %
+%       MaxIter         The Maximum Number of iterations to perform on each
+%                       optimization round. DEFAULT=300
+%
+%       MaxTime         The Maximim Time (in seconds) to spend on each 
+%                       optimization. DEFAULT=inf;
+%
+%
+%
 %
 %
 %
 
 ITER_DISP_FLAG=false;
 NO_DISPLAY_FLAG=false;
+MaxIter=300;
+MaxTime=inf;
 
 MATCH_SPOTS=[];
 OPT_METHOD_FLAG=true;
@@ -58,7 +68,7 @@ OPT_METHOD_FLAG=true;
 if ~isempty(varargin)
     for i=1:2:length(varargin)
         switch lower(varargin{i})
-            case 'matched_spots'
+            case {'matched_spots','match_spots'}
                 if iscell(varargin{i+1})
                     MATCH_SPOTS=varargin{i+1};
                     if size(MATCH_SPOTS,1)~=size(SEQS,1)
@@ -87,6 +97,7 @@ if ~isempty(varargin)
                 else
                     error('ELMPositional:BAD_NODISPLAY','Arguement to NO_DISPLAY must be a logical.')
                 end
+            case 'maxiter'
             otherwise
                 error('ELMPositional:BAD_ARG','An unknown arguement was provided: %s',varargin{i})
         end
@@ -166,13 +177,16 @@ if ~OPT_METHOD_FLAG
 
 else
     if NO_DISPLAY_FLAG
-        options=optimset('diffminchange',1,'diffmaxchange',10,'MaxIter',300);
+        options=optimset('diffminchange',1,'diffmaxchange',10,'MaxIter',MaxIter);
     else
-        options=optimset('OutputFcn', @EvalDisplay,'diffminchange',1,'diffmaxchange',10,'MaxIter',300);
+        options=optimset('OutputFcn', @EvalDisplay,'diffminchange',1,'diffmaxchange',10,'MaxIter',MaxIter);
     end
     
+    ELM_Annot_Cell=cell(length(ELM_STRUCT),1);
+    ELM_PosCall_Cell=cell(length(ELM_STRUCT),1);
+    
     for i=1:length(ELM_STRUCT)
-        CurrentFval=zeros(1,1000);
+        CurrentFval=zeros(1,MaxIter);
         sizes=cellfun('length',MATCH_SPOTS(:,i));
         %waitbar(i/length(ELM_STRUCT),WAIT_HANDLE)
 
@@ -187,6 +201,7 @@ else
         subplot(2,2,3), bar(1:size(LogicalData,2),sum(LogicalData,1))
         FvalLog=zeros(10,1);
         FposLog=unique(ceil(linspace(.5*max(sizes),2*max(sizes),10)));
+        WindowLog=cell(length(FposLog),1);
         
         if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
             WAIT_HANDLE=waitbar(0,ELM_STRUCT(i).Name);
@@ -198,16 +213,33 @@ else
             NumSlices=ceil(testSlice);
             x0=linspace(1,size(LogicalData,2),NumSlices+2);
             x0=x0(2:end-1);
-
-            [x fval]=fminsearchbnd(@EvalWindows,x0,ones(size(x0)),size(LogicalData,2)*ones(size(x0)),options);
+            StartTime=clock;
+            [WindowLog{nnz(FvalLog)+1} fval]=fminsearchbnd(@EvalWindows,x0,ones(size(x0)),size(LogicalData,2)*ones(size(x0)),options);
             FvalLog(nnz(FvalLog)+1)=fval;
-            subplot(2,2,2), plot(FposLog(1:nnz(FvalLog)),FvalLog(1:nnz(FvalLog)))
+            if ~NO_DISPLAY_FLAG
+                subplot(2,2,2), plot(FposLog(1:nnz(FvalLog)),FvalLog(1:nnz(FvalLog)))
+            end
 
         end
 
-        %[x fval]=OptimizeSlice(@EvalWindows,max(sizes),100,@EvalDisplay);
-
+        [MinVal MinSpot]=min(FvalLog);
+        tempWindows=WindowLog{MinSpot};
+        
+        ELM_Annot_Cell{i}=[repmat(i,[1 length(WindowLog{MinSpot})+1]);1 tempWindows; tempWindows size(LogicalData,2)];
+        
+        tempPosCall=cellfun(@CheckWindows,MATCH_SPOTS(:,i),'uniformoutput',false);
+        
+        ELM_PosCall_Cell{i}=cell2mat(tempPosCall);
+        
+        if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
+            close(WAIT_HANDLE);
+        end
     end
+    
+    POSITIONAL_CALL=cat(2,ELM_PosCall_Cell{:});
+    ELM_vec=cat(2,ELM_Annot_Cell{:});   
+    
+
 end
 
 
@@ -223,7 +255,8 @@ end
     end
 
     function stop=EvalDisplay(x,OptimStruct,state)
-        stop=false;
+        stop=etime(clock,StartTime)>MaxTime;
+        
         if ITER_DISP_FLAG
             switch state
                 case 'iter'
@@ -287,7 +320,18 @@ end
         end
     end
 
-
+    function OutCalls=CheckWindows(TempMatchSpot)
+        if ~isempty(TempMatchSpot)
+        tempRight=repmat([1 tempWindows],[length(TempMatchSpot) 1]);
+        tempLeft=repmat([tempWindows size(LogicalData,2)],[length(TempMatchSpot) 1]);
+        tempMatch=repmat(TempMatchSpot',[1 size(tempRight,2)]);
+        
+        OutCalls=sum(tempMatch>tempRight&tempMatch<tempLeft,1)>0;
+        else
+            OutCalls=false(1,size(tempWindows,2)+1);
+        end
+        
+    end
 
 
 end
