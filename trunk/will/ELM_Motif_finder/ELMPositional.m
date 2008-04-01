@@ -35,14 +35,21 @@ function [POSITIONAL_CALL ELM_vec ELM_annot]=ELMPositional(SEQS,MAPPING_CELL,ELM
 %                       provided the input to avoid re-running the
 %                       time-consuming process.
 %
+%       ITER_DISPAY     [true|FALSE] If set to TRUE then the optimization
+%                       technique will display the progress at each
+%                       iterateration.  When set to FALSE then only the
+%                       final window display is shown.
+%
+%       NO_DISPLAY      [true|FALSE] If set to TRUE then all displays are
+%                       removed.  Good for batch processing and nested
+%                       functions.
 %
 %
 %
 %
-%
-%
-%
+
 ITER_DISP_FLAG=false;
+NO_DISPLAY_FLAG=false;
 
 MATCH_SPOTS=[];
 OPT_METHOD_FLAG=true;
@@ -52,11 +59,36 @@ if ~isempty(varargin)
     for i=1:2:length(varargin)
         switch lower(varargin{i})
             case 'matched_spots'
-                MATCH_SPOTS=varargin{i+1};
+                if iscell(varargin{i+1})
+                    MATCH_SPOTS=varargin{i+1};
+                    if size(MATCH_SPOTS,1)~=size(SEQS,1)
+                        error('ELMPositional:BAD_MATCHEDSPOTS_ROWS','MATCHED_SPOTS have the same number of rows as SEQS.')
+                    elseif size(MATCH_SPOTS,2)~=length(ELM_STRUCT)
+                        error('ELMPositional:BAD_MATCHEDSPOTS_COLS','MATCHED_SPOTS have the same number of columns as ELM_STRUCT.')
+                    end
+                else
+                    error('ELMPositional:BAD_MATCHEDSPOTS','Arguement to MATCHED_SPOTS must be a cell-array.')
+                end
             case 'opt_method'
                 if islogical(varargin{i+1})
                     OPT_METHOD_FLAG=varargin{i+1};
+                else
+                    error('ELMPositional:BAD_OPTMETHOD','Arguement to OPT_METHOD must be a logical.')
                 end
+            case 'iter_display'
+                if islogical(varargin{i+1})
+                    ITER_DISP_FLAG=varargin{i+1};
+                else
+                    error('ELMPositional:BAD_ITERDISPLAY','Arguement to ITER_DISPLAY must be a logical.')
+                end
+            case 'no_display'
+                if islogical(varargin{i+1})
+                    NO_DISPLAY_FLAG=varargin{i+1};
+                else
+                    error('ELMPositional:BAD_NODISPLAY','Arguement to NO_DISPLAY must be a logical.')
+                end
+            otherwise
+                error('ELMPositional:BAD_ARG','An unknown arguement was provided: %s',varargin{i})
         end
     end
 end
@@ -133,7 +165,12 @@ if ~OPT_METHOD_FLAG
     end
 
 else
-    options=optimset('OutputFcn', @EvalDisplay,'diffminchange',1,'diffmaxchange',10,'MaxIter',300);
+    if NO_DISPLAY_FLAG
+        options=optimset('diffminchange',1,'diffmaxchange',10,'MaxIter',300);
+    else
+        options=optimset('OutputFcn', @EvalDisplay,'diffminchange',1,'diffmaxchange',10,'MaxIter',300);
+    end
+    
     for i=1:length(ELM_STRUCT)
         CurrentFval=zeros(1,1000);
         sizes=cellfun('length',MATCH_SPOTS(:,i));
@@ -151,7 +188,7 @@ else
         FvalLog=zeros(10,1);
         FposLog=unique(ceil(linspace(.5*max(sizes),2*max(sizes),10)));
         
-        if ~ITER_DISP_FLAG
+        if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
             WAIT_HANDLE=waitbar(0,ELM_STRUCT(i).Name);
         end
         
@@ -172,97 +209,6 @@ else
 
     end
 end
-
-
-    function [Slices ObjVal]=OptimizeSlice(ObjFunHandle,NumSlices,MaxIter,DisFunHandle)
-        InitialSlices=round(linspace(1,size(LogicalData,2),NumSlices));
-        InitialSlices=InitialSlices(2:end-1);
-        
-        NumSlices=length(InitialSlices);
-
-        StepSize=10;
-
-        OptimStruct=struct('fval',[],'iteration',[]);
-
-        counter=0;
-        while (counter<MaxIter)
-            counter=counter+1;
-            OptimStruct.iteration=counter;
-
-            GradVector=zeros(2*NumSlices,1);
-            RemoveVector=zeros(NumSlices,1);
-            AddVector=zeros(NumSlices,1);
-
-            %calculate moving in the positive direction
-            for sliceInd=1:NumSlices
-                thisSlice=InitialSlices(sliceInd)+StepSize;
-                GradVector(sliceInd)=ObjFunHandle(thisSlice);
-            end
-
-            %calculate moving in the negative direction
-            for sliceInd=1:NumSlices
-                thisSlice=InitialSlices(sliceInd)-StepSize;
-                GradVector(sliceInd+NumSlices)=ObjFunHandle(thisSlice);
-            end
-
-            %calculate removing a window
-            for sliceInd=1:length(RemoveVector)
-                thisSlice=InitialSlices;
-                thisSlice(sliceInd)=[];
-                RemoveVector(sliceInd)=ObjFunHandle(thisSlice);
-            end
-
-            %calculate adding a window
-            thisSlice=[round(InitialSlices(1)/2) InitialSlices];
-            AddVector(1)=ObjFunHandle(thisSlice);
-            for sliceInd=2:NumSlices-1
-                thisSlice=[InitialSlices(1:sliceInd) round(mean([InitialSlices(sliceInd) InitialSlices(sliceInd+1)])) InitialSlices(sliceInd+1:end)];
-                AddVector(sliceInd)=ObjFunHandle(thisSlice);
-            end
-            thisSlice=[InitialSlices mean([InitialSlices(end) size(LogicalData,2)])];
-            AddVector(end)=ObjFunHandle(thisSlice);
-
-            [AddVal BestAdd]=min(AddVector);
-            [GradVal BestGrad]=min(GradVector);
-            [RemoveVal BestRemove]=min(RemoveVector);
-
-            [Minval MinInd]=min([AddVal GradVal RemoveVal]);
-            switch MinInd
-                case 1
-                    OptimStruct.fval=AddVal;
-                    if BestAdd==1
-                        InitialSlices=[round(InitialSlices(1)/2) InitialSlices];
-                    elseif BestAdd==NumSlices+1
-                        InitialSlices=[InitialSlices mean([InitialSlices(end) size(LogicalData,2)])];
-                    else
-                        InitialSlices=[InitialSlices(1:BestAdd) round(mean([InitialSlices(BestAdd) InitialSlices(BestAdd+1)])) InitialSlices(BestAdd+1:end)];
-                    end
-                    NumSlices=Numslices+1;
-
-                case 2
-                    OptimStruct.fval=GradVal;
-                    if BestGrad<NumSlices
-                        InitialSlices(BestGrad)=InitialSlices(BestGrad)+StepSize;
-                    else
-                        InitialSlices(BestGrad-NumSlices+1)=InitialSlices(BestGrad-NumSlices+1)-StepSize;
-                    end
-                case 3
-                    OptimStruct.fval=RemoveVal;
-                    InitialSlices(BestRemove)=[];
-                    NumSlices=NumSlices-1;
-            end
-            
-            DisFunHandle(InitialSlices,OptimStruct,'iter');
-        end
-        
-        Slices=InitialSlices;
-        ObjVal=MinVal;
-
-
-
-
-
-    end
 
 
     function ObjVal=EvalWindows(INPUT)
