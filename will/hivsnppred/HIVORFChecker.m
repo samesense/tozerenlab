@@ -33,13 +33,16 @@ function [OUTPUT_SEQS MAPPING]=HIVORFChecker(HIV_REF,INPUT_SEQ,varargin)
 if iscell(INPUT_SEQ)&&length(INPUT_SEQ)>1
     OUTPUT_SEQS=cell(length(INPUT_SEQ),1);
     MAPPING=cell(length(INPUT_SEQ),1);
-    parfor (i=1:length(INPUT_SEQ))
+    %waitbar(0)
+    for i=1:length(INPUT_SEQ)
+        %waitbar(i/length(INPUT_SEQ))
         try
             [out1 out2]=HIVORFChecker(HIV_REF,INPUT_SEQ(i),varargin{:});
             OUTPUT_SEQS{i}=out1;
             MAPPING{i}=out2;
-        catch
-            warning('HIVORFChecker:BAD_ATTEMPT','While translating SEQ(%s) an error was encountered.  Trying to continue.',int2str(i));
+        catch %
+            TEMP_ME=lasterror;
+            warning('HIVORFChecker:BAD_ATTEMPT','While translating SEQ(%s) an error was encountered: \n %s \n  Trying to continue.',int2str(i),TEMP_ME.message);
         end
     end
     return
@@ -103,6 +106,8 @@ if NEED_TRANSLATE
 else
     TRANS_SEQS=INPUT_SEQ;
 end
+
+TRANS_SEQS=TRANS_SEQS(~cellfun('isempty',TRANS_SEQS));
 
 scores=zeros(length(HIV_REF.AAseqs),length(TRANS_SEQS));
 alignments=cell(length(HIV_REF.AAseqs),length(TRANS_SEQS));
