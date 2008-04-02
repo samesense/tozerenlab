@@ -1,10 +1,5 @@
 import MySQLdb, sys
 
-# define species references in GO database
-speciesID = dict()
-speciesID['yeast'] = "97048"
-speciesID['fly'] = "157890"
-speciesID['human'] = '92001'
 gocats = ['Process', 'Component', 'Function']
 
 gocatAlias = dict()
@@ -112,6 +107,24 @@ def getDistanceFromRoot():
     cursor.close()
     connection.close()
     return [disDict, maxDist]
+
+def getDistanceFromRoot2():
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute("SELECT term.id, p.distance FROM term INNER JOIN graph_path AS p ON (p.term2_id=term.id) INNER JOIN term AS root ON (p.term1_id=root.id) WHERE root.is_root=1;")
+        data = cursor.fetchall()
+        distDict = dict()
+        for item in data:
+            distDict[ item[0] ] = item[1]
+            
+    except MySQLdb.OperationalError, message:
+        print message[0]
+        print message[1]
+        sys.exit()
+        
+    cursor.close()
+    connection.close()
+    return distDict
 
 # assigns children to all terms in termProperties
 #  and assigns proteins and children to terms
@@ -228,3 +241,94 @@ def getTermSynonym(term):
         print 'error in getTermSynonym: term =', term
         sys.exit(0)
         
+
+def getGeneSymbolsPerSpecies(species_commonName):
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute('SELECT symbol, id from gene_product where species_id=(select id from species where common_name=\"' + species_commonName + '\");')
+        data = cursor.fetchall()
+        d = dict()
+        for list in data:
+            d[ list[0] ] = list[1]
+        return d
+    except:
+        print 'error in getAnnotatedGeneProductsBySpecies'
+        sys.exit(0)
+
+def getGeneSynonyms():
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute('SELECT gene_product_id, product_synonym from gene_product_synonym;')
+        data = cursor.fetchall()
+        d = dict()
+        for list in data:
+            if not d.has_key( list[0] ): d[ list[0] ] = dict()
+            d[ list[0] ][ list[1] ] = True
+        return d
+    except:
+        print 'error in getGeneSynonyms'
+        sys.exit(0)
+
+def getTermsPerGeneProduct():
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute('SELECT term_id, gene_product_id from association;')
+        data = cursor.fetchall()
+        d = dict()
+        for list in data:
+            if not d.has_key( list[1] ): d[ list[1] ] = dict()
+            d[ list[1] ][ list[0] ] = True
+        return d
+    except:
+        print 'error in getTermsPerGeneProduct'
+        sys.exit(0)
+
+def getTermsPerGeneProductPerSpecies(species_commonName):
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute('SELECT term_id, gene_product_id from association a inner join gene_product b on a.gene_product_id=b.id where b.species_id=(select id from species where common_name=\"' + species_commonName + '\");')
+        data = cursor.fetchall()
+        d = dict()
+        for list in data:
+            if not d.has_key( list[1] ): d[ list[1] ] = dict()
+            d[ list[1] ][ list[0] ] = True
+        return d
+    except:
+        print 'error in getTermsPerGeneProductPerProtein'
+        sys.exit(0)
+
+def getAncestors(goTerm):
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute('SELECT ancestor.*, graph_path.distance, graph_path.term1_id AS ancestor_id FROM term child, graph_path, term ancestor WHERE child.id=graph_path.term2_id AND ancestor.id=graph_path.term1_id AND child.id=' + goTerm + ';')
+        data = cursor.fetchall()
+        d = dict()
+        for list in data:
+            d[ list[0] ] = True
+        return d
+    except:
+        print 'getAncestors'
+        sys.exit(0)
+
+def getDescendants(goTerm):
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute('SELECT DISTINCT descendant.id, descendant.acc, descendant.name, descendant.term_type FROM term INNER JOIN graph_path ON (term.id=graph_path.term1_id) INNER JOIN term AS descendant ON (descendant.id=graph_path.term2_id) WHERE term.name='+ goTerm + ' AND distance <> 0 ;')
+        data = cursor.fetchall()
+        d = dict()
+        for list in data:
+            d[ list[0] ] = True
+        return d
+    except:
+        print 'getDescendants'
+        sys.exit(0)
+
+def expandTerm(goTerm):
+    ancestors = getAncestors(goTerm)
+    descendants = getDescendants(goTerm)
+    d = dict()
+    for a in ancestors.keys():
+        d[a] = True
+    for c in descendants.keys():
+        d[c] = True
+    return d
