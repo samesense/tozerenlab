@@ -47,7 +47,7 @@ function [POSITIONAL_CALL ELM_vec ELM_annot]=ELMPositional(SEQS,MAPPING_CELL,ELM
 %       MaxIter         The Maximum Number of iterations to perform on each
 %                       optimization round. DEFAULT=300
 %
-%       MaxTime         The Maximim Time (in seconds) to spend on each 
+%       MaxTime         The Maximim Time (in seconds) to spend on each
 %                       optimization. DEFAULT=inf;
 %
 %
@@ -127,10 +127,10 @@ end
 
 if ~OPT_METHOD_FLAG
     warning('off','stats:kmeans:EmptyCluster')
-    N=size(MATCH_SPOTS,1);
+    %N=size(MATCH_SPOTS,1);
     ELM_annot=cell(1,length(ELM_STRUCT));
     current_center=0;
-    for (i=1:length(ELM_STRUCT))
+    for i=1:length(ELM_STRUCT)
         sizes=cellfun('length',MATCH_SPOTS(:,i));
 
         waitbar(i/length(ELM_STRUCT),WAIT_HANDLE)
@@ -181,64 +181,71 @@ else
     else
         options=optimset('OutputFcn', @EvalDisplay,'diffminchange',1,'diffmaxchange',10,'MaxIter',MaxIter);
     end
-    
+
     ELM_Annot_Cell=cell(length(ELM_STRUCT),1);
     ELM_PosCall_Cell=cell(length(ELM_STRUCT),1);
-    
+
     for i=1:length(ELM_STRUCT)
-        CurrentFval=zeros(1,MaxIter);
-        sizes=cellfun('length',MATCH_SPOTS(:,i));
-        %waitbar(i/length(ELM_STRUCT),WAIT_HANDLE)
-
-        LogicalData=false(length(SEQUENCES),max(sizes));
-
-        for p=1:size(LogicalData,1)
-            if ~isempty(MATCH_SPOTS{p,i})
-                LogicalData(p,MATCH_SPOTS{p,i})=true;
+        try
+            CurrentFval=zeros(1,MaxIter);
+            sizes=cellfun('length',MATCH_SPOTS(:,i));
+            if max(sizes)==0
+                continue
             end
-        end
+            %waitbar(i/length(ELM_STRUCT),WAIT_HANDLE)
 
-        subplot(2,2,3), bar(1:size(LogicalData,2),sum(LogicalData,1))
-        FvalLog=zeros(10,1);
-        FposLog=unique(ceil(linspace(.5*max(sizes),2*max(sizes),10)));
-        WindowLog=cell(length(FposLog),1);
-        
-        if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
-            WAIT_HANDLE=waitbar(0,ELM_STRUCT(i).Name);
-        end
-        
+            LogicalData=false(length(SEQUENCES),max(sizes));
 
-        for testSlice=FposLog
-            
-            NumSlices=ceil(testSlice);
-            x0=linspace(1,size(LogicalData,2),NumSlices+2);
-            x0=x0(2:end-1);
-            StartTime=clock;
-            [WindowLog{nnz(FvalLog)+1} fval]=fminsearchbnd(@EvalWindows,x0,ones(size(x0)),size(LogicalData,2)*ones(size(x0)),options);
-            FvalLog(nnz(FvalLog)+1)=fval;
-            if ~NO_DISPLAY_FLAG
-                subplot(2,2,2), plot(FposLog(1:nnz(FvalLog)),FvalLog(1:nnz(FvalLog)))
+            for p=1:size(LogicalData,1)
+                if ~isempty(MATCH_SPOTS{p,i})
+                    LogicalData(p,MATCH_SPOTS{p,i})=true;
+                end
             end
 
-        end
+            subplot(2,2,3), bar(1:size(LogicalData,2),sum(LogicalData,1))
+            FvalLog=zeros(10,1);
+            FposLog=unique(ceil(linspace(.5*max(sizes),2*max(sizes),10)));
+            WindowLog=cell(length(FposLog),1);
 
-        [MinVal MinSpot]=min(FvalLog);
-        tempWindows=WindowLog{MinSpot};
-        
-        ELM_Annot_Cell{i}=[repmat(i,[1 length(WindowLog{MinSpot})+1]);1 tempWindows; tempWindows size(LogicalData,2)];
-        
-        tempPosCall=cellfun(@CheckWindows,MATCH_SPOTS(:,i),'uniformoutput',false);
-        
-        ELM_PosCall_Cell{i}=cell2mat(tempPosCall);
-        
-        if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
-            close(WAIT_HANDLE);
+            if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
+                WAIT_HANDLE=waitbar(0,ELM_STRUCT(i).Name);
+            end
+
+
+            for testSlice=FposLog
+
+                NumSlices=ceil(testSlice);
+                x0=linspace(1,size(LogicalData,2),NumSlices+2);
+                x0=x0(2:end-1);
+                StartTime=clock;
+                [WindowLog{nnz(FvalLog)+1} fval]=fminsearchbnd(@EvalWindows,x0,ones(size(x0)),size(LogicalData,2)*ones(size(x0)),options);
+                FvalLog(nnz(FvalLog)+1)=fval;
+                if ~NO_DISPLAY_FLAG
+                    subplot(2,2,2), plot(FposLog(1:nnz(FvalLog)),FvalLog(1:nnz(FvalLog)))
+                end
+
+            end
+
+            [MinVal MinSpot]=min(FvalLog);
+            tempWindows=WindowLog{MinSpot};
+
+            ELM_Annot_Cell{i}=[repmat(i,[1 length(WindowLog{MinSpot})+1]);1 tempWindows; tempWindows size(LogicalData,2)];
+
+            tempPosCall=cellfun(@CheckWindows,MATCH_SPOTS(:,i),'uniformoutput',false);
+
+            ELM_PosCall_Cell{i}=cell2mat(tempPosCall);
+
+            if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
+                close(WAIT_HANDLE);
+            end
+        catch
+            display('here')
         end
     end
-    
+
     POSITIONAL_CALL=cat(2,ELM_PosCall_Cell{:});
-    ELM_vec=cat(2,ELM_Annot_Cell{:});   
-    
+    ELM_vec=cat(2,ELM_Annot_Cell{:});
+
 
 end
 
@@ -256,7 +263,7 @@ end
 
     function stop=EvalDisplay(x,OptimStruct,state)
         stop=etime(clock,StartTime)>MaxTime;
-        
+
         if ITER_DISP_FLAG
             switch state
                 case 'iter'
@@ -271,7 +278,7 @@ end
                     display_mat(:,ceil(x)-1)=200;
 
                     subplot(2,2,1), image(display_mat)
-                    
+
                     subplot(2,2,3), bar(1:size(LogicalData,2),sum(LogicalData,1))
                     for lineind=1:length(x)
                         line('xdata',[x(lineind) x(lineind)],[0 100],'color','r');
@@ -306,13 +313,13 @@ end
                     display_mat(:,ceil(x)-1)=200;
 
                     subplot(2,2,1), image(display_mat)
-                    
+
                     subplot(2,2,3), bar(1:size(LogicalData,2),sum(LogicalData,1))
                     for lineind=1:length(x)
                         line([x(lineind) x(lineind)],[0 max(sum(LogicalData,1))],'color','r');
                     end
-                    
-                    
+
+
                     drawnow
 
             end
@@ -322,15 +329,15 @@ end
 
     function OutCalls=CheckWindows(TempMatchSpot)
         if ~isempty(TempMatchSpot)
-        tempRight=repmat([1 tempWindows],[length(TempMatchSpot) 1]);
-        tempLeft=repmat([tempWindows size(LogicalData,2)],[length(TempMatchSpot) 1]);
-        tempMatch=repmat(TempMatchSpot',[1 size(tempRight,2)]);
-        
-        OutCalls=sum(tempMatch>tempRight&tempMatch<tempLeft,1)>0;
+            tempRight=repmat([1 tempWindows],[length(TempMatchSpot) 1]);
+            tempLeft=repmat([tempWindows size(LogicalData,2)],[length(TempMatchSpot) 1]);
+            tempMatch=repmat(TempMatchSpot',[1 size(tempRight,2)]);
+
+            OutCalls=sum(tempMatch>tempRight&tempMatch<tempLeft,1)>0;
         else
             OutCalls=false(1,size(tempWindows,2)+1);
         end
-        
+
     end
 
 
