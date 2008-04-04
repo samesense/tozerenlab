@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import sys
 
-if len(sys.argv) <= 3:
+if len(sys.argv) < 3:
     print 'enter the fileName & the order you want the fields in'
     sys.exit(0)
 
