@@ -6,7 +6,7 @@ if len(sys.argv) < 3:
     sys.exit(0)
 
 def removeQuotes(s):
-    return s[1:-2].strip()
+    return s[1:-1].strip()
 
 order = []
 for o in sys.argv[2:]:
