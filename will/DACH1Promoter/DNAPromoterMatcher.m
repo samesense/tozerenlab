@@ -95,17 +95,24 @@ end
 RegCell=RegCell(1:cell_counter-1)';
 RegCell=cellfun(@(x)(['[' x ']']),RegCell,'uniformoutput',false);
 
-MisMatchInds=zeros(1,length(RegCell));
-for i=1:length(RegCell)
-    for j=i:length(RegCell)
-        temp=zeros(1,length(RegCell));
-        temp([i j])=1;
-        MisMatchInds=[MisMatchInds; temp];
+if NUM_MISMATCH==2
+    MisMatchInds=zeros(1,length(RegCell));
+    for i=1:length(RegCell)
+        for j=i:length(RegCell)
+            temp=zeros(1,length(RegCell));
+            temp([i j])=1;
+            MisMatchInds=[MisMatchInds; temp];
+        end
     end
+    [Y I]=sort(sum(MisMatchInds,2),'descend');
+    MisMatchInds=MisMatchInds(I,:);
+elseif NUM_MISMATCH==1
+    MisMatchInds=[zeros(1,length(RegCell)); eye(length(RegCell))];
+elseif NUM_MISMATCH==0
+    MisMatchInds=zeros(1,length(RegCell));
 end
 
-[Y I]=sort(sum(MisMatchInds,2));
-MisMatchInds=MisMatchInds(I,:);
+
 
 
 % waitbar(0,WAITBAR_HANDLE,'Creating Sequence-Cells')
