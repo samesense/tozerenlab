@@ -98,5 +98,21 @@ def getPathwayGenes(path):
                 genes[n.split(':')[1]] = True
     return genes
 
-def getPathwayComplexDict(pathway):
-    pass
+def getPathwayComplexDict(path):
+    complex2gene = dict()
+    gene2complex = dict()
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    elements = serv.get_elements_by_pathway(path)
+    for element in elements:
+        if element['type'] == 'gene':            
+            names = element['names']
+            elementID = str(element['element_id'])
+            complex2gene[elementID] = dict()
+            for n in names:
+                n=n.split(':')[1]
+                complex2gene[elementID][n] = True
+                if not gene2complex.has_key(n): gene2complex[n] = dict()
+                gene2complex[n][elementID] = True
+    return [complex2gene, gene2complex]
+
