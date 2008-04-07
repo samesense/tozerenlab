@@ -39,7 +39,13 @@ function [varargout]=DavidParse(INPUT_FILENAME,varargin)
 %                           Annotation table.  This will allow annotation
 %                           of ALL GO labels.
 %
-%
+%       FORCE_ORDER         If provided with a list of EntrezIDs this will
+%                           force the output order into that provided.  If
+%                           there is no annotation for an ID then the
+%                           corresponding cells are filled with
+%                           'UNANNOTATED'.  Any IDs which are annotated but
+%                           not in the LIST are removed from the output and
+%                           a warning is displayed.
 %
 %
 %
@@ -52,6 +58,8 @@ MAKE_EXCEL_FLAG=false;
 MAKE_FIGURE_FLAG=false;
 P_VAL_CUTOFF=0.05;
 NUM_INCLUDE=10;
+FORCED_ORDER=[];
+MISSING_INDS=[];
 
 if ~isempty(varargin)
     for i=1:2:length(varargin)
@@ -88,6 +96,13 @@ if ~isempty(varargin)
 
                 if ~(nargout==3||nargout==0)
                     error('DavidParse:BAD_OUTPUT','If DAVID_TABLE is provided then there must be 0 or 3 output.')
+                end
+                
+            case 'force_order'
+                if isnumeric(varargin{i+1})
+                    FORCED_ORDER=varargin{i+1};
+                else
+                    error('DavidParse:BAD_DAVIDTABLE','Arguement to FORCE_ORDER must be a numeric array.')
                 end
 
             otherwise
@@ -127,6 +142,16 @@ for i=1:length(AllCat)
 
     GeneGOOutput(:,i+1)=cellfun(@(x)(TermNames(InternalInds(x))'),num2cell(LogicalArray,2),'uniformoutput',false);
 end
+
+if ~isempty(FORCED_ORDER)
+    tempGeneGOOuput=cell(size(FORCED_ORDER,1),size(GeneGOOutput,2));
+    tempGeneGOOuput(:,1)=num2cell(FORCED_ORDER);
+    [TF LOC]=ismember(cell2mat(GeneGOOutput(:,1)),FORCED_ORDER);
+    tempGeneGOOuput(nonzeros(LOC),2:end)=GeneGOOutput(TF,2:end);
+    tempGeneGOOuput(~ismember(FORCED_ORDER,cell2mat(GeneGOOutput(:,1))),2:end)={'UNANNOTATED'};
+    GeneGOOutput=tempGeneGOOuput;
+end
+
 
 [ColHeaders{1:length(AllCat)+1}]=deal('ENTREZ_GENE_ID',AllCat{:});
 
