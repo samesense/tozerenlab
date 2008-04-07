@@ -177,7 +177,7 @@ def fillInTermPropertiesWParents(termProperties, child2Parent, parent2Child):
 def getTermIDtoGOterm():
     try:
         [connection, cursor] = getGOConnection_Cursor()
-        cursor.execute(" SELECT id, acc, term_type, name FROM term WHERE term_type='biological_process' or term_type='cellular_component' or term_type='molecular_function' or term_type='universal';")
+        cursor.execute("SELECT id, acc, term_type, name FROM term WHERE term_type='biological_process' or term_type='cellular_component' or term_type='molecular_function' or term_type='universal';")
         data = cursor.fetchall()        
         termInfo = dict()
         for item in data:
