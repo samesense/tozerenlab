@@ -1,17 +1,17 @@
-% KNOWN_SEQ='AATACAATTAAAT';
-% 
-% 
-% [headers PromoterSeqs]=fastaread('unique_IDS.fa');
-% LLIDS=cell(size(headers));
-% GeneNames=cell(size(headers));
-% for i=1:length(headers)
-%     temp=textscan(headers{i},'%*s%*s%s%s%*s%*s%*s','delimiter','|');
-%     GeneNames(i)=temp{1};
-%     LLIDS(i)=temp{2};
-% end
-% 
-% display('Finding Matches')
-% [GeneSymbol LLID POS STRAND ORIENT SEQS]=DNAPromoterMatcher(KNOWN_SEQ,'unique_IDS.fa',2);
+KNOWN_SEQ='AA[AT]ACAA[AT]TAA[AT]';
+
+
+[headers PromoterSeqs]=fastaread('unique_IDS.fa');
+LLIDS=cell(size(headers));
+GeneNames=cell(size(headers));
+for i=1:length(headers)
+    temp=textscan(headers{i},'%*s%*s%s%s%*s%*s%*s','delimiter','|');
+    GeneNames(i)=temp{1};
+    LLIDS(i)=temp{2};
+end
+
+display('Finding Matches')
+[GeneSymbol LLID POS STRAND ORIENT SEQS]=DNAPromoterMatcher(KNOWN_SEQ,'unique_IDS.fa',2);
 
 SeqProf=seqprofile(SEQS,'alphabet','nt');
 
@@ -48,41 +48,41 @@ SeqVals_mat=cell2mat(SeqVals);
 
 display('loading RNA Null-data')
 [junk_headers rna_seq]=fastaread('rna.fa');
+shuffle=randperm(length(rna_seq));
 
 display('Calculating Null-distribution')
-RNA_NullVals=PWMEvaluator(SeqProf,rna_seq);
+RNA_NullVals=PWMEvaluator(SeqProf,rna_seq(shuffle(1:10000)));
 RNA_NullDist=[RNA_NullVals{:}];
+
 
 RNA_NullDist=sort(RNA_NullDist(~isnan(RNA_NullDist)&RNA_NullDist~=0));
 
 clear rna_seq junk_headers RNA_NullVals
+% % 
+% display('loading pseudo_without_product Null-data')
+% [junk_headers pseudo_seq]=fastaread('pseudo_without_product.fa');
+% 
+% display('Calculating pseudo_seq Null-distribution')
+% pseudo_NullVals=PWMEvaluator(SeqProf,pseudo_seq);
+% pseudo_NullDist=[pseudo_NullVals{:}];
+% 
+% pseudo_NullDist=sort(pseudo_NullDist(~isnan(pseudo_NullDist)&pseudo_NullDist~=0));
+% 
+% clear pseudo_seq pseudo_NullVals pseudo_NullVals
+% 
+% 
+% display('loading CHR1 Null-data')
+% [junk_headers ref_chr1_seq]=fastaread('ref_chr1.fa');
+% 
+% display('Calculating ref_chr1 Null-distribution')
+% ref_chr1_NullVals=PWMEvaluator(SeqProf,ref_chr1_seq);
+% ref_chr1_NullDist=[ref_chr1_NullVals{:}];
+% 
+% ref_chr1_NullDist=sort(ref_chr1_NullDist(~isnan(ref_chr1_NullDist)&ref_chr1_NullDist~=0));
+% 
+% clear ref_chr1_seq ref_chr1_NullVals ref_chr1_NullVals
 
-display('loading pseudo_without_product Null-data')
-[junk_headers pseudo_seq]=fastaread('pseudo_without_product.fa');
 
-display('Calculating pseudo_seq Null-distribution')
-pseudo_NullVals=PWMEvaluator(SeqProf,pseudo_seq);
-pseudo_NullDist=[pseudo_NullVals{:}];
-
-pseudo_NullDist=sort(pseudo_NullDist(~isnan(pseudo_NullDist)&pseudo_NullDist~=0));
-
-clear pseudo_seq pseudo_NullVals pseudo_NullVals
-
-
-display('loading CHR1 Null-data')
-[junk_headers ref_chr1_seq]=fastaread('ref_chr1.fa');
-
-display('Calculating ref_chr1 Null-distribution')
-ref_chr1_NullVals=PWMEvaluator(SeqProf,ref_chr1_seq);
-ref_chr1_NullDist=[ref_chr1_NullVals{:}];
-
-ref_chr1_NullDist=sort(ref_chr1_NullDist(~isnan(ref_chr1_NullDist)&ref_chr1_NullDist~=0));
-
-clear ref_chr1_seq ref_chr1_NullVals ref_chr1_NullVals
-
-
-P_val_cutoff=0.05;
-cutoff_val=NullDist(round(length(NullDist)*(1-P_val_cutoff)));
 
 display('Calculating P-vals')
 RNA_Pvals=zeros(size(SeqPos));
@@ -97,22 +97,22 @@ for pos=1:numel(SeqPos)
         RNA_Pvals(pos)=1/length(RNA_NullDist);
     end
     
-    spot=find(pseudo_NullDist>SeqMaxVal(pos),1);
-    if ~isempty(spot)
-        psuedo_Pvals(pos)=1-spot/length(pseudo_NullDist);
-    else
-        psuedo_Pvals(pos)=0;
-    end
-    
-    spot=find(ref_chr1_NullDist>SeqMaxVal(pos),1);
-    if ~isempty(spot)
-        ref_chr1_Pvals(pos)=1-spot/length(ref_chr1_NullDist);
-    else
-        ref_chr1_Pvals(pos)=1/length(ref_chr1_NullDist);
-    end
+%     spot=find(pseudo_NullDist>SeqMaxVal(pos),1);
+%     if ~isempty(spot)
+%         psuedo_Pvals(pos)=1-spot/length(pseudo_NullDist);
+%     else
+%         psuedo_Pvals(pos)=0;
+%     end
+%     
+%     spot=find(ref_chr1_NullDist>SeqMaxVal(pos),1);
+%     if ~isempty(spot)
+%         ref_chr1_Pvals(pos)=1-spot/length(ref_chr1_NullDist);
+%     else
+%         ref_chr1_Pvals(pos)=1/length(ref_chr1_NullDist);
+%     end
 
     
-    fprintf('Numel: %d of %d done in: %f min\n',pos,numel(Pvals),(toc/pos)*(numel(Pvals)-pos)/60)
+    fprintf('Numel: %d of %d done in: %f min\n',pos,numel(RNA_Pvals),(toc/pos)*(numel(RNA_Pvals)-pos)/60)
 end
 
 
