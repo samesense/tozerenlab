@@ -1,4 +1,96 @@
+import sys
 from SOAPpy import WSDL
+
+def parseKO_name(description_st):
+    sp = description_st.split('\n')
+    ko_index = 1
+    name_index = 2
+    if len(sp[0]) > 0:
+        ko_index = 0
+        name_index = 1
+    ko  = 'ko:' + sp[ko_index].split()[1].lstrip().strip()
+    name= sp[name_index].split()[1].lstrip().strip()
+    return [ko, name]
+
+def parseKO_EC(description_st):    
+    sp = description_st.split('\n')
+    ko_index = 1
+    if len(sp[0]) > 0:
+        ko_index = 0
+    ko  = 'ko:' + sp[ko_index].split()[1].lstrip().strip()
+    ec = ''
+    for line in sp[ko_index+1:]:
+        if line != '':
+            sp_break = line.split()
+            if sp_break[0].strip() == 'DBLINKS':
+                ec = sp_break[2].strip().lstrip()
+                break
+    return [ko, ec] 
+
+def parseGene_name(description_st):
+    sp = description_st.split('\n')
+    gene_index = 1
+    name_index = 2
+    if len(sp[0]) > 0:
+        gene_index = 0
+        name_index = 1
+    gene  = sp[gene_index].split()[1].lstrip().strip()
+    name= sp[name_index].split()[1].lstrip().strip()
+    return [gene, name]
+
+def dict2str(d):
+    s = ''
+    for item in d.keys():
+        s = s + item + ' '
+    return s.strip()        
+
+def getKOnames(ko_dict):
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    ls = serv.bget( dict2str(ko_dict) ).split('///')
+    if ls[0]=='':
+        ls = ls[1:]
+    if ls[-1] == '\n':
+        ls = ls[:-1]   
+    map_ls = map(parseKO_name, ls)
+    ret_d = dict()
+    for item in map_ls:
+        ret_d[ item[0] ] = item[1]
+    return ret_d
+
+def getKO2EC_EC2KO(ko_dict):
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    ls = serv.bget( dict2str(ko_dict) ).split('///')
+    if ls[0]=='':
+        ls = ls[1:]
+    if ls[-1] == '\n':
+        ls = ls[:-1]   
+    map_ls = map(parseKO_EC, ls)
+    ret_d = dict()
+    ec2ko = dict()
+    for item in map_ls:
+        if item[1] != '':
+            if not ec2ko.has_key(item[1]): ec2ko[ item[1] ] = dict()
+            ec2ko[ item[1] ][ item[0] ] = True
+            ret_d[ item[0] ] = item[1]
+    return [ret_d, ec2ko]
+
+def getGeneNames(gene_dict):
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    #print serv.bget( dict2str(gene_dict) )
+    ls = serv.bget( dict2str(gene_dict) ).split('///')
+    if ls[0]=='':
+        ls = ls[1:]
+    if ls[-1] == '\n':
+        ls = ls[:-1]   
+    map_ls = map(parseGene_name, ls)
+    ret_d = dict()
+    prefix = gene_dict.keys()[0].split(':')[0]
+    for item in map_ls:
+        ret_d[ prefix + ':' + item[0] ] = item[1]
+    return ret_d
 
 def getGene2KO(path):
     wsdl = 'http://soap.genome.jp/KEGG.wsdl'
@@ -6,12 +98,16 @@ def getGene2KO(path):
     kos = serv.get_kos_by_pathway(path)
     gene2ko = dict()
     for ko in kos:
+        if ko=='ko:K07363': print 'have ko in gene2KO'
         genes = serv.get_genes_by_ko(ko)
+        #ko = serv.bget(ko).split('NAME')[1].split('DEFINITION')[0].strip()
         for gene in genes:
             gene = gene['entry_id']
             if not gene2ko.has_key(gene):
                 gene2ko[gene] = dict()
             gene2ko[gene][ko] = True
+            if ko=='ko:K07363':
+                print 'genes', gene
     return gene2ko
 
 def junk(path):
@@ -135,11 +231,25 @@ def getKODictForPathway(path):
                 gene2complex[n][elementID] = True
     return [complex2gene, gene2complex]
 
+def getKOPathDict(path):
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    use_KOs_ls = serv.get_kos_by_pathway(path)
+    use_KOs = dict()
+    for item in use_KOs_ls:
+        use_KOs[item] = True
+    return use_KOs
+
 def getGraphicLinks(path):
+    use_KOs = dict()
     gene2ko = getGene2KO(path)
     edges = dict()
     wsdl = 'http://soap.genome.jp/KEGG.wsdl'
     serv = WSDL.Proxy(wsdl)
+    use_KOs_ls = serv.get_kos_by_pathway(path)
+    for item in use_KOs_ls:
+        use_KOs[item] = True
+    #print use_KOs.keys()
     elements = serv.get_elements_by_pathway(path)
     relations = serv.get_element_relations_by_pathway(path)
     elementid2gene = dict()
@@ -158,26 +268,66 @@ def getGraphicLinks(path):
             elements1 = elementid2gene[ k1 ]
             elements2 = elementid2gene[ k2 ]
             for gene1 in elements1.keys():
+                ko1 = ''
+                if gene2ko.has_key(gene1):
+                    ko1s = gene2ko[gene1]
+                    for k in ko1s.keys():
+                        if use_KOs.has_key(k):
+                            if ko1 != '':
+                                print 'WARNING, multiple assignment', ko1s
+                            ko1 = k
+                if ko1 == 'ko:K07363': print 'found'
                 for gene2 in elements2.keys():
                     for s in relation['subtypes']:
-                        ko1 = ''
-                        ko2 = ''
-                        if gene2ko.has_key(gene1):
-                            ko1 = gene2ko[gene1]
+                        ko2 = ''                        
                         if gene2ko.has_key(gene2):
-                            ko2 = gene2ko[gene2]
+                            ko2s = gene2ko[gene2]
+                            for k in ko2s.keys():
+                                if use_KOs.has_key(k):
+                                    if ko2 != '':
+                                        print 'WARNING, multiple assignment', ko2s
+                                    ko2 = k
+                        if ko2 == 'ko:K07363': print 'found'
                         if ko1 != '' and ko2 != '':
-                            print ko1, ko2
-                        else: print 'missing'
-                        #if not edges.has_key(gene1):
-                        #    edges[gene1] = dict()
-                        #if not edges.has_key(gene2):
-                        #    edges[gene2] = dict()
-                        #if not edges[gene1].has_key(gene2):
-                        #    edges[gene1][gene2] = dict()
-                        #if not edges[gene2].has_key(gene1):
-                        #    edges[gene2][gene1] = dict()
-                        #edges[gene1][gene2][ relation['type'] + '/' + s['relation'] ] = True
-                        #edges[gene2][gene1][ relation['type'] + '/' + s['relation'] ] = True
+                            #print ko1, ko2
+                            if not edges.has_key(ko1):
+                                edges[ko1] = dict()
+                            if not edges.has_key(ko2):
+                                edges[ko2] = dict()
+                            if not edges[ko1].has_key(ko2): edges[ko1][ko2] = dict()
+                            if not edges[ko2].has_key(ko1): edges[ko2][ko1] = dict()
+                            edges[ko1][ko2][ relation['type'] + '/' + s['relation']  ] = True
+                            edges[ko2][ko1][ relation['type'] + '/' + s['relation']  ] = True
+                        elif ko2 != '':
+                            #print gene1, ko2
+                            if not edges.has_key(gene1):
+                                edges[gene1] = dict()
+                            if not edges.has_key(ko2):
+                                edges[ko2] = dict()
+                            if not edges[gene1].has_key(ko2): edges[gene1][ko2] = dict()
+                            if not edges[ko2].has_key(gene1): edges[ko2][gene1] = dict()
+                            edges[gene1][ko2][ relation['type'] + '/' + s['relation']  ] = True
+                            edges[ko2][gene1][ relation['type'] + '/' + s['relation']  ] = True
+                        elif ko1 != '':
+                            #print ko1, gene2
+                            if not edges.has_key(ko1):
+                                edges[ko1] = dict()
+                            if not edges.has_key(gene2):
+                                edges[gene2] = dict()
+                            if not edges[ko1].has_key(gene2): edges[ko1][gene2] = dict()
+                            if not edges[gene2].has_key(ko1): edges[gene2][ko1] = dict()
+                            edges[ko1][gene2][ relation['type'] + '/' + s['relation']  ] = True
+                            edges[gene2][ko1][ relation['type'] + '/' + s['relation']  ] = True
+                        else:
+                            #print gene1, gene2
+                            if not edges.has_key(gene1):
+                                edges[gene1] = dict()
+                            if not edges.has_key(gene2):
+                                edges[gene2] = dict()
+                            if not edges[gene1].has_key(gene2): edges[gene1][gene2] = dict()
+                            if not edges[gene2].has_key(gene1): edges[gene2][gene1] = dict()
+                            edges[gene1][gene2][ relation['type'] + '/' + s['relation']  ] = True
+                            edges[gene2][gene1][ relation['type'] + '/' + s['relation']  ] = True
     return edges
+                        
 
