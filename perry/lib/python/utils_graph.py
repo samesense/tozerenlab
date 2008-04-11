@@ -8,6 +8,12 @@ def getNodes(afile):
     f.close()
     return nodes
 
+def dumpNodes(afile, ls):
+    f = open(afile, 'w')
+    for g in ls.keys():
+        f.write(g + '\n')
+    f.close()
+
 def getEdges(afile):
     edges = dict()
     f = open(afile)
@@ -19,3 +25,16 @@ def getEdges(afile):
         edges[n2][n1] = True
     f.close()
     return edges
+
+def dumpEdges(afile, d):
+    f = open(afile, 'w')
+    seen = {}
+    for g1 in d.keys():
+        for g2 in d[g1].keys():
+            k1 = g1+':'+g2
+            k2 = g2+':'+g1
+            if not seen.has_key(k1) and not seen.has_key(k2):
+                seen[k1] = True
+                seen[k2] = True
+                f.write(g1 + '\t' + g2 + '\n')
+    f.close()
