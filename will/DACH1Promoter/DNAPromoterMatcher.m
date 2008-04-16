@@ -1,4 +1,4 @@
-function varargout=DNAPromoterMatcher(SEARCH_SEQ,SEQ_DB_FILENAME,NUM_MISMATCH,EXCEL_FILENAME,varargin)
+function varargout=DNAPromoterMatcher(SEARCH_SEQ,SEQ_DB,NUM_MISMATCH,varargin)
 %   DNAPromoterMatcher
 %       Searches through a database of sequences to find the SEARCH_SEQ.
 %       This is optimized to find exact (or near exact) matches throughout
@@ -31,11 +31,12 @@ function varargout=DNAPromoterMatcher(SEARCH_SEQ,SEQ_DB_FILENAME,NUM_MISMATCH,EX
 %   SEQ                 The matched GENOMIC sequence.
 %
 %
-%   ...=DNAPromoterMatcher(...,EXCEL_FILENAME)
 %
-%   EXCEL_FILENAME      A filename to output the data in EXCEL format.
+%   Optional Properties
 %
+%   EXCEL_OUTPUT        A filename to output the data in EXCEL format.
 %
+%   HTML_OUTPUT         A filename to output marked-up seqeunces.
 %
 %
 %   See also: ClosestDNAMatch.
@@ -50,33 +51,90 @@ function varargout=DNAPromoterMatcher(SEARCH_SEQ,SEQ_DB_FILENAME,NUM_MISMATCH,EX
 %%%%%%%%%%%%%%%INPUT CHECKING%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 GLOBAL_LENGTH=2000;
+EXCEL_FLAG=false;
+EXCEL_FILENAME=[];
+HTML_FLAG=false;
+HTML_FILENAME=[];
 
-if nargin==3
-    EXCEL_FILENAME=[];
+if ~isempty(varargin)
+    for i=1:2:length(varargin)
+        switch lower(varargin{i})
+            case 'excel_output'
+                if ischar(varargin{i+1})
+                    EXCEL_FLAG=true;
+                    EXCEL_FILENAME=varargin{i+1};
+                else
+                    error('DNAPromoterMatcher:BAD_EXCELFILENAME','The arguement to EXCEL_FILENAME must be a char-array')
+                end
+
+            case 'html_output'
+                if ischar(varargin{i+1})
+                    HTML_FLAG=true;
+                    HTML_FILENAME=varargin{i+1};
+                else
+                    error('DNAPromoterMatcher:BAD_HTMLFILENAME','The arguement to HTML_FILENAME must be a char-array')
+                end
+
+            otherwise
+                error('DNAPromoterMatcher:BAD_ARG','An unknown arguement was provided: %s', varargin{i})
+
+        end
+    end
 end
 
-try
-    [headers seqs]=fastaread(SEQ_DB_FILENAME);
-    LLIDS=cell(size(headers));
-    GeneNames=cell(size(headers));
-    for i=1:length(headers)
-        temp=textscan(headers{i},'%*s%*s%s%s%*s%*s%*s','delimiter','|');
-        GeneNames(i)=temp{1};
-        LLIDS(i)=temp{2};
+
+%deal with loading FASTA-file
+if ischar(SEQ_DB)
+    try
+        [headers seqs]=fastaread(SEQ_DB);
+        LLIDS=cell(size(headers));
+        GeneNames=cell(size(headers));
+        for i=1:length(headers)
+            temp=textscan(headers{i},'%*s%*s%s%s%*s%*s%*s','delimiter','|');
+            GeneNames(i)=temp{1};
+            LLIDS(i)=temp{2};
+        end
+
+    catch
+        warning('DNAPromoterMatcher:BAD_SEQ_DB','Cannot read Sequence Database.')
+        %close(WAITBAR_HANDLE);
+        rethrow(lasterror)
     end
+elseif isstruct(SEQ_DB)
+    [seqs{1:length(SEQ_DB)}]=deal(SEQ_DB.Sequence);
 
-    SeqLength=cellfun('length',seqs);
-    seqs=arrayfun(@(x,y)(x{1}(max(y-GLOBAL_LENGTH,1):end)),seqs,SeqLength,'uniformoutput',false);
+    %if data is easily available, then use it
+    if isfield(SEQ_DB,'LLID')&&isfield(SEQ_DB,'GeneName')
+        [LLIDS{1:length(SEQ_DB)}]=deal(SEQ_DB.LLID);
+        [GeneNames{1:length(SEQ_DB)}]=deal(SEQ_DB.GeneName);
+    else
+        %otherwise take from header information
+        try
+            [headers{1:length(SEQ_DB)}]=deal(SEQ_DB.Headers);
 
-    SeqLength=cellfun('length',seqs);
-
-catch
-    warning('DNAPromoterMatcher:BAD_SEQ_DB','Cannot read Sequence Database.')
-    %close(WAITBAR_HANDLE);
-    rethrow(lasterror)
+            LLIDS=cell(size(headers));
+            GeneNames=cell(size(headers));
+            for i=1:length(headers)
+                temp=textscan(headers{i},'%*s%*s%s%s%*s%*s%*s','delimiter','|');
+                GeneNames(i)=temp{1};
+                LLIDS(i)=temp{2};
+            end
+        catch
+            warning('DNAPromoterMatcher:BAD_NAMEINFO','Cannot understand header information, continuing anyway.')
+            LLIDS=num2cell(1:length(SEQ_DB));
+            [GeneNames{1:length(SEQ_DB)}]=deal('UNKNOWN');
+        end
+    end
 end
 
 %%shorten database to 2000bp.
+SeqLength=cellfun('length',seqs);
+seqs=arrayfun(@(x,y)(x{1}(max(y-GLOBAL_LENGTH,1):end)),seqs,SeqLength,'uniformoutput',false);
+
+SeqLength=cellfun('length',seqs);
+
+
+
 
 %%%Parse the Regular-Expression into sets of cells
 
@@ -252,86 +310,89 @@ for i=1:length(UniGene)
 
 end
 
+if HTML_FLAG
+    fid=fopen(HTML_FILENAME,'wt');
+    fprintf(fid,'<html> \n <body> \n <FONT face="Courier"> \n');
+    for i=1:length(seqs)
+        tempMarkup=false(8,SeqLength(i));
+        for j=1:4
+            StartPos=[PosCell{i+(j-1)*length(seqs),:}];
+            EndPos=[EndCell{i+(j-1)*length(seqs),:}];
 
-fid=fopen('TestHTML.html','wt');
-fprintf(fid,'<html> \n <body> \n <FONT face="Courier"> \n');
-
-for i=1:length(seqs)
-
-    tempMarkup=false(8,SeqLength(i));
-    for j=1:4
-        StartPos=[PosCell{i+(j-1)*length(seqs),:}];
-        EndPos=[EndCell{i+(j-1)*length(seqs),:}];
-
-        if ~isempty(StartPos)
-            tempMarkup(1+2*(j-1),StartPos)=true;
-            tempMarkup(2+2*(j-1),EndPos)=true;
+            if ~isempty(StartPos)
+                tempMarkup(1+2*(j-1),StartPos)=true;
+                tempMarkup(2+2*(j-1),EndPos)=true;
+            end
         end
-    end
+        %only print those with markup
+        if any(tempMarkup(:))
+            tempMarkup(3:4,:)=fliplr(tempMarkup([4 3],:));
+            tempMarkup(7:8,:)=fliplr(tempMarkup([8 7],:));
 
-    %only print those with markup
-    if any(tempMarkup(:))
-        tempMarkup(3:4,:)=fliplr(tempMarkup([4 3],:));
-        tempMarkup(7:8,:)=fliplr(tempMarkup([8 7],:));
+            fprintf(fid,'<br> %s \t %s <br>\n <br>\n',GeneNames{i},LLIDS{i});
+            if any(tempMarkup(1,:))
+                fprintf(fid,'<FONT COLOR="#FF0000"> 3-5 Sense Pos: %d </FONT> <br> \n',find(tempMarkup(1,:)));
+            end
+            if any(tempMarkup(3,:))
+                fprintf(fid,'<FONT COLOR="#00FF00"> 5-3 Sense Pos: %d </FONT> <br> \n',find(tempMarkup(3,:)));
+            end
+            if any(tempMarkup(5,:))
+                fprintf(fid,'<FONT COLOR="#0000FF"> 3-5 Anti-Sense Pos: %d </FONT> <br> \n',find(tempMarkup(5,:)));
+            end
+            if any(tempMarkup(7,:))
+                fprintf(fid,'<FONT COLOR="#00FFFF"> 5-3 Anti-Sense Pos: %d </FONT> <br> \n',find(tempMarkup(7,:)));
+            end
 
-        fprintf(fid,'<br> %s \t %s <br>\n <br>\n',GeneNames{i},LLIDS{i});
-        if any(tempMarkup(1,:))
-            fprintf(fid,'<FONT COLOR="#FF0000"> 3-5 Sense Pos: %d </FONT> <br> \n',find(tempMarkup(1,:)));
-        end
-        if any(tempMarkup(3,:))
-            fprintf(fid,'<FONT COLOR="#00FF00"> 5-3 Sense Pos: %d </FONT> <br> \n',find(tempMarkup(3,:)));
-        end
-        if any(tempMarkup(5,:))
-            fprintf(fid,'<FONT COLOR="#0000FF"> 3-5 Anti-Sense Pos: %d </FONT> <br> \n',find(tempMarkup(5,:)));
-        end
-        if any(tempMarkup(7,:))
-            fprintf(fid,'<FONT COLOR="#00FFFF"> 5-3 Anti-Sense Pos: %d </FONT> <br> \n',find(tempMarkup(7,:)));
-        end
-        
-        counter=1;
-        for k=1:length(tempMarkup)
-            spot=find(tempMarkup(:,k));
-            if ~isempty(spot)
-                switch spot(1)
-                    case 1
-                        %red
-                        fprintf(fid,'%s<FONT COLOR="#FF0000">',seqs{i}(k));
-                    case 2
-                        fprintf(fid,'%s</FONT>',seqs{i}(k));
-                    case 3
-                        %green
-                        fprintf(fid,'%s<FONT COLOR="#00FF00">',seqs{i}(k));
-                    case 4
-                        fprintf(fid,'%s</FONT>',seqs{i}(k));
-                    case 5
-                        %blue
-                        fprintf(fid,'%s<FONT COLOR="#0000FF">',seqs{i}(k));
-                    case 6
-                        fprintf(fid,'%s</FONT>',seqs{i}(k));
-                    case 7
-                        %cyan
-                        fprintf(fid,'%s<FONT COLOR="#00FFFF">',seqs{i}(k));
-                    case 8
-                        fprintf(fid,'%s</FONT>',seqs{i}(k));
-
-
+            counter=1;
+            k=1;
+            while k<=size(tempMarkup,2)
+                %print an entire line if possible
+                if k+49<size(tempMarkup,2)&&~any(sum(tempMarkup(:,k:k+49)))&&counter==1;
+                    fprintf(fid,'%s <br> \n',seqs{i}(k:k+49));
+                    k=k+50;
+                else    %otherwise go char-by-char
+                    spot=find(tempMarkup(:,k));
+                    if ~isempty(spot)
+                        switch spot(1)
+                            case 1
+                                %red
+                                fprintf(fid,'%s<FONT COLOR="#FF0000">',seqs{i}(k));
+                            case 2
+                                fprintf(fid,'%s</FONT>',seqs{i}(k));
+                            case 3
+                                %green
+                                fprintf(fid,'%s<FONT COLOR="#00FF00">',seqs{i}(k));
+                            case 4
+                                fprintf(fid,'%s</FONT>',seqs{i}(k));
+                            case 5
+                                %blue
+                                fprintf(fid,'%s<FONT COLOR="#0000FF">',seqs{i}(k));
+                            case 6
+                                fprintf(fid,'%s</FONT>',seqs{i}(k));
+                            case 7
+                                %cyan
+                                fprintf(fid,'%s<FONT COLOR="#00FFFF">',seqs{i}(k));
+                            case 8
+                                fprintf(fid,'%s</FONT>',seqs{i}(k));
+                        end
+                    else
+                        fprintf(fid,'%s',seqs{i}(k));
+                    end
+                    k=k+1;
+                    counter=counter+1;
+                    if counter>50
+                        fprintf(fid,'<br> \n');
+                        counter=1;
+                    end
                 end
-            else
-                fprintf(fid,'%s',seqs{i}(k));
             end
-            counter=counter+1;
-            if counter>50
-                fprintf(fid,'<br> \n');
-                counter=1;
-            end
+            fprintf(fid,'<br> \n');
         end
-        fprintf(fid,'<br> \n');
+
     end
-
+    fprintf(fid,'</FONT> \n </body> \n </html> \n');
+    fclose(fid);
 end
-fprintf(fid,'</FONT> \n </body> \n </html> \n');
-fclose(fid);
-
 
 
 if nargout>0
@@ -341,7 +402,7 @@ if nargout>0
     end
 end
 
-if ~isempty(EXCEL_FILENAME)
+if EXCEL_FLAG
     xlswrite(EXCEL_FILENAME,ExcelOutput);
 end
 
