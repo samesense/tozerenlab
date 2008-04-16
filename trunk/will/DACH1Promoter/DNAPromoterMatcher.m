@@ -35,7 +35,7 @@ function varargout=DNAPromoterMatcher(SEARCH_SEQ,SEQ_DB_FILENAME,NUM_MISMATCH,EX
 %
 %   EXCEL_FILENAME      A filename to output the data in EXCEL format.
 %
-%   
+%
 %
 %
 %   See also: ClosestDNAMatch.
@@ -45,7 +45,7 @@ function varargout=DNAPromoterMatcher(SEARCH_SEQ,SEQ_DB_FILENAME,NUM_MISMATCH,EX
 % SEARCH_SEQ ='AA[AT]ACAA[AT]TAA[AT]';
 % SEQ_DB_FILENAME='unique_IDS.fa';
 
-WAITBAR_HANDLE=waitbar(0,'Loading Sequences');
+%WAITBAR_HANDLE=waitbar(0,'Loading Sequences');
 
 %%%%%%%%%%%%%%%INPUT CHECKING%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -64,15 +64,15 @@ try
         GeneNames(i)=temp{1};
         LLIDS(i)=temp{2};
     end
-    
+
     SeqLength=cellfun('length',seqs);
     seqs=arrayfun(@(x,y)(x{1}(max(y-GLOBAL_LENGTH,1):end)),seqs,SeqLength,'uniformoutput',false);
-    
+
     SeqLength=cellfun('length',seqs);
-    
+
 catch
     warning('DNAPromoterMatcher:BAD_SEQ_DB','Cannot read Sequence Database.')
-    close(WAITBAR_HANDLE);
+    %close(WAITBAR_HANDLE);
     rethrow(lasterror)
 end
 
@@ -123,18 +123,22 @@ end
 
 
 
-waitbar(0,WAITBAR_HANDLE,'Creating Sequence-Cells')
-PromoterSeqs=[seqs'; seqreverse(seqs)'; ...
+%waitbar(0,WAITBAR_HANDLE,'Creating Sequence-Cells')
+PromoterSeqs=[seqs'; ...
+    cellfun(@(x)(seqreverse(x)),seqs','uniformoutput',false); ...
     cellfun(@(x)(seqcomplement(x)),seqs','uniformoutput',false); ...
     cellfun(@(x)(seqrcomplement(x)),seqs','uniformoutput',false)];
+
+
 PromoterType=[(1:length(seqs))' ones(length(seqs),1); (1:length(seqs))' 2*ones(length(seqs),1); ...
     (1:length(seqs))' 3*ones(length(seqs),1); (1:length(seqs))' 4*ones(length(seqs),1)];
 
-waitbar(0,WAITBAR_HANDLE,'Searching Seqs')
+%waitbar(0,WAITBAR_HANDLE,'Searching Seqs')
 MatchCell=cell(length(PromoterSeqs),length(MisMatchInds));
 PosCell=cell(length(PromoterSeqs),length(MisMatchInds));
+EndCell=cell(length(PromoterSeqs),length(MisMatchInds));
 for i=1:size(MisMatchInds,1)
-    waitbar(i/size(MisMatchInds,1))
+    %waitbar(i/size(MisMatchInds,1))
     fprintf('%d of %d\n',i,size(MisMatchInds,1))
     temp=RegCell;
     change_inds=find(MisMatchInds(i,:));
@@ -146,8 +150,8 @@ for i=1:size(MisMatchInds,1)
     else
         RegSearch=cat(2,temp{:});
     end
-   
-    [PosCell(:,i) MatchCell(:,i)]=regexpi(PromoterSeqs,RegSearch,'start','match');
+
+    [PosCell(:,i) MatchCell(:,i) EndCell(:,i)]=regexpi(PromoterSeqs,RegSearch,'start','match','end');
 end
 
 %%%%%Explodes cells in which there are multiple matches for each
@@ -158,43 +162,53 @@ while counter<=size(PosCell,2)
     if any(NeedExpand>1)
         NewTempPos=cellfun(@(x)(x(end)),PosCell(NeedExpand>1,counter),'uniformoutput',false);
         ShortenedPos=cellfun(@(x)(x(1:end-1)),PosCell(NeedExpand>1,counter),'uniformoutput',false);
-        
+
+        NewTempEnd=cellfun(@(x)(x(end)),EndCell(NeedExpand>1,counter),'uniformoutput',false);
+        ShortenedEnd=cellfun(@(x)(x(1:end-1)),EndCell(NeedExpand>1,counter),'uniformoutput',false);
+
         NewTempMatch=cellfun(@(x)(x(end)),MatchCell(NeedExpand>1,counter),'uniformoutput',false);
         ShortenedMatch=cellfun(@(x)(x(1:end-1)),MatchCell(NeedExpand>1,counter),'uniformoutput',false);
-        
-        
+
+
         PosCell(NeedExpand>1,counter)=ShortenedPos;
         MatchCell(NeedExpand>1,counter)=ShortenedMatch;
-        
+        EndCell(NeedExpand>1,counter)=ShortenedEnd;
+
         if counter~=size(PosCell,2)
             PosCell=[PosCell(:,1:counter) cell(size(PosCell,1),1) PosCell(:,counter+1:end)];
             PosCell(NeedExpand>1,counter+1)=NewTempPos;
-            
+
+            EndCell=[EndCell(:,1:counter) cell(size(EndCell,1),1) EndCell(:,counter+1:end)];
+            EndCell(NeedExpand>1,counter+1)=NewTempEnd;
+
             MatchCell=[MatchCell(:,1:counter) cell(size(MatchCell,1),1) MatchCell(:,counter+1:end)];
             MatchCell(NeedExpand>1,counter+1)=NewTempMatch;
-            
+
             MisMatchInds=[MisMatchInds(1:counter,:); MisMatchInds(counter,:); MisMatchInds(counter+1:end,:)];
 
         else
             PosCell=[PosCell(:,1:counter) cell(size(PosCell,1),1)];
             PosCell(NeedExpand>1,counter+1)=NewTempPos;
-            
+
+            EndCell=[EndCell(:,1:counter) cell(size(EndCell,1),1)];
+            EndCell(NeedExpand>1,counter+1)=NewTempEnd;
+
             MatchCell=[MatchCell(:,1:counter) cell(size(MatchCell,1),1)];
             MatchCell(NeedExpand>1,counter+1)=NewTempMatch;
-            MisMatchInds=[MisMatchInds(1:counter,:); MisMatchInds(counter,:)];        
+            MisMatchInds=[MisMatchInds(1:counter,:); MisMatchInds(counter,:)];
         end
-        
+
     else
         counter=counter+1;
     end
-    
+
 end
 
 
 FoundMask=~cellfun('isempty',PosCell(:,sum(MisMatchInds,2)<3));
 [I J]=find(FoundMask);
 
-waitbar(0,WAITBAR_HANDLE,'Generating Output')
+%waitbar(0,WAITBAR_HANDLE,'Generating Output')
 UniGene=PromoterType(I);
 
 UniCols=J;
@@ -205,7 +219,7 @@ ExcelOutput=cell(length(UniGene),7);
 for i=1:length(UniGene)
     ExcelOutput(i,1)=GeneNames(UniGene(i));
     ExcelOutput(i,2)=LLIDS(UniGene(i));
-    
+
     switch ceil(UniRows(i)/length(seqs))
         case 1
             ExcelOutput{i,3}=SeqLength(UniGene(i))-PosCell{UniRows(i),UniCols(i)};
@@ -215,12 +229,12 @@ for i=1:length(UniGene)
             ExcelOutput{i,3}=PosCell{UniRows(i),UniCols(i)};
             ExcelOutput{i,4}='Sense';
             ExcelOutput{i,5}='5prime - 3prime';
-            
+
         case 3
             ExcelOutput{i,3}=SeqLength(UniGene(i))-PosCell{UniRows(i),UniCols(i)};
             ExcelOutput{i,4}='AntiSense';
             ExcelOutput{i,5}='3prime - 5prime';
-            
+
         case 4
             ExcelOutput{i,3}=PosCell{UniRows(i),UniCols(i)};
             ExcelOutput{i,4}='AntiSense';
@@ -230,13 +244,94 @@ for i=1:length(UniGene)
     if iscell(temp)
         temp=temp{1};
     end
-    
+
     temp(MisMatchInds(UniCols(i),:)&true)=lower(temp(MisMatchInds(UniCols(i),:)&true));
 
     ExcelOutput{i,6}=temp;
     ExcelOutput{i,7}=sum(MisMatchInds(UniCols(i),:));
-    
+
 end
+
+
+fid=fopen('TestHTML.html','wt');
+fprintf(fid,'<html> \n <body> \n <FONT face="Courier"> \n');
+
+for i=1:length(seqs)
+
+    tempMarkup=false(8,SeqLength(i));
+    for j=1:4
+        StartPos=[PosCell{i+(j-1)*length(seqs),:}];
+        EndPos=[EndCell{i+(j-1)*length(seqs),:}];
+
+        if ~isempty(StartPos)
+            tempMarkup(1+2*(j-1),StartPos)=true;
+            tempMarkup(2+2*(j-1),EndPos)=true;
+        end
+    end
+
+    %only print those with markup
+    if any(tempMarkup(:))
+        tempMarkup(3:4,:)=fliplr(tempMarkup([4 3],:));
+        tempMarkup(7:8,:)=fliplr(tempMarkup([8 7],:));
+
+        fprintf(fid,'<br> %s \t %s <br>\n <br>\n',GeneNames{i},LLIDS{i});
+        if any(tempMarkup(1,:))
+            fprintf(fid,'<FONT COLOR="#FF0000"> 3-5 Sense Pos: %d </FONT> <br> \n',find(tempMarkup(1,:)));
+        end
+        if any(tempMarkup(3,:))
+            fprintf(fid,'<FONT COLOR="#00FF00"> 5-3 Sense Pos: %d </FONT> <br> \n',find(tempMarkup(3,:)));
+        end
+        if any(tempMarkup(5,:))
+            fprintf(fid,'<FONT COLOR="#0000FF"> 3-5 Anti-Sense Pos: %d </FONT> <br> \n',find(tempMarkup(5,:)));
+        end
+        if any(tempMarkup(7,:))
+            fprintf(fid,'<FONT COLOR="#00FFFF"> 5-3 Anti-Sense Pos: %d </FONT> <br> \n',find(tempMarkup(7,:)));
+        end
+        
+        counter=1;
+        for k=1:length(tempMarkup)
+            spot=find(tempMarkup(:,k));
+            if ~isempty(spot)
+                switch spot(1)
+                    case 1
+                        %red
+                        fprintf(fid,'%s<FONT COLOR="#FF0000">',seqs{i}(k));
+                    case 2
+                        fprintf(fid,'%s</FONT>',seqs{i}(k));
+                    case 3
+                        %green
+                        fprintf(fid,'%s<FONT COLOR="#00FF00">',seqs{i}(k));
+                    case 4
+                        fprintf(fid,'%s</FONT>',seqs{i}(k));
+                    case 5
+                        %blue
+                        fprintf(fid,'%s<FONT COLOR="#0000FF">',seqs{i}(k));
+                    case 6
+                        fprintf(fid,'%s</FONT>',seqs{i}(k));
+                    case 7
+                        %cyan
+                        fprintf(fid,'%s<FONT COLOR="#00FFFF">',seqs{i}(k));
+                    case 8
+                        fprintf(fid,'%s</FONT>',seqs{i}(k));
+
+
+                end
+            else
+                fprintf(fid,'%s',seqs{i}(k));
+            end
+            counter=counter+1;
+            if counter>50
+                fprintf(fid,'<br> \n');
+                counter=1;
+            end
+        end
+        fprintf(fid,'<br> \n');
+    end
+
+end
+fprintf(fid,'</FONT> \n </body> \n </html> \n');
+fclose(fid);
+
 
 
 if nargout>0
