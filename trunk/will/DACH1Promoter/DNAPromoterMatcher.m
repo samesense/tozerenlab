@@ -38,6 +38,15 @@ function varargout=DNAPromoterMatcher(SEARCH_SEQ,SEQ_DB,NUM_MISMATCH,varargin)
 %
 %   HTML_OUTPUT         A filename to output marked-up seqeunces.
 %
+%   COLUMN_WIDTH        A property to adjust the fixed-width of columns in
+%                       the HTML_OUTPUT. DEFAULT=50;
+%
+%   MAX_PRO_LENGTH      The maximum length of allowed promoters.  All
+%                       promoter regions are shortened to this length.
+%                       Anything shorter than the given length is left
+%                       alone. DEFAULT = 2000.
+%
+%
 %
 %   See also: ClosestDNAMatch.
 %
@@ -55,6 +64,7 @@ EXCEL_FLAG=false;
 EXCEL_FILENAME=[];
 HTML_FLAG=false;
 HTML_FILENAME=[];
+COLUMN_WIDTH=50;
 
 if ~isempty(varargin)
     for i=1:2:length(varargin)
@@ -74,7 +84,21 @@ if ~isempty(varargin)
                 else
                     error('DNAPromoterMatcher:BAD_HTMLFILENAME','The arguement to HTML_FILENAME must be a char-array')
                 end
-
+                
+            case 'column_width'
+                if isnumeric(varargin{i+1})&&isscalar(varargin{i+1})&&varargin{i+1}>1
+                    COLUMN_WIDTH=varargin{i+1};
+                else
+                    error('DNAPromoterMatcher:BAD_COLUMNWIDTH','The arguement to COLUMN_WIDTH must be a numeric scalar')
+                end
+                
+            case 'max_pro_length'
+                if isnumeric(varargin{i+1})&&isscalar(varargin{i+1})&&varargin{i+1}>1
+                    GLOBAL_LENGTH=varargin{i+1};
+                else
+                    error('DNAPromoterMatcher:BAD_MAXPROLENGTH','The arguement to MAX_PRO_LENGTH must be a numeric scalar')
+                end
+                
             otherwise
                 error('DNAPromoterMatcher:BAD_ARG','An unknown arguement was provided: %s', varargin{i})
 
@@ -132,9 +156,6 @@ SeqLength=cellfun('length',seqs);
 seqs=arrayfun(@(x,y)(x{1}(max(y-GLOBAL_LENGTH,1):end)),seqs,SeqLength,'uniformoutput',false);
 
 SeqLength=cellfun('length',seqs);
-
-
-
 
 %%%Parse the Regular-Expression into sets of cells
 
@@ -347,9 +368,9 @@ if HTML_FLAG
             k=1;
             while k<=size(tempMarkup,2)
                 %print an entire line if possible
-                if k+49<size(tempMarkup,2)&&~any(sum(tempMarkup(:,k:k+49)))&&counter==1;
-                    fprintf(fid,'%s <br> \n',seqs{i}(k:k+49));
-                    k=k+50;
+                if k+COLUMN_WIDTH<size(tempMarkup,2)&&~any(sum(tempMarkup(:,k:k+COLUMN_WIDTH-1)))&&counter==1;
+                    fprintf(fid,'%s <br> \n',seqs{i}(k:k+COLUMN_WIDTH-1));
+                    k=k+COLUMN_WIDTH;
                 else    %otherwise go char-by-char
                     spot=find(tempMarkup(:,k));
                     if ~isempty(spot)
@@ -380,7 +401,7 @@ if HTML_FLAG
                     end
                     k=k+1;
                     counter=counter+1;
-                    if counter>50
+                    if counter>COLUMN_WIDTH
                         fprintf(fid,'<br> \n');
                         counter=1;
                     end
