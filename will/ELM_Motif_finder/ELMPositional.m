@@ -58,8 +58,10 @@ function [POSITIONAL_CALL ELM_vec ELM_annot]=ELMPositional(SEQS,MAPPING_CELL,ELM
 
 ITER_DISP_FLAG=false;
 NO_DISPLAY_FLAG=false;
-MaxIter=300;
+MaxIter=1000;
 MaxTime=inf;
+NUM_CUTOFF=3;
+MIN_FRAC_CORRECT=0.3;
 
 MATCH_SPOTS=[];
 OPT_METHOD_FLAG=true;
@@ -98,6 +100,12 @@ if ~isempty(varargin)
                     error('ELMPositional:BAD_NODISPLAY','Arguement to NO_DISPLAY must be a logical.')
                 end
             case 'maxiter'
+                if isnumeric(varargin{i+1})
+                    MaxIter=varargin{i+1};
+                else
+                    error('ELMPositional:BAD_MAXITER','Arguement to MaxIter must be a numeric.')
+                end
+
             otherwise
                 error('ELMPositional:BAD_ARG','An unknown arguement was provided: %s',varargin{i})
         end
@@ -189,7 +197,7 @@ else
         try
             CurrentFval=zeros(1,MaxIter);
             sizes=cellfun('length',MATCH_SPOTS(:,i));
-            if max(sizes)==0
+            if max(sizes)==0||sum(sizes)<NUM_CUTOFF*length(sizes)
                 continue
             end
             %waitbar(i/length(ELM_STRUCT),WAIT_HANDLE)
@@ -203,38 +211,38 @@ else
             end
 
             subplot(2,2,3), bar(1:size(LogicalData,2),sum(LogicalData,1))
-            FvalLog=zeros(10,1);
             FposLog=unique(ceil(linspace(.5*max(sizes),2*max(sizes),10)));
             WindowLog=cell(length(FposLog),1);
+            FvalLog=zeros(length(FposLog),1);
 
             if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
                 WAIT_HANDLE=waitbar(0,ELM_STRUCT(i).Name);
             end
 
 
-            for testSlice=FposLog
-
-                NumSlices=ceil(testSlice);
+            for M=1:length(FposLog)
+                
+                NumSlices=ceil(FposLog(M));
                 x0=linspace(1,size(LogicalData,2),NumSlices+2);
                 x0=x0(2:end-1);
                 StartTime=clock;
-                [WindowLog{nnz(FvalLog)+1} fval]=fminsearchbnd(@EvalWindows,x0,ones(size(x0)),size(LogicalData,2)*ones(size(x0)),options);
-                FvalLog(nnz(FvalLog)+1)=fval;
+                [WindowLog{M} fval]=fminsearchbnd(@EvalWindows,x0,ones(size(x0)),size(LogicalData,2)*ones(size(x0)),options);
+                FvalLog(M)=fval;
                 if ~NO_DISPLAY_FLAG
-                    subplot(2,2,2), plot(FposLog(1:nnz(FvalLog)),FvalLog(1:nnz(FvalLog)))
+                    subplot(2,2,2), plot(FposLog(1:M),FvalLog(1:M)/nnz(LogicalData))
                 end
 
             end
 
             [MinVal MinSpot]=min(FvalLog);
-            tempWindows=WindowLog{MinSpot};
-
-            ELM_Annot_Cell{i}=[repmat(i,[1 length(WindowLog{MinSpot})+1]);1 tempWindows; tempWindows size(LogicalData,2)];
-
-            tempPosCall=cellfun(@CheckWindows,MATCH_SPOTS(:,i),'uniformoutput',false);
-
-            ELM_PosCall_Cell{i}=cell2mat(tempPosCall);
-
+            
+            if MinVal/nnz(LogicalData)<MIN_FRAC_CORRECT
+                tempWindows=WindowLog{MinSpot};
+                ELM_Annot_Cell{i}=[repmat(i,[1 length(WindowLog{MinSpot})+1]);1 tempWindows; tempWindows size(LogicalData,2)];
+                tempPosCall=cellfun(@CheckWindows,MATCH_SPOTS(:,i),'uniformoutput',false);
+                ELM_PosCall_Cell{i}=cell2mat(tempPosCall);
+            end
+           
             if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
                 close(WAIT_HANDLE);
             end
