@@ -247,7 +247,7 @@ else
     end
 
     POSITIONAL_CALL=cat(2,ELM_PosCall_Cell{:});
-    ELM_vec=cat(2,ELM_Annot_Cell{:});
+    ELM_vec=ceil(cat(2,ELM_Annot_Cell{:}));
 
 
 end
