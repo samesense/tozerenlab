@@ -19,7 +19,7 @@ function [POSITIONAL_CALL ELM_vec ELM_annot]=ELMPositional(SEQS,MAPPING_CELL,ELM
 %       POSITIONAL_CALL     A cell-array of the presence/absence calls
 %                           for each feature in each sequence.
 %
-%       ANNOT_VEC   A 2xN vector where the first row represents the postion
+%       ANNOT_VEC   A 3xN vector where the first row represents the postion
 %                   in the sequence and the second row is the index of the
 %                   ELM_STRUCT.
 %
@@ -49,7 +49,6 @@ function [POSITIONAL_CALL ELM_vec ELM_annot]=ELMPositional(SEQS,MAPPING_CELL,ELM
 %
 %       MaxTime         The Maximim Time (in seconds) to spend on each
 %                       optimization. DEFAULT=inf;
-%
 %
 %
 %
@@ -194,7 +193,6 @@ else
     ELM_PosCall_Cell=cell(length(ELM_STRUCT),1);
 
     for i=1:length(ELM_STRUCT)
-        try
             CurrentFval=zeros(1,MaxIter);
             sizes=cellfun('length',MATCH_SPOTS(:,i));
             if max(sizes)==0||sum(sizes)<NUM_CUTOFF*length(sizes)
@@ -246,9 +244,6 @@ else
             if ~ITER_DISP_FLAG&&~NO_DISPLAY_FLAG
                 close(WAIT_HANDLE);
             end
-        catch
-            display('here')
-        end
     end
 
     POSITIONAL_CALL=cat(2,ELM_PosCall_Cell{:});
