@@ -21,6 +21,21 @@ function PWM_CELL=ELMTrainPWM(INPUT_SEQS,ELM_STRUCT,varargin)
 %                       from ELMPositional.
 %
 %
+%
+%   Optional Inputs
+%   
+%       MAPPING_DATA    A cell-array of mapping data from HIVORFChecker.
+%                       Beware, only minimal error-checking is performed,
+%                       so be SURE that it is the right data.
+%       
+%       MATCH_SPOTS     The output of ELMFinder.  This can drastically
+%                       speed up computation.
+%
+%       POSITION_CALL   The first output of ELMPositional.
+%
+%       ANNOT_VECTOR    The second output of ELMPositional.
+%
+%
 %   Optional Properities
 %
 %       WHOLE_SEQ       [true|FALSE] if set to true then the algorithm uses
@@ -30,16 +45,21 @@ function PWM_CELL=ELMTrainPWM(INPUT_SEQS,ELM_STRUCT,varargin)
 %       DISPLAY         [TRUE|false] When set to true the algorithm shows
 %                       the optimization at each iteration.
 %
-%       MAPPING_DATA    A cell-array of mapping data from HIVORFChecker.
-%                       Beware, only minimal error-checking is performed,
-%                       so be SURE that it is the right data.
 %
 %
+
+GetMatched=@(x,y)(x(y));
+GetNotMatched=@(x,y)(x(~y));
+
+
 
 MAPPING_DATA=[];
 WHOLE_SEQ_FLAG=false;
 DISPLAY_FLAG=true;
-
+MatchedSpots=[];
+PositCall=[];
+AnnotVec=[];
+MaxIter=500;
 
 if ~isempty(varargin)
     for i=1:2:length(varargin)
@@ -67,18 +87,43 @@ if ~isempty(varargin)
                     error('ELMTrainPWM:BAD_MAPPINGDATA','The arguement provided to MAPPING_DATA must be a cell-array the same size as INPUT_SEQS')
                 end
             
+            case 'match_spots'
+                if iscell(varargin{i+1})&&length(INPUT_SEQS)==size(varargin{i+1},1)&&length(ELM_STRUCT)==size(varargin{i+1},2)
+                    MatchedSpots=varargin{i+1};
+                else
+                    error('ELMTrainPWM:BAD_MATCHSPOTS','The arguement provided to MATCH_SPOTS must be a cell-array with size of: [%d %d], was provided: [%d %d]',...
+                        length(INPUT_SEQS),length(ELM_STRUCT),size(varargin{i+1},1),size(varargin{i+1},2));
+                end
             
+            case 'position_call'
+                if (isnumeric(varargin{i+1})||islogical(varargin{i+1}))&&size(varargin{i+1},1)==length(INPUT_SEQS)
+                    PositCall=varargin{i+1};
+                else
+                    error('ELMTrainPWM:BAD_POSITIONCALL','The arguement provided to POSITION_CALL must be a logical-array of which has length(INPUT_SEQS) rows');
+                end
+                
+            case 'annot_vector'
+                if isnumeric(varargin{i+1})&&size(varargin{i+1},1)==3
+                    AnnotVec=varargin{i+1};
+                else
+                    error('ELMTrainPWM:BAD_ANNOTVECTOR','The arguement provided to ANNOT_VECTOR must be a numeric-array of which has 3 rows');
+                end
             otherwise
                 error('ELMTrainPWM:BAD_ARG','An unknown arguement was provided: %s',varargin{i})
             
         end
         
     end
+    if (~isempty(PositCall)&&~isempty(AnnotVec))&&size(PositCall,2)~=size(AnnotVec,2)
+        error('ELMTrainPWM:BAD_ANNOTVEC_POSITCALL_SIZE','The number of columns in POSITION_CALL must match the columns in ANNOT_VECTOR');
+    end
+    
+    
     
 end
 
 if DISPLAY_FLAG
-    options=optimset('OutputFcn', @PWMDisplay);
+    options=optimset('OutputFcn', @PWMDisplay,'MaxIter',MaxIter);
 end
 
 
@@ -91,16 +136,18 @@ if nnz(skipped_mask)~=0
     display(['There are ' int2str(nnz(skipped_mask)) ' ELMs that will be skipped.'])
 end
 
+if isempty(MatchedSpots)
+    MatchedSpots=ELMFinder(INPUT_SEQS,ELM_STRUCT);
+end
 
-MatchedSpots=ELMFinder(INPUT_SEQS,ELM_STRUCT);
-[PositCall AnnotVec Centers]=ELMPositional(INPUT_SEQS,MAPPING_DATA,ELM_STRUCT,'Matched_Spots',MatchedSpots);
+if isempty(AnnotVec)
+    [PositCall AnnotVec]=ELMPositional(INPUT_SEQS,MAPPING_DATA,ELM_STRUCT,'Matched_Spots',MatchedSpots);
+end
 
 
 INT_SEQS_MASTER=cellfun(@(x)(double(aa2int(x))),INPUT_SEQS,'uniformoutput',false);
 SeqLengths=cellfun('length',INT_SEQS_MASTER);
 SeqLengths_CELL=cellfun(@length,INT_SEQS_MASTER,'uniformoutput',false);
-
-
 
 if WHOLE_SEQ_FLAG
     INT_SEQS=INT_SEQS_MASTER;
@@ -133,31 +180,30 @@ if WHOLE_SEQ_FLAG
         drawnow
 
         
-
-        [x fval]=fmincon(@PWMObjective,OriginalPWM(ChangeSpots),[],[],Aeq,Beq,zeros(length(ChangeSpots),1),ones(length(ChangeSpots),1),[],options);
+        [x fval]=fmincon(@PWMObjective,OriginalPWM(ChangeSpots),[],[],[],[],zeros(length(ChangeSpots),1),[],[],options);
+        
     end
 
 else
-    CenterInd=find(~cellfun('isempty',Centers));
+    FoundELMs=unique(AnnotVec(1,:));
     
-    for i=1:length(CenterInd)
-        this_ELM=CenterInd(i);
+    for i=1:length(FoundELMs)
+        this_ELM=FoundELMs(i);
 
         if isempty(INITIAL_PWMS{this_ELM})
+            %could not convert the reg-exp to PWM, nothing to do
             continue
         end
         
-        TheseCenters=Centers{CenterInd(i)}(1,:);
+        TheseBins=AnnotVec(2:3,AnnotVec(1,:)==this_ELM);
         
-        CentroidWidth=round(2*min(TheseCenters));
-        CentroidBound=1:CentroidWidth:max(SeqLengths);
-        
-        for g=1:length(CentroidBound)-1
+        for g=1:size(TheseBins,2)
             CurrentFval=zeros(1,1000);
             INT_SEQS=cellfun(@SeqRetrieve,INT_SEQS_MASTER,'uniformoutput',false);
             NormMatchedSpots=cellfun(@NormalizeSpots,MatchedSpots(:,this_ELM),'uniformoutput',false);
             SeqVals=cell(length(INT_SEQS),1);
-
+            SeqLengths=cellfun('length',INT_SEQS);
+            
             OriginalPWM=INITIAL_PWMS{this_ELM};
             OriginalPWM=repmat(1./sum(OriginalPWM,1),[20 1]).*OriginalPWM;
             ChangeSpots=find(OriginalPWM>0);
@@ -165,25 +211,24 @@ else
 
             [find_I find_J]=find(OriginalPWM>0);
 
-
-            this_MatchedSpots=cellfun(@(x)ismember(1:CentroidWidth,x),NormMatchedSpots,'uniformoutput',false);
+            this_MatchedSpots=cellfun(@(x)ismember(1:(TheseBins(2,g)-TheseBins(1,g)+1),x),NormMatchedSpots,'uniformoutput',false);
+            this_MatchedSpots=cellfun(@(x,y)(x(1:length(y))),this_MatchedSpots,INT_SEQS,'uniformoutput',false);
             
-
 %             Aeq=zeros(length(ChangeSpots));
 %             for j=1:length(ChangeSpots)
 %                 Aeq(j,find_J(j)==find_J)=1;
 %             end
 %             Beq=ones(size(ChangeSpots));
 
-            figure
+%            figure
             pwm_figure=subplot(3,2,1);
             fval_figure=subplot(3,2,2);
             score_figure=subplot(3,1,2);
             hist_figure=subplot(3,1,3);
-            subplot(hist_figure), hist([NormMatchedSpots{:}],CentroidWidth);
+            subplot(hist_figure), hist([NormMatchedSpots{:}],(TheseBins(2,g)-TheseBins(1,g)));
             drawnow
 
-            [x fval]=fmincon(@PWMObjective,OriginalPWM(ChangeSpots),[],[],[],[],zeros(length(ChangeSpots),1),[],[],options);
+            [x fval]=fminsearchbnd(@PWMObjective,OriginalPWM(ChangeSpots),zeros(length(ChangeSpots),1),10*ones(length(ChangeSpots),1),options);
             %[x fval]=fminsearch(@PWMObjective,OriginalPWM(ChangeSpots),options);
         end
         
@@ -199,32 +244,33 @@ end
         CurrentPWM(ChangeSpots)=INPUT_VALS;
         
         SeqVals=PWMEvaluator(CurrentPWM,INT_SEQS,'TRUST_INPUT');
+        try
+        MatchedVals=cellfun(GetMatched,SeqVals,this_MatchedSpots,'uniformoutput',false);
+        NonMatchedVals=cellfun(GetNotMatched,SeqVals,this_MatchedSpots,'uniformoutput',false);
+        catch
+            display('here')
+        end
         
-        MatchedVals=cellfun(@(x,y)(x(y)),SeqVals,this_MatchedSpots,'uniformoutput',false);
-        NonMatchedVals=cellfun(@(x,y)(x(~y)),SeqVals,this_MatchedSpots,'uniformoutput',false);
         
-        ObjVal=mean([NonMatchedVals{:}])-mean([MatchedVals{:}]);
+        ObjVal=mean([NonMatchedVals{:}])/mean([MatchedVals{:}]);
         
     end
 
     function stop=PWMDisplay(x,OptimStruct,state)
         stop=false;
         switch state
-            case 'iter'
+            case 'done'
                 this_PWM=OriginalPWM;
                 this_PWM(ChangeSpots)=x;
 
-                CurrentFval(OptimStruct.iteration+1)=OptimStruct.fval;
-                
                 subplot(pwm_figure), pcolor(this_PWM);
-                subplot(fval_figure), plot(1:OptimStruct.iteration+1,CurrentFval(1:OptimStruct.iteration+1));
+                subplot(fval_figure), plot(1:OptimStruct.iteration+1,CurrentFval(1:OptimStruct.iteration+1));              
                 
-                
-                noise_display_mat=zeros(length(INT_SEQS),CentroidWidth);
-                signal_display_mat=NaN(length(INT_SEQS),CentroidWidth);
+                noise_display_mat=zeros(length(INT_SEQS),max(SeqLengths));
+                signal_display_mat=NaN(length(INT_SEQS),max(SeqLengths));
                 
                 for p=1:length(INT_SEQS)
-                    noise_display_mat(p,1:CentroidWidth)=SeqVals{p}(1:CentroidWidth);
+                    noise_display_mat(p,1:SeqLengths(p))=SeqVals{p}(:);
                     if ~isempty(NormMatchedSpots{p})
                         noise_display_mat(p,NormMatchedSpots{p})=NaN;
                         signal_display_mat(p,NormMatchedSpots{p})=SeqVals{p}(NormMatchedSpots{p});
@@ -236,21 +282,15 @@ end
                 
                 signal_data=nanmean(signal_display_mat,1);
                 signal_data(isnan(signal_data))=0;
-                
 
                 subplot(score_figure), plot(1:length(noise_data),noise_data,'k',1:length(signal_data),signal_data,'b');
                 
                 drawnow
             case 'interupt'
+            case  'init'
                 
-            case 'init'
-                
-
-                
-               
-
-            case 'done'
-
+            case 'iter'
+                CurrentFval(OptimStruct.iteration+1)=OptimStruct.fval;
         end
     end
 
@@ -299,7 +339,7 @@ end
     end
 
     function SEQ=SeqRetrieve(input_seq)
-        SEQ=input_seq(CentroidBound(g):min(CentroidBound(g+1),length(input_seq)));
+        SEQ=input_seq(TheseBins(1,g):min(TheseBins(2,g),length(input_seq)));
     end
 
     function NormedSpot=NormalizeSpots(match_spots)
@@ -307,7 +347,7 @@ end
             NormedSpot=[];
             return
         else
-            NormedSpot=match_spots(match_spots>=CentroidBound(g)&match_spots<CentroidBound(g+1))-CentroidBound(g)+1;
+            NormedSpot=match_spots(match_spots>=TheseBins(1,g)&match_spots<TheseBins(2,g))-TheseBins(1,g)+1;
         end
     end
 
