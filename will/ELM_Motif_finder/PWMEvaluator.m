@@ -58,15 +58,19 @@ end
 
 SETUP_TRUST_FLAG=false;
 MISSING_VAL=NaN;
+NEED_MAPPING=true;
 
-
-
-if size(PWM_mat,1)==20||size(PWM_mat,1)==20
+if ~isnumeric(INPUT_SEQS{1})
+    
+if size(PWM_mat,1)==20||size(PWM_mat,1)==21
     MapFun=@(x)(double(aa2int(x)));
 elseif size(PWM_mat,1)==4||size(PWM_mat,1)==5
     MapFun=@(x)(double(nt2int(x)));
 else
     MapFun=@(x)(double(aa2int(x)));
+end
+else
+    NEED_MAPPING=false;
 end
 
 if ~isempty(varargin)
@@ -80,6 +84,7 @@ if ~isempty(varargin)
                 end
                 
             case 'seq_type'
+                NEED_MAPPING=true;
                 switch lower(varargin{i+1})
                     case 'aa'
                         MapFun=@(x)(double(aa2int(x)));
@@ -89,6 +94,7 @@ if ~isempty(varargin)
                         error('PWMEvaluator:BAD_SEQTYPE','An unkown arguement was provided to SEQ_TYPE: %s',varargin{i+1});
                 end
             case 'mapping_fun'
+                NEED_MAPPING=true;
                 if ishandle(varargin{i+1})&&nargin(varargin{i+1})==1
                     MapFun=varargin{i+1};
                 else
@@ -105,8 +111,11 @@ if ~isempty(varargin)
 end
 
 %Map sequences to Indexes into PWM_mat
-NormalizedSeqs=cellfun(MapFun,INPUT_SEQS,'uniformoutput',false);
-
+if NEED_MAPPING
+    NormalizedSeqs=cellfun(MapFun,INPUT_SEQS,'uniformoutput',false);
+else
+    NormalizedSeqs=INPUT_SEQS;
+end
 
 %check for values that are either Zero or >size(PWM_mat,2) because they
 %will disrupt indexing within the MEX function.
@@ -133,7 +142,7 @@ varargout{1}=PWMEvaluatorFAST(PWM_mat,NormalizedSeqs(:));
     function input_seq=ReviseSeq(input_seq)
         %remove the bad values and replace them with an index into the last
         %column
-        input_seq(input_seq==0|input_seq>size(PWM_mat,2))=size(PWM_mat,1);
+        input_seq(input_seq==0|input_seq>size(PWM_mat,1))=size(PWM_mat,1);
     end
 end
 
