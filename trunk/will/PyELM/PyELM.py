@@ -1,6 +1,7 @@
 import os
-import numpy
+from numpy import *
 import re
+from pylab import *
 
 print 'Actually running'
 
@@ -95,3 +96,31 @@ def ELMMatchSeqs(SEQUENCES,ELM_DICT):
 
     return SeqELMDict
     
+def ELMHistGen(ELM_MATCH_VEC,ELM_DICT,MAX_SIZE):
+    """
+    ELMHistGen
+        Generates a count-matrix of ELM matches at specific locations in the sequences.
+
+    ELM_COUNT_MAT = ELMHistGen(ELM_MATCH_VEC,ELM_DICT,MAX_SIZE)
+
+    ELM_MATCH_VEC   An output produced by ELMMatchSeqs.  This is an array where each element represnts a
+                    sequence and each value is a DICT of ELMs and thier matched locations.
+
+    ELM_DICT        An output of Parser().  This is a DICT of each ELM and its regexp.
+
+    ELM_COUNT_MAT   An [maxSeqLength x len(ELM_DICT)] each Row represent an ELM and each Column
+                    is a seqLocation.
+
+    """
+
+    histArray=zeros((len(ELM_DICT),MAX_SIZE))
+
+    counter=0
+    for thisELM in ELM_DICT:
+        for i in xrange(len(ELM_MATCH_VEC)):
+            histArray[counter,ELM_MATCH_VEC[i][thisELM]] += 1
+        counter+=1
+    
+    return histArray
+
+
