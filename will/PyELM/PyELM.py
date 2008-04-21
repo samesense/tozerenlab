@@ -58,3 +58,41 @@ def Parser(DIRECTORY="C:\Documents and Settings\Will\My Documents\ELM_Motif_find
         thisFile.close()
     
     return allRegExps
+
+def ELMMatchSeqs(SEQUENCES,ELM_DICT):
+    """
+    ELMMatchSeqs
+        Searches for the regular expressions of ELM_DICT within the SEQUENCES provided.
+
+    ELM_MATCH_VEC = ELMMatchSeqs(SEQUENCES,ELM_DICT)
+
+    SEQUENCES       A LIST or ITER of BioSeq objects of Amino Acid sequences
+
+    ELM_DICT        A DICT of ELM motifs as created by Parser()
+
+    ELM_MATCH_VEC   A LIST corresponding to each BioSeq object provided.  Each element in the list is a
+                    DICT where each element indicates a matched ELM location.
+
+    """
+
+    #compile all of the re's
+    ELMreDict={}
+    for thisELM in ELM_DICT:
+        ELMreDict[thisELM]=re.compile(ELM_DICT[thisELM],re.I)
+
+    
+    SeqELMDict=[]
+    for thisSeq in SEQUENCES:
+        thisELMSeq={}
+        for thisELM in ELMreDict:
+            thisIndex=[];
+            #each search only finds one match, so repeat the search until no more are found
+            spot = ELMreDict[thisELM].search(thisSeq.seq.tostring())
+            while spot != None:
+                thisIndex.append(spot.start())
+                spot = ELMreDict[thisELM].search(thisSeq.seq.tostring(),spot.start()+1)
+            thisELMSeq[thisELM]=thisIndex
+        SeqELMDict.append(thisELMSeq)
+
+    return SeqELMDict
+    
