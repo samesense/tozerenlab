@@ -1,4 +1,10 @@
 import os
+import Bio
+import numpy
+import re
+
+print 'Actually running'
+
 
 def Parser(DIRECTORY="C:\\Documents and Settings\\Will\\My Documents\\PyELM\\ELM_RAW_DOWNLOAD\\"):
     """
