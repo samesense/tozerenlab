@@ -1,5 +1,4 @@
 import os
-import Bio
 import numpy
 import re
 
@@ -66,7 +65,7 @@ def ELMMatchSeqs(SEQUENCES,ELM_DICT):
 
     ELM_MATCH_VEC = ELMMatchSeqs(SEQUENCES,ELM_DICT)
 
-    SEQUENCES       A LIST or ITER of BioSeq objects of Amino Acid sequences
+    SEQUENCES       A LIST of AA sequences.
 
     ELM_DICT        A DICT of ELM motifs as created by Parser()
 
@@ -87,10 +86,10 @@ def ELMMatchSeqs(SEQUENCES,ELM_DICT):
         for thisELM in ELMreDict:
             thisIndex=[];
             #each search only finds one match, so repeat the search until no more are found
-            spot = ELMreDict[thisELM].search(thisSeq.seq.tostring())
+            spot = ELMreDict[thisELM].search(thisSeq)
             while spot != None:
                 thisIndex.append(spot.start())
-                spot = ELMreDict[thisELM].search(thisSeq.seq.tostring(),spot.start()+1)
+                spot = ELMreDict[thisELM].search(thisSeq,spot.start()+1)
             thisELMSeq[thisELM]=thisIndex
         SeqELMDict.append(thisELMSeq)
 
