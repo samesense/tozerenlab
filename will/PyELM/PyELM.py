@@ -6,7 +6,7 @@ import re
 print 'Actually running'
 
 
-def Parser(DIRECTORY="C:\\Documents and Settings\\Will\\My Documents\\PyELM\\ELM_RAW_DOWNLOAD\\"):
+def Parser(DIRECTORY="C:\Documents and Settings\Will\My Documents\ELM_Motif_finder\ELM_RAW_DOWNLOAD\\"):
     """
     Parser
         Parses a directory of HTML files to extract the ELM names and Regular Expressions and returns a DICT.
@@ -34,7 +34,7 @@ def Parser(DIRECTORY="C:\\Documents and Settings\\Will\\My Documents\\PyELM\\ELM
         
         currentLine=thisFile.readline()
         
-        allRegExps[ELMname[0]]=currentLine[currentLine.find('>')+1:currentLine.find('/')-3]
+        allRegExps[ELMname[0]]=currentLine[currentLine.find('>')+1:currentLine.find('/')-2]
         thisFile.close()
     
     return allRegExps
