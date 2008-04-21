@@ -1,17 +1,18 @@
 import os
 
 def Parser(DIRECTORY="C:\\Documents and Settings\\Will\\My Documents\\PyELM\\ELM_RAW_DOWNLOAD\\"):
-#   Parser
-#       Parses a directory of HTML files to extract the ELM names and Regular Expressions and returns a DICT.
-#   
-#   ELM_LIST = Parser(DIRECTORY)
-#
-#   DIRECTORY       The directory containing the HTML files downloaded from the ELM database.
-#                   If left empty then C:\Documents and Settings\Will\My Documents\PyELM\ELM_RAW_DOWNLOAD\
-#
-#   ELM_LIST        A DICT containing all of the parsed ELMs.
-#
-#
+    """
+    Parser
+        Parses a directory of HTML files to extract the ELM names and Regular Expressions and returns a DICT.
+
+        ELM_LIST = Parser(DIRECTORY)
+
+        DIRECTORY       The directory containing the HTML files downloaded from the ELM database.
+                        If left empty then C:\Documents and Settings\Will\My Documents\PyELM\ELM_RAW_DOWNLOAD\
+
+        ELM_LIST        A DICT containing all of the parsed ELMs.
+    """
+
 
     fileList=os.listdir(DIRECTORY)
     allRegExps={}
