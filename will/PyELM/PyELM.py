@@ -101,14 +101,14 @@ class PyELM:
             #compile all of the re's
             if self.ELMreDict != None:
                 ELMreDict={}
-                for thisELM in self.ELMDict:
+                for thisELM in self.ELMOrder:
                     ELMreDict[thisELM]=re.compile(self.ELMDict[thisELM],re.I)
                 self.ELMreDict=ELMreDict
             
             SeqELMDict=[]
             for thisSeq in self.Sequences:
                 thisELMSeq={}
-                for thisELM in self.ELMreDict:
+                for thisELM in self.ELMOrder:
                     thisIndex=[];
                     #each search only finds one match, so repeat the search until no more are found
                     spot = self.ELMreDict[thisELM].search(thisSeq)
@@ -147,10 +147,10 @@ class PyELM:
 
         if len(self.PreCalchistArray) == 0:
 
-            histArray=zeros((len(self.ELMDict),self.MaxSize))
+            histArray=zeros((len(self.ELMOrder),self.MaxSize))
 
             counter=0
-            for thisELM in self.ELMDict:
+            for thisELM in self.ELMOrder:
                 for i in xrange(len(self.PreCalcELMMatchSeqs)):
                     histArray[counter,self.PreCalcELMMatchSeqs[i][thisELM]] += 1
                 counter+=1
@@ -187,7 +187,7 @@ class PyELM:
 
         if len(self.PreCalcELMPosDict) == 0 | FORCE_CALC:
             ELM_POS_DICT={}
-            for thisELM in self.ELMDict:
+            for thisELM in self.ELMOrder:
                 boolArray = zeros((len(self.PreCalcELMMatchSeqs),self.MaxSize))
                 for i in xrange(len(self.PreCalcELMMatchSeqs)):
                     boolArray[i,self.PreCalcELMMatchSeqs[i][thisELM]]=1
@@ -232,10 +232,19 @@ class PyELM:
         GetSeqIterator('ELMPosDict',WANTED_ELM)
             This creates an iterator which will return the ELMPos Array data in Sequence order. If WANTED_ELM
             is left empty then Data is returned as an Array in which each row represents one ELM.
-
-        
         """
         if (WANTED_ELM == None) | (WANTED_ELM in self.ELMOrder):
+            if TYPE == 'ELMMatchSeqs':
+                if len(self.PreCalcELMMatchSeqs) == 0:
+                    self.ELMMatchSeqs()
+            elif TYPE == 'ELMPosDict':
+                if len(self.PreCalcELMMatchSeqs) == 0:
+                    self.ELMPosGen()
+            else:
+                print 'A undefined Type was provided'
+                raise KeyError
+
+
             return self.SeqIterator(self,TYPE,WANTED_ELM)
         else:
             print 'Provided an unknown ELM key'
@@ -254,7 +263,6 @@ class PyELM:
                 self.__MaxSize=instance.MaxSize
                 self.__ELMOrder=instance.ELMOrder
                 self.__ELMPosDict=instance.PreCalcELMPosDict
-
 
         def __iter__(self):
             return self
