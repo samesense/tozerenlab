@@ -123,4 +123,63 @@ def ELMHistGen(ELM_MATCH_VEC,ELM_DICT,MAX_SIZE):
     
     return histArray
 
+def ELMPosGen(ELM_MATCH_VEC,ELM_DICT,MAX_SIZE,WANTED_ELM=None):
+    """
+    ELMPosGen
+        Generates a [len(ELM_MATCH_VEC) MAX_SIZE] matrix in which each position is a 1 if the ELM is present at that location
+    and 0 otherwise.
 
+        ELM_POS_DICT = ELMPosGen(ELM_MATCH_VEC,ELM_DICT,MAX_SIZE)
+
+    ELM_MATCH_VEC   An output produced by ELMMatchSeqs.  This is an array where each element represnts a
+                    sequence and each value is a DICT of ELMs and thier matched locations.
+
+    ELM_DICT        An output of Parser().  This is a DICT of each ELM and its regexp.
+
+    ELM_POS_DICT    A DICT which is 'keyed' by ELM name and each value is a matrix.
+
+
+        ELM_POS_ARRAY = ELMPosGen(..., WANTED_ELM)
+    Will return only the desired array.
+
+    """
+    
+
+    if WANTED_ELM != None:
+        boolArray = zeros((len(ELM_MATCH_VEC),MAX_SIZE))
+        for i in xrange(len(ELM_MATCH_VEC)):
+            boolArray[i,ELM_MATCH_VEC[i][WANTED_ELM]]=1
+        return boolArray
+
+    ELM_POS_DICT={}
+    for thisELM in ELM_DICT:
+        boolArray = zeros((len(ELM_MATCH_VEC),MAX_SIZE))
+        for i in xrange(len(ELM_MATCH_VEC)):
+            boolArray[i,ELM_MATCH_VEC[i][thisELM]]=1
+        ELM_POS_DICT[thisELM] = boolArray
+
+    return ELM_POS_DICT
+
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    
