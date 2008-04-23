@@ -236,7 +236,7 @@ class PyELM:
             elif len(WANTED_RANGE) != 2:
                 print 'WANTED_RANGE must be len == 2 or None'
                 raise IndexError
-            elif WANTED_RANGE[0] < 0 | WANTED_RANGE[1] < WANTED_RANGE[0]:
+            elif WANTED_RANGE[0] < 0 | WANTED_RANGE[1] <= WANTED_RANGE[0]:
                 print 'WANTED_RANGE[0] > 0 and WANTED_RANGE[1] > WANTED_RANGE[0]'
                 raise IndexError
             elif WANTED_RANGE[0] > self.MaxSize | WANTED_RANGE[1] > self.MaxSize:
