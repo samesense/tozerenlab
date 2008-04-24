@@ -1,7 +1,7 @@
 import os
 from numpy import *
 import re
-from pylab import *
+
 
 print 'Actually running'
 
