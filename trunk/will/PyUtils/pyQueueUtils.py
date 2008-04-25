@@ -24,7 +24,7 @@ class PriorityQueue(Queue):
         thisPos = array(self.priority).searchsorted(thisVal)
        
         self.priority.insert(thisPos,thisVal)
-        self.queue.insert(thisPos,item[1])
+        self.queue.insert(thisPos,item[0])
 
     def _get(self):
         self.priority.pop(0)
