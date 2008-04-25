@@ -1,6 +1,20 @@
 from numpy import searchsorted,array
 from Queue import *
 class PriorityQueue(Queue):
+    """
+    A simple implementation of a priority Queue.  Items are passed in as a tuple that includes both the item and its priority.
+
+    put((ITEM,PRIORITY))
+        
+        ITEM        Any sinlge object to be stored in the queue
+
+        PRIORITY    A numerical value where the LOWEST number implies greatest priority.
+
+    get()
+        Returns the next item in the PriorityQueue
+
+
+    """
     def _put(self,item):
 
         if len(item) != 2:
