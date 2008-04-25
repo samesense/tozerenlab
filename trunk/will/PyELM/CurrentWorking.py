@@ -4,14 +4,14 @@ from numpy import *
 import re
 from copy import *
 from Queue import *
+import cProfile
+from threading import *
 
-HOME_DIR="C:\\Documents and Settings\\William Dampier\\My Documents\\ELM_Motif_finder\\ELM_RAW_DOWNLOAD\\"
 
 os.chdir(os.curdir)
 
 from PyELM import *
-
-TestedSolutions = {}
+from pyQueueUtils import *
 
 
 def EvaluateBin(ELMData,WANTED_ELM,binEdges):
@@ -28,19 +28,92 @@ def EvaluateBin(ELMData,WANTED_ELM,binEdges):
 
 
 def EvaluateAllBins(ELMData,WANTED_ELM,allBins):
-    if not( tuple(allBins) in TestedSolutions ):
+    if not( tuple(allBins) in allBinDict ):
+
         TotalEmpty=0
         TotalCorrect=0
         TotalWrong=0
         for i in xrange(len(allBins)-1):
-            if (allBins[i],allBins[i+1]) not in CalculatedBins:
-                CalculatedBins[(allBins[i],allBins[i+1])] = EvaluateBin(ELMData,WANTED_ELM,(allBins[i],allBins[i+1]))
+            if (allBins[i],allBins[i+1]) not in singlebinDict:
+                singlebinDict[(allBins[i],allBins[i+1])] = EvaluateBin(ELMData,WANTED_ELM,(allBins[i],allBins[i+1]))
             
-            TotalEmpty += CalculatedBins[(allBins[i],allBins[i+1])][0]
-            TotalCorrect += CalculatedBins[(allBins[i],allBins[i+1])][1]
-            TotalWrong += CalculatedBins[(allBins[i],allBins[i+1])][2]
-        TestedSolutions[tuple(theseBins)]=(TotalEmpty,TotalCorrect,TotalWrong)
-    return TestedSolutions[tuple(theseBins)][2]
+            TotalEmpty += singlebinDict[(allBins[i],allBins[i+1])][0]
+            TotalCorrect += singlebinDict[(allBins[i],allBins[i+1])][1]
+            TotalWrong += singlebinDict[(allBins[i],allBins[i+1])][2]
+        funVal = (.25*TotalEmpty + TotalWrong) / (TotalCorrect + 1)
+        allBinDict[tuple(allBins)]=(TotalEmpty,TotalCorrect,TotalWrong,funVal)
+
+    return allBinDict[tuple(allBins)][3]
+
+
+def MakeBreadth(globalQueue,allBins,BreadthCounter,DepthCounter):
+    print (BreadthCounter,DepthCounter,EvaluateAllBins(ELMAnal,wanted_elm,allBins),globalQueue.qsize(),wanted_elm)
+    if DepthCounter > MaxDepth:
+        return
+
+    if (BreadthCounter > MaxBreadth) & (allBins in DepthChecked):
+        return
+        
+    LocalQueue = []
+    LocalVals = []
+        
+    for k in xrange(len(allBins)-1):
+        thisBinSet = deepcopy(allBins)
+        newBinEdge=thisBinSet[k]+int((thisBinSet[k+1]-thisBinSet[k])/2)
+        thisBinSet.insert(k+1,newBinEdge)
+        LocalQueue.append(thisBinSet)
+        LocalVals.append(EvaluateAllBins(ELMAnal,wanted_elm,thisBinSet))
+
+    for k in xrange(1,len(allBins)-1):
+        thisBinSet = deepcopy(allBins)
+        thisBinSet.pop(k)
+        LocalQueue.append(thisBinSet)
+        LocalVals.append(EvaluateAllBins(ELMAnal,wanted_elm,thisBinSet))
+
+    for k in xrange(1,len(allBins)-1):
+        thisBinSet = deepcopy(allBins)
+        newBinMove = int((thisBinSet[k+1]-thisBinSet[k])/2)
+        LocalQueue.append(thisBinSet)
+        LocalVals.append(EvaluateAllBins(ELMAnal,wanted_elm,thisBinSet))
+
+    for k in xrange(1,len(allBins)-1):
+        thisBinSet = deepcopy(allBins)
+        newBinMove=int((thisBinSet[k]-thisBinSet[k-1])/2)
+        thisBinSet[k]=thisBinSet[k]-newBinMove
+        LocalQueue.append(thisBinSet)
+        LocalVals.append(EvaluateAllBins(ELMAnal,wanted_elm,thisBinSet))
+
+    BestInds=argsort(LocalVals)
+
+    if BreadthCounter < MaxBreadth:
+        for k in xrange(min(MaxWidth,len(BestInds))-1,0,-1):
+            globalQueue.put(((LocalQueue[BestInds[k]],BreadthCounter+1,DepthCounter),LocalVals[BestInds[k]]))
+    else:
+        if (LocalVals[BestInds[0]] < EvaluateAllBins(ELMAnal,wanted_elm,allBins)):
+            DepthChecked.append(allBins)
+            globalQueue.put(((LocalQueue.pop(BestInds[0]),BreadthCounter+1,DepthCounter+1),LocalVals[BestInds[0]]))
+
+
+    
+
+
+def nonQueueWorker():
+    GlobalCounter = 0
+    while True:
+        GlobalCounter += 1
+        print GlobalCounter
+        try:
+            thisItem = BreadthQueue.get(True, 60)
+            BreadthQueue.task_done()
+        except:
+            print 'queue empty'
+            break
+        
+        if GlobalCounter < MaxIter:
+            try:
+                MakeBreadth(BreadthQueue,thisItem[0],thisItem[1],thisItem[2])
+            except:
+                print 'weird error'
 
 bkgHandle = open('test_data.fasta','rU')
 bkgSeqs=[]
@@ -52,175 +125,49 @@ bkgHandle.close()
 
 ELMAnal = PyELM()
 
-ELMAnal.ELMParser(HOME_DIR)
+ELMAnal.ELMParser()
 ELMAnal.LoadSeqs(bkgSeqs)
 
 ELMAnal.ELMMatchSeqs()
 
 theseBins = [0, int(ELMAnal.MaxSize/2), ELMAnal.MaxSize]
 
-wanted_elm='CLV_PCSK_KEX2_1'
 
-CalculatedBins = {}
-
-
-##TotalEmpty=0
-##TotalCorrect=0
-##TotalWrong=0
-##for i in xrange(len(theseBins)-1):
-##    if (theseBins[i],theseBins[i+1]) not in CalculatedBins:
-##        CalculatedBins[(theseBins[i],theseBins[i+1])] = EvaluateBin(ELMAnal,wanted_elm,(theseBins[i],theseBins[i+1]))
-##    TotalEmpty += CalculatedBins[(theseBins[i],theseBins[i+1])][0]
-##    TotalCorrect += CalculatedBins[(theseBins[i],theseBins[i+1])][1]
-##    TotalWrong += CalculatedBins[(theseBins[i],theseBins[i+1])][2]
-##TestedSolutions[tuple(theseBins)]=(TotalEmpty,TotalCorrect,TotalWrong)
-##
-##CurrentBest=TestedSolutions[tuple(theseBins)][2]
-##BestMethod=''
-##BestInd=0
-
-##for p in xrange(40):
-##    #try adding Edges in the middle of current edges
-##    for k in xrange(len(theseBins)-1):
-##
-##        newBinEdge=theseBins[k]+int((theseBins[k+1]-theseBins[k])/2)
-##        theseBins.insert(k+1,newBinEdge)
-##        if tuple(theseBins) in TestedSolutions:
-##            continue
-##
-##        EvaluateAllBins(ELMAnal,wanted_elm,theseBins)
-##
-##        if TestedSolutions[tuple(theseBins)][2] < CurrentBest:
-##            BestMethod='ADD'
-##            BestInd=k
-##            CurrentBest=TestedSolutions[tuple(theseBins)][2]
-##
-##        theseBins.pop(k+1)
-##
-##    #try moving edges to the midpoint
-##    for k in xrange(1,len(theseBins)-1):
-##
-##        newBinMove=int((theseBins[k+1]-theseBins[k])/2)
-##        theseBins[k]=theseBins[k]+newBinMove
-##
-##        if tuple(theseBins) in TestedSolutions:
-##            continue        
-##
-##        EvaluateAllBins(ELMAnal,wanted_elm,theseBins)
-##
-##        if TestedSolutions[tuple(theseBins)][2] < CurrentBest:
-##            BestMethod='MoveRight'
-##            BestInd=k
-##            CurrentBest=TestedSolutions[tuple(theseBins)][2]
-##
-##        theseBins[k]=theseBins[k]-newBinMove
-##
-##    for k in xrange(1,len(theseBins)-1):
-##        newBinMove=int((theseBins[k]-theseBins[k-1])/2)
-##        
-##        theseBins[k]=theseBins[k]-newBinMove
-##
-##        
-##        if tuple(theseBins) in TestedSolutions:
-##            continue        
-##
-##        EvaluateAllBins(ELMAnal,wanted_elm,theseBins)
-##
-##        if TestedSolutions[tuple(theseBins)][2] < CurrentBest:
-##            BestMethod='MoveLeft'
-##            BestInd=k
-##            CurrentBest=TestedSolutions[tuple(theseBins)][2]
-##
-##        theseBins[k]=theseBins[k]+newBinMove
-##
-##
-##
-##    if BestMethod=='ADD':
-##        newBinEdge=theseBins[BestInd]+int((theseBins[BestInd+1]-theseBins[BestInd])/2)
-##        theseBins.insert(BestInd+1,newBinEdge)
-##    elif BestMethod == 'MoveRight':
-##        newBinMove=int((theseBins[k+1]-theseBins[k])/2)
-##        theseBins[k]=theseBins[k]+newBinMove
-##    elif BestMethod == 'MoveLeft':
-##        newBinMove=int((theseBins[k]-theseBins[k-1])/2)
-##        theseBins[k]=theseBins[k]-newBinMove
-##
+MaxBreadth = 4
+MaxDepth = 100
+MaxWidth = 5
+MaxIter = 1000
 
 
-globalQueue = Queue(-1)
-MaxBreadth = 3
-MaxDepth = 5
 
-def MakeBreadth(allBins,BreadthCounter,DepthCounter):
+
+for wanted_elm in ELMAnal.GetELMIterator():
+    BreadthQueue = PriorityQueue(-1)
+    print wanted_elm
+    BreadthQueue.put(((theseBins,0,0),0))
+       
     
-    print (BreadthCounter,DepthCounter,globalQueue.qsize())
+    singlebinDict = {}
+    allBinDict = {}
+    DepthChecked = []
+    GlobalCounter = 0
 
-    if DepthCounter > MaxDepth:
-        return
-    
-    if BreadthCounter > MaxBreadth:
-        print 'CurrentVals'
-        LocalQueue = []
-        
-    for k in xrange(len(allBins)-1):
-        thisBinSet = deepcopy(allBins)
-        newBinEdge=thisBinSet[k]+int((thisBinSet[k+1]-thisBinSet[k])/2)
-        thisBinSet.insert(k+1,newBinEdge)
-        if BreadthCounter > MaxBreadth:
-            LocalQueue.append(thisBinSet)
-        else:
-            globalQueue.put((thisBinSet,BreadthCounter+1,DepthCounter))
+    for i in range(10):
+        t = Thread(target = nonQueueWorker)
+        t.setDaemon(True)
+        t.start()
 
-    for k in xrange(1,len(allBins)-1):
-        thisBinSet = deepcopy(allBins)
-        thisBinSet.pop(k)
-        if BreadthCounter > MaxBreadth:
-            LocalQueue.append(thisBinSet)
-        else:
-            globalQueue.put((thisBinSet,BreadthCounter+1,DepthCounter))
-
-    for k in xrange(1,len(allBins)-1):
-        thisBinSet = deepcopy(allBins)
-        newBinMove = int((thisBinSet[k+1]-thisBinSet[k])/2)
-        if BreadthCounter > MaxBreadth:
-            LocalQueue.append(thisBinSet)
-        else:
-            globalQueue.put((thisBinSet,BreadthCounter+1,DepthCounter))
-
-    for k in xrange(1,len(allBins)-1):
-        thisBinSet = deepcopy(allBins)
-        newBinMove=int((thisBinSet[k]-thisBinSet[k-1])/2)
-        thisBinSet[k]=thisBinSet[k]-newBinMove
-        if BreadthCounter > MaxBreadth:
-            LocalQueue.append(thisBinSet)
-        else:
-            globalQueue.put((thisBinSet,BreadthCounter+1,DepthCounter))
-
-    if BreadthCounter > MaxBreadth:
-        bestBinSet = LocalQueue.pop()
-        bestVal = EvaluateAllBins(ELMAnal,wanted_elm,bestBinSet)
-        while len(LocalQueue) !=0:
-            thisBin = LocalQueue.pop()
-            thisVal = EvaluateAllBins(ELMAnal,wanted_elm,thisBin)
-            if thisVal < bestVal:
-                bestVal = thisVal
-                bestBinSet = deepcopy(thisBin)
-
-        globalQueue.put((bestBinSet,BreadthCounter,DepthCounter+1))
-            
-
-globalQueue.put((theseBins,0,0))
-while not(globalQueue.empty()):
-    thisItem = globalQueue.get()
-    globalQueue.task_done()
-    MakeBreadth(thisItem[0],thisItem[1],thisItem[2])
+    BreadthQueue.join()
 
 
 
 
+    currentMin = 50000
+    currentMinInd = 0
+    for i in allBinDict:
+        if allBinDict[i][3] < currentMin:
+            currentMinInd = i
+            currentMin = allBinDict[currentMinInd][3]
 
-
-
-
-
+    print (wanted_elm, allBinDict[currentMinInd])
 
