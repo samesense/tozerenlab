@@ -1,9 +1,9 @@
 import os
 from numpy import *
 import re
+from pyQueueUtils import *
+from copy import *
 
-
-print 'Actually running'
 
 class PyELM:
 
@@ -13,11 +13,24 @@ class PyELM:
         self.ELMOrder=[]
         self.Sequences=[]
         self.ELMreDict={}
-        self.MaxSize=0    
+        self.MaxSize=0
+
+        self.__FoundCorrect = False
 
 
         self.PreCalchistArray=[]        
         self.PreCalcELMMatchSeqs=[]
+        self.PreCalcELMBinDict={}
+
+        self.__singlebinDict={}
+        self.__allBinDict={}
+        self.__DepthChecked=[]
+
+        
+        self.MaxBreadth = 4
+        self.MaxDepth = 100
+        self.MaxWidth = 5
+        self.MaxIter = 1000
 
     def ELMParser(self,DIRECTORY="C:\Documents and Settings\Will\My Documents\ELM_Motif_finder\ELM_RAW_DOWNLOAD\\"):
         """
@@ -195,8 +208,22 @@ class PyELM:
             return 1
         else:
             return 0
+
+
+
     def MultiELMCall(self,SEQ_IND,WANTED_ELM):
-        assert NotImplemented
+        thisCall = []
+        allBins = self.PreCalcELMBinDict[WANTED_ELM]
+        for i in xrange(len(allBins)-1):
+            if sum(self.ELMPosGen(SEQ_IND,allBins[i],allBins[i+1],WANTED_ELM)) > 0:
+                thisCall.append(1)
+            else:
+                thisCall.append(0)
+        return thisCall
+
+
+        
+
 
     def ELMPosGen(self,SEQ_IND,POS_START,POS_STOP,WANTED_ELM):
         """
@@ -318,3 +345,139 @@ class PyELM:
                     return OutArray
             else:
                 raise StopIteration
+
+    def __QueueWorker(self,BreadthQueue,WANTED_ELM):
+        """
+        A helper function to manage the Priority Queue and Threads
+        """
+        while True:
+            try:
+                thisItem = BreadthQueue.get(True, 5)
+                BreadthQueue.task_done()
+            except:
+                break
+            
+            if not(self.__FoundCorrect):
+                self.__MakeBreadth(BreadthQueue,WANTED_ELM,thisItem[0],thisItem[1],thisItem[2])
+                
+
+    def __MakeBreadth(self,globalQueue,WANTED_ELM,allBins,BreadthCounter,DepthCounter):
+        """
+        __MakeBreadth
+
+        Performs a breadth-first search.  All nodes are added to the Queue and processes in order.
+
+
+        """
+        #print (BreadthCounter,DepthCounter,self.__EvaluateAllBins(WANTED_ELM,allBins),globalQueue.qsize(),WANTED_ELM)
+        if DepthCounter > self.MaxDepth:
+            return
+
+        if (BreadthCounter > self.MaxBreadth) & (allBins in self.__DepthChecked):
+            return
+            
+        LocalQueue = []
+        LocalVals = []
+            
+        for k in xrange(len(allBins)-1):
+            thisBinSet = deepcopy(allBins)
+            newBinEdge=thisBinSet[k]+int((thisBinSet[k+1]-thisBinSet[k])/2)
+            thisBinSet.insert(k+1,newBinEdge)
+            LocalQueue.append(thisBinSet)
+            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+
+        for k in xrange(1,len(allBins)-1):
+            thisBinSet = deepcopy(allBins)
+            thisBinSet.pop(k)
+            LocalQueue.append(thisBinSet)
+            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+
+        for k in xrange(1,len(allBins)-1):
+            thisBinSet = deepcopy(allBins)
+            newBinMove = int((thisBinSet[k+1]-thisBinSet[k])/2)
+            LocalQueue.append(thisBinSet)
+            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+
+        for k in xrange(1,len(allBins)-1):
+            thisBinSet = deepcopy(allBins)
+            newBinMove=int((thisBinSet[k]-thisBinSet[k-1])/2)
+            thisBinSet[k]=thisBinSet[k]-newBinMove
+            LocalQueue.append(thisBinSet)
+            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+
+        BestInds=argsort(LocalVals)
+
+
+        if BreadthCounter < self.MaxBreadth:
+            for k in xrange(min(self.MaxWidth,len(BestInds))-1,0,-1):
+
+                globalQueue.put(((LocalQueue[BestInds[k]],BreadthCounter+1,DepthCounter),LocalVals[BestInds[k]]))
+        else:
+            if (LocalVals[BestInds[0]] < self.__EvaluateAllBins(WANTED_ELM,allBins)):
+                self.__DepthChecked.append(allBins)
+                globalQueue.put(((LocalQueue.pop(BestInds[0]),BreadthCounter+1,DepthCounter+1),LocalVals[BestInds[0]]))
+
+
+    
+
+    def __EvaluateBin(self,WANTED_ELM,binEdges):
+        """
+        Evaluates the values of the single bin provided.
+        """
+        thisBinVal=[0,0,0]
+        for thisSeq in self.GetSeqIterator(WANTED_ELM,(binEdges[0],binEdges[1])):
+            CurrentBin=sum(thisSeq)
+            if CurrentBin == 0:
+                thisBinVal[0]+=1
+            elif CurrentBin == 1:
+                thisBinVal[1]+=1
+            else:
+                thisBinVal[2]+=1
+        return (thisBinVal[0], thisBinVal[1], thisBinVal[2] )
+
+
+    def __EvaluateAllBins(self,WANTED_ELM,allBins):
+        """
+        Evaluates the values of the bins provided.  Uses a dictionary to avoid re-calculating values wherever possible
+        """
+        if not(tuple(allBins) in self.__allBinDict ):
+            TotalEmpty=0
+            TotalCorrect=0
+            TotalWrong=0
+            for i in xrange(len(allBins)-1):
+                if (allBins[i],allBins[i+1]) not in self.__singlebinDict:
+                    self.__singlebinDict[(allBins[i],allBins[i+1])] = self.__EvaluateBin(WANTED_ELM,(allBins[i],allBins[i+1]))
+                
+                TotalEmpty += self.__singlebinDict[(allBins[i],allBins[i+1])][0]
+                TotalCorrect += self.__singlebinDict[(allBins[i],allBins[i+1])][1]
+                TotalWrong += self.__singlebinDict[(allBins[i],allBins[i+1])][2]
+            funVal = (.25*TotalEmpty + TotalWrong) / (TotalCorrect + 1)
+            self.__allBinDict[tuple(allBins)]=(TotalEmpty,TotalCorrect,TotalWrong,funVal)
+            if TotalWrong == 0:
+                self.__FoundCorrect = True
+        return self.__allBinDict[tuple(allBins)][3]
+
+    def CalculateBins(self,WANTED_ELM):
+        if len(self.PreCalcELMMatchSeqs) == 0:
+            self.ELMMatchSeqs()
+
+        self.__singlebinDict={}
+        self.__allBinDict={}
+        self.__DepthChecked=[]
+        self.__FoundCorrect = False
+        
+        BreadthQueue = PriorityQueue(-1)
+        theseBins = [0, int(self.MaxSize/2), self.MaxSize]
+
+        BreadthQueue.put(((theseBins,0,0),0))
+
+        self.__QueueWorker(BreadthQueue,WANTED_ELM)
+
+        currentMin = 50000
+        currentMinInd = 0
+        for i in self.__allBinDict:
+            if self.__allBinDict[i][3] < currentMin:
+                currentMinInd = i
+                currentMin = self.__allBinDict[currentMinInd][3]
+
+        self.PreCalcELMBinDict[WANTED_ELM] = currentMinInd
