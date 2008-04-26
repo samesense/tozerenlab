@@ -115,7 +115,7 @@ def nonQueueWorker():
             except:
                 print 'weird error'
 
-bkgHandle = open('test_data.fasta','rU')
+bkgHandle = open('ReallyEasyData.fa','rU')
 bkgSeqs=[]
 
 for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
@@ -123,51 +123,51 @@ for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
 
 bkgHandle.close()
 
-ELMAnal = PyELM()
-
-ELMAnal.ELMParser()
-ELMAnal.LoadSeqs(bkgSeqs)
-
-ELMAnal.ELMMatchSeqs()
-
-theseBins = [0, int(ELMAnal.MaxSize/2), ELMAnal.MaxSize]
-
-
-MaxBreadth = 4
-MaxDepth = 100
-MaxWidth = 5
-MaxIter = 1000
-
-
-
-
-for wanted_elm in ELMAnal.GetELMIterator():
-    BreadthQueue = PriorityQueue(-1)
-    print wanted_elm
-    BreadthQueue.put(((theseBins,0,0),0))
-       
-    
-    singlebinDict = {}
-    allBinDict = {}
-    DepthChecked = []
-    GlobalCounter = 0
-
-    for i in range(10):
-        t = Thread(target = nonQueueWorker)
-        t.setDaemon(True)
-        t.start()
-
-    BreadthQueue.join()
-
-
-
-
-    currentMin = 50000
-    currentMinInd = 0
-    for i in allBinDict:
-        if allBinDict[i][3] < currentMin:
-            currentMinInd = i
-            currentMin = allBinDict[currentMinInd][3]
-
-    print (wanted_elm, allBinDict[currentMinInd])
-
+##ELMAnal = PyELM()
+##
+##ELMAnal.ELMParser()
+##ELMAnal.LoadSeqs(bkgSeqs)
+##
+##ELMAnal.ELMMatchSeqs()
+##
+##theseBins = [0, int(ELMAnal.MaxSize/2), ELMAnal.MaxSize]
+##
+##
+##MaxBreadth = 4
+##MaxDepth = 100
+##MaxWidth = 5
+##MaxIter = 1000
+##
+##
+##
+##
+##for wanted_elm in ELMAnal.GetELMIterator():
+##    BreadthQueue = PriorityQueue(-1)
+##    print wanted_elm
+##    BreadthQueue.put(((theseBins,0,0),0))
+##       
+##    
+##    singlebinDict = {}
+##    allBinDict = {}
+##    DepthChecked = []
+##    GlobalCounter = 0
+##
+##    for i in range(10):
+##        t = Thread(target = nonQueueWorker)
+##        t.setDaemon(True)
+##        t.start()
+##
+##    BreadthQueue.join()
+##
+##
+##
+##
+##    currentMin = 50000
+##    currentMinInd = 0
+##    for i in allBinDict:
+##        if allBinDict[i][3] < currentMin:
+##            currentMinInd = i
+##            currentMin = allBinDict[currentMinInd][3]
+##
+##    print (wanted_elm, allBinDict[currentMinInd])
+##

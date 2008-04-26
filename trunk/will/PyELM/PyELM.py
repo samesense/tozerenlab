@@ -52,6 +52,20 @@ class PyELM:
         
         self.ELMDict=allRegExps
 
+    def AddELM(self,Name,RegExp):
+        """ 
+        AddELM
+            Loads a single ELM RegExp into the database.
+
+        AddELM(Name,RegExp)
+
+        """
+        self.ELMOrder.append(Name)
+        self.ELMDict[Name] = RegExp
+        self.ELMreDict[Name] = re.compile(RegExp)
+        self.PreCalcELMMatchSeqs=[]
+        self.PreCalchistArray=[]
+        
     def LoadSeqs(self,SEQUENCES):
         """
         LoadSeqs
@@ -155,6 +169,34 @@ class PyELM:
             self.PreCalchistArray=histArray
         
         return self.PreCalchistArray
+
+    def SimpleELMCall(self,SEQ_IND,WANTED_ELM):
+        """
+        SimpleELMCall
+            Returns a simple Presence/Absence Call for the ELM.
+
+        PACall = SimpleELMCall(SEQ_IND,WANTED_ELM)
+
+        SEQ_IND     The index of the desired sequence
+        WANTED_ELM  The desired ELM
+
+        PACall      Returns 1 if the ELM is present in the sequence and 0 otherwise.
+
+        """
+
+        if SEQ_IND > len(self.Sequences) | SEQ_IND < 0:
+            print 'Arguement SEQ_IND must be between 0 and len(self.Sequences)'
+            raise IndexError
+        
+        if len(self.PreCalcELMMatchSeqs) == 0:
+            self.ELMMatchSeqs()
+
+        if len(self.PreCalcELMMatchSeqs[SEQ_IND][WANTED_ELM]) >= 1:
+            return 1
+        else:
+            return 0
+    def MultiELMCall(self,SEQ_IND,WANTED_ELM):
+        assert NotImplemented
 
     def ELMPosGen(self,SEQ_IND,POS_START,POS_STOP,WANTED_ELM):
         """
