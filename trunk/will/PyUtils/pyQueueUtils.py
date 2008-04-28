@@ -1,4 +1,4 @@
-from numpy import searchsorted,array
+import bisect
 from Queue import *
 class PriorityQueue(Queue):
     """
@@ -21,7 +21,7 @@ class PriorityQueue(Queue):
             raise IndexError
         
         thisVal = item[1]
-        thisPos = array(self.priority).searchsorted(thisVal)
+        thisPos = bisect.bisect(self.priority,thisVal)
        
         self.priority.insert(thisPos,thisVal)
         self.queue.insert(thisPos,item[0])
