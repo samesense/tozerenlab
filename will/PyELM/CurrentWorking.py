@@ -6,6 +6,7 @@ from copy import *
 from Queue import *
 import cProfile
 from threading import *
+import pickle
 
 
 os.chdir(os.curdir)
@@ -13,6 +14,22 @@ os.chdir(os.curdir)
 from PyELM import *
 from pyQueueUtils import *
 
+class SeqAns:
+    def __init__(self):
+        self.seq = []
+        self.SimpleAns = []
+        self.MultiAns = []
+        self.ELM = []
+
+def MakeMultiCall(ELMData,SEQ_IND,WANTED_ELM,allBins):
+    thisCall = []
+    for i in xrange(len(allBins)-1):
+        if sum(ELMData.ELMPosGen(SEQ_IND,allBins[i],allBins[i+1],WANTED_ELM)) > 0:
+            thisCall.append(1)
+        else:
+            thisCall.append(0)
+    return thisCall
+    
 
 def EvaluateBin(ELMData,WANTED_ELM,binEdges):
     thisBinVal=[0,0,0]
@@ -115,21 +132,27 @@ def nonQueueWorker():
             except:
                 print 'weird error'
 
-bkgHandle = open('ReallyEasyData.fa','rU')
-bkgSeqs=[]
-
-for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
-    bkgSeqs.append(thisSeq.seq.tostring())
-
+bkgHandle = open('MedSeqs.pkl','rU')
+bkgSeqs=pickle.load(bkgHandle)
+##
+##for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
+##    bkgSeqs.append(thisSeq.seq.tostring())
+##
 bkgHandle.close()
 
-##ELMAnal = PyELM()
-##
+
+
+
+ELMAnal = PyELM()
+
 ##ELMAnal.ELMParser()
-##ELMAnal.LoadSeqs(bkgSeqs)
-##
-##ELMAnal.ELMMatchSeqs()
-##
+ELMAnal.AddELM('TESTCASE','CCCC')
+ELMAnal.LoadSeqs(bkgSeqs.seq)
+
+ELMAnal.ELMMatchSeqs()
+
+ELMAnal.CalculateBins('TESTCASE')
+
 ##theseBins = [0, int(ELMAnal.MaxSize/2), ELMAnal.MaxSize]
 ##
 ##
@@ -152,16 +175,18 @@ bkgHandle.close()
 ##    DepthChecked = []
 ##    GlobalCounter = 0
 ##
-##    for i in range(10):
-##        t = Thread(target = nonQueueWorker)
-##        t.setDaemon(True)
-##        t.start()
+##    nonQueueWorker()
 ##
-##    BreadthQueue.join()
-##
-##
-##
-##
+####    for i in range(10):
+####        t = Thread(target = nonQueueWorker)
+####        t.setDaemon(True)
+####        t.start()
+####
+####    BreadthQueue.join()
+####
+####
+####
+####
 ##    currentMin = 50000
 ##    currentMinInd = 0
 ##    for i in allBinDict:
@@ -171,3 +196,8 @@ bkgHandle.close()
 ##
 ##    print (wanted_elm, allBinDict[currentMinInd])
 ##
+##    for i in xrange(len(ELMAnal.Sequences)-1):
+##        print MakeMultiCall(ELMAnal,i,wanted_elm,currentMinInd)
+##
+##    
+####

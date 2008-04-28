@@ -17,7 +17,6 @@ class PyELM:
 
         self.__FoundCorrect = False
 
-
         self.PreCalchistArray=[]        
         self.PreCalcELMMatchSeqs=[]
         self.PreCalcELMBinDict={}
@@ -25,6 +24,7 @@ class PyELM:
         self.__singlebinDict={}
         self.__allBinDict={}
         self.__DepthChecked=[]
+        self.__WorkingQueue=PriorityQueue(-1)
 
         
         self.MaxBreadth = 4
@@ -100,12 +100,12 @@ class PyELM:
 
     
 
-    def ELMMatchSeqs(self,SEQUENCES=None, ELM_DICT=None):
+    def ELMMatchSeqs(self):
         """
         ELMMatchSeqs
             Searches for the regular expressions of ELM_DICT within the SEQUENCES provided.
 
-        ELM_MATCH_VEC = ELMMatchSeqs(SEQUENCES,ELM_DICT)
+        ELM_MATCH_VEC = ELMMatchSeqs()
 
 
         ELM_MATCH_VEC   A LIST corresponding to each BioSeq object provided.  Each element in the list is a
@@ -212,6 +212,21 @@ class PyELM:
 
 
     def MultiELMCall(self,SEQ_IND,WANTED_ELM):
+        """
+        MultiELMCall
+            Returns the binned Presence/Absence Call for the ELM.
+
+        PACall = MultiELMCall(SEQ_IND,WANTED_ELM)
+
+        SEQ_IND     The index of the desired sequence
+        WANTED_ELM  The desired ELM
+
+        PACall      Returns 1 if the ELM is present in the sequence and 0 otherwise.
+
+        """
+        if WANTED_ELM not in self.PreCalcELMBinDict:
+            raise KeyError
+            
         thisCall = []
         allBins = self.PreCalcELMBinDict[WANTED_ELM]
         for i in xrange(len(allBins)-1):
@@ -346,22 +361,23 @@ class PyELM:
             else:
                 raise StopIteration
 
-    def __QueueWorker(self,BreadthQueue,WANTED_ELM):
+    def __QueueWorker(self,WANTED_ELM):
         """
         A helper function to manage the Priority Queue and Threads
         """
         while True:
             try:
-                thisItem = BreadthQueue.get(True, 5)
-                BreadthQueue.task_done()
+                thisItem = self.__WorkingQueue.get(True, 5)
+                self.__WorkingQueue.task_done()
             except:
+                print 'queue empty'
                 break
             
             if not(self.__FoundCorrect):
-                self.__MakeBreadth(BreadthQueue,WANTED_ELM,thisItem[0],thisItem[1],thisItem[2])
+                self.__MakeBreadth(WANTED_ELM,thisItem[0],thisItem[1],thisItem[2])
                 
 
-    def __MakeBreadth(self,globalQueue,WANTED_ELM,allBins,BreadthCounter,DepthCounter):
+    def __MakeBreadth(self,WANTED_ELM,allBins,BreadthCounter,DepthCounter):
         """
         __MakeBreadth
 
@@ -369,7 +385,7 @@ class PyELM:
 
 
         """
-        #print (BreadthCounter,DepthCounter,self.__EvaluateAllBins(WANTED_ELM,allBins),globalQueue.qsize(),WANTED_ELM)
+        print (BreadthCounter,DepthCounter,self.__EvaluateAllBins(WANTED_ELM,allBins),self.__WorkingQueue.qsize(),WANTED_ELM)
         if DepthCounter > self.MaxDepth:
             return
 
@@ -410,12 +426,12 @@ class PyELM:
 
         if BreadthCounter < self.MaxBreadth:
             for k in xrange(min(self.MaxWidth,len(BestInds))-1,0,-1):
-
-                globalQueue.put(((LocalQueue[BestInds[k]],BreadthCounter+1,DepthCounter),LocalVals[BestInds[k]]))
+                print 'inside here'
+                self.__WorkingQueue.put(((LocalQueue[BestInds[k]],BreadthCounter+1,DepthCounter),LocalVals[BestInds[k]]))
         else:
             if (LocalVals[BestInds[0]] < self.__EvaluateAllBins(WANTED_ELM,allBins)):
                 self.__DepthChecked.append(allBins)
-                globalQueue.put(((LocalQueue.pop(BestInds[0]),BreadthCounter+1,DepthCounter+1),LocalVals[BestInds[0]]))
+                self.__WorkingQueue.put(((LocalQueue.pop(BestInds[0]),BreadthCounter+1,DepthCounter+1),LocalVals[BestInds[0]]))
 
 
     
@@ -466,12 +482,12 @@ class PyELM:
         self.__DepthChecked=[]
         self.__FoundCorrect = False
         
-        BreadthQueue = PriorityQueue(-1)
+        self.__WorkingQueue = PriorityQueue(-1)
         theseBins = [0, int(self.MaxSize/2), self.MaxSize]
 
-        BreadthQueue.put(((theseBins,0,0),0))
+        self.__WorkingQueue.put(((theseBins,0,0),0))
 
-        self.__QueueWorker(BreadthQueue,WANTED_ELM)
+        self.__QueueWorker(WANTED_ELM)
 
         currentMin = 50000
         currentMinInd = 0
