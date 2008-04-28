@@ -3,6 +3,8 @@ from numpy import *
 import re
 from pyQueueUtils import *
 from copy import *
+import threading
+import time
 
 
 class PyELM:
@@ -26,7 +28,7 @@ class PyELM:
         self.__DepthChecked=[]
         self.__WorkingQueue=PriorityQueue(-1)
 
-        
+        self.__GlobalCounter=0
         self.MaxBreadth = 4
         self.MaxDepth = 100
         self.MaxWidth = 5
@@ -366,15 +368,22 @@ class PyELM:
         A helper function to manage the Priority Queue and Threads
         """
         while True:
+            self.__GlobalCounter +=1 
             try:
-                thisItem = self.__WorkingQueue.get(True, 5)
-                self.__WorkingQueue.task_done()
+                #print 'Worker qsize: ', self.__WorkingQueue.qsize()
+                thisItem = self.__WorkingQueue.get(True, 10)
+                
             except:
-                print 'queue empty'
+                #print 'queue empty'
                 break
             
-            if not(self.__FoundCorrect):
-                self.__MakeBreadth(WANTED_ELM,thisItem[0],thisItem[1],thisItem[2])
+            if self.__FoundCorrect.isSet():
+                #print 'Detected Bailing, dumping stuff out of queue'
+                self.__WorkingQueue.task_done()
+                continue
+
+            self.__MakeBreadth(WANTED_ELM,thisItem[0],thisItem[1],thisItem[2])
+            self.__WorkingQueue.task_done()
                 
 
     def __MakeBreadth(self,WANTED_ELM,allBins,BreadthCounter,DepthCounter):
@@ -385,7 +394,8 @@ class PyELM:
 
 
         """
-        print (BreadthCounter,DepthCounter,self.__EvaluateAllBins(WANTED_ELM,allBins),self.__WorkingQueue.qsize(),WANTED_ELM)
+        #print (BreadthCounter,DepthCounter,self.__EvaluateAllBins(WANTED_ELM,allBins),self.__WorkingQueue.qsize(),WANTED_ELM)
+        #print allBins
         if DepthCounter > self.MaxDepth:
             return
 
@@ -426,7 +436,6 @@ class PyELM:
 
         if BreadthCounter < self.MaxBreadth:
             for k in xrange(min(self.MaxWidth,len(BestInds))-1,0,-1):
-                print 'inside here'
                 self.__WorkingQueue.put(((LocalQueue[BestInds[k]],BreadthCounter+1,DepthCounter),LocalVals[BestInds[k]]))
         else:
             if (LocalVals[BestInds[0]] < self.__EvaluateAllBins(WANTED_ELM,allBins)):
@@ -469,25 +478,55 @@ class PyELM:
                 TotalWrong += self.__singlebinDict[(allBins[i],allBins[i+1])][2]
             funVal = (.25*TotalEmpty + TotalWrong) / (TotalCorrect + 1)
             self.__allBinDict[tuple(allBins)]=(TotalEmpty,TotalCorrect,TotalWrong,funVal)
-            if TotalWrong == 0:
-                self.__FoundCorrect = True
+            if (self.__allBinDict[tuple(allBins)][2] == 0) & (self.__allBinDict[tuple(allBins)][0] == 0):
+                #print self.__allBinDict[tuple(allBins)][2], 'found best', self.__allBinDict[tuple(allBins)][0]
+                self.__FoundCorrect.set()
+        #print 'Bins: ', allBins
+        #print 'Vals: ', self.__allBinDict[tuple(allBins)]
         return self.__allBinDict[tuple(allBins)][3]
 
+    def __BailingThread(self):
+        #print 'Exceded timeLimit, bailing on further exploration'
+        self.__FoundCorrect.set()
+        return
+
     def CalculateBins(self,WANTED_ELM):
+        numThreads=10
         if len(self.PreCalcELMMatchSeqs) == 0:
             self.ELMMatchSeqs()
 
         self.__singlebinDict={}
         self.__allBinDict={}
         self.__DepthChecked=[]
-        self.__FoundCorrect = False
+        self.__FoundCorrect = threading.Event()
+        self.__GlobalCounter=0
         
         self.__WorkingQueue = PriorityQueue(-1)
         theseBins = [0, int(self.MaxSize/2), self.MaxSize]
 
         self.__WorkingQueue.put(((theseBins,0,0),0))
 
-        self.__QueueWorker(WANTED_ELM)
+        for i in range(numThreads-1):
+            #print 'Starting Thread: ', i
+            t=threading.Thread(target=self.__QueueWorker,args=(WANTED_ELM,))
+            time.sleep(15)
+            t.start()
+
+            
+
+        stoppingThread=threading.Timer(300,self.__BailingThread)
+        stoppingThread.start()
+
+        self.__WorkingQueue.join()
+        stoppingThread.cancel()
+        
+       
+        #print 'Calculating Values'
+        
+            
+            
+
+        #self.__QueueWorker(WANTED_ELM)
 
         currentMin = 50000
         currentMinInd = 0
