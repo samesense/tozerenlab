@@ -26,7 +26,7 @@ class PyELM:
         self.__singlebinDict={}
         self.__allBinDict={}
         self.__DepthChecked=[]
-        self.__WorkingQueue=PriorityQueue(-1)
+        self.__WorkingQueue=None
 
         self.__GlobalCounter=0
         self.MaxBreadth = 4
@@ -372,7 +372,7 @@ class PyELM:
             self.__GlobalCounter +=1 
             try:
                 print 'Worker qsize: ', self.__WorkingQueue.qsize()
-                thisItem = self.__WorkingQueue.get(True, 10)
+                thisItem = self.__WorkingQueue.get(True, 30)
                 
             except:
                 #print 'queue empty'
@@ -507,22 +507,28 @@ class PyELM:
 
         self.__WorkingQueue.put(((theseBins,0,0),0))
 
+        workerThreads = []
         for i in range(numThreads-1):
-            #print 'Starting Thread: ', i
+            print 'Starting Thread: ', i
             t=threading.Thread(target=self.__QueueWorker,args=(WANTED_ELM,))
+            workerThreads.append(t)
             time.sleep(15)
             t.start()
 
             
-
+        print 'Starting Bailing Thread'
         stoppingThread=threading.Timer(self.CalcTimeOut,self.__BailingThread)
         stoppingThread.start()
 
         self.__WorkingQueue.join()
         stoppingThread.cancel()
+
         
-       
-        print 'Calculating Values'
+        for thisThread in workerThreads:
+            print 'Joining Thread'
+            thisThread.join()
+        
+        #print 'Calculating Values'
         
             
             
@@ -537,3 +543,5 @@ class PyELM:
                 currentMin = self.__allBinDict[currentMinInd][3]
 
         self.PreCalcELMBinDict[WANTED_ELM] = currentMinInd
+        self.__WorkingQueue=None
+        self.__FoundCorrect=None
