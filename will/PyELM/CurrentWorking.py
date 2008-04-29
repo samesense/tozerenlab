@@ -23,12 +23,13 @@ class SeqAns:
 
 
 
-bkgHandle = open('MedSeqs.pkl','rU')
-bkgSeqs=pickle.load(bkgHandle)
-##
-##for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
-##    bkgSeqs.append(thisSeq.seq.tostring())
-##
+bkgHandle = open('bkg_aa_seq.fasta','rU')
+bkgSeqs=[]
+##bkgSeqs=pickle.load(bkgHandle)
+
+for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
+    bkgSeqs.append(thisSeq.seq.tostring())
+
 bkgHandle.close()
 
 
@@ -36,59 +37,21 @@ bkgHandle.close()
 
 ELMAnal = PyELM()
 
-##ELMAnal.ELMParser()
-ELMAnal.AddELM('TESTCASE','CCCC')
-ELMAnal.LoadSeqs(bkgSeqs.seq)
+ELMAnal.ELMParser()
+##ELMAnal.AddELM('TESTCASE','CCCC')
+ELMAnal.LoadSeqs(bkgSeqs)
 
 ELMAnal.ELMMatchSeqs()
+ELMAnal.CalcTimeOut=1000
 
-ELMAnal.CalculateBins('TESTCASE')
+for wanted_elm in ELMAnal.GetELMIterator():
+    print wanted_elm
 
-##theseBins = [0, int(ELMAnal.MaxSize/2), ELMAnal.MaxSize]
-##
-##
-##MaxBreadth = 4
-##MaxDepth = 100
-##MaxWidth = 5
-##MaxIter = 1000
-##
-##
-##
-##
-##for wanted_elm in ELMAnal.GetELMIterator():
-##    BreadthQueue = PriorityQueue(-1)
-##    print wanted_elm
-##    BreadthQueue.put(((theseBins,0,0),0))
-##       
-##    
-##    singlebinDict = {}
-##    allBinDict = {}
-##    DepthChecked = []
-##    GlobalCounter = 0
-##
-##    nonQueueWorker()
-##
-####    for i in range(10):
-####        t = Thread(target = nonQueueWorker)
-####        t.setDaemon(True)
-####        t.start()
-####
-####    BreadthQueue.join()
-####
-####
-####
-####
-##    currentMin = 50000
-##    currentMinInd = 0
-##    for i in allBinDict:
-##        if allBinDict[i][3] < currentMin:
-##            currentMinInd = i
-##            currentMin = allBinDict[currentMinInd][3]
-##
-##    print (wanted_elm, allBinDict[currentMinInd])
-##
-##    for i in xrange(len(ELMAnal.Sequences)-1):
-##        print MakeMultiCall(ELMAnal,i,wanted_elm,currentMinInd)
-##
-##    
-####
+    try:
+        ELMAnal.CalculateBins(wanted_elm)
+    finally:
+        print 'Backing Up'
+        backupHandle = open('backupData.pkl','w')
+        pickle.dump(ELMAnal,backupHandle)
+        backupHandle.close()
+    

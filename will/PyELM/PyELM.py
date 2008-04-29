@@ -33,6 +33,7 @@ class PyELM:
         self.MaxDepth = 100
         self.MaxWidth = 5
         self.MaxIter = 1000
+        self.CalcTimeOut=300
 
     def ELMParser(self,DIRECTORY="C:\Documents and Settings\Will\My Documents\ELM_Motif_finder\ELM_RAW_DOWNLOAD\\"):
         """
@@ -370,7 +371,7 @@ class PyELM:
         while True:
             self.__GlobalCounter +=1 
             try:
-                #print 'Worker qsize: ', self.__WorkingQueue.qsize()
+                print 'Worker qsize: ', self.__WorkingQueue.qsize()
                 thisItem = self.__WorkingQueue.get(True, 10)
                 
             except:
@@ -486,7 +487,7 @@ class PyELM:
         return self.__allBinDict[tuple(allBins)][3]
 
     def __BailingThread(self):
-        #print 'Exceded timeLimit, bailing on further exploration'
+        print 'Exceded timeLimit, bailing on further exploration'
         self.__FoundCorrect.set()
         return
 
@@ -514,14 +515,14 @@ class PyELM:
 
             
 
-        stoppingThread=threading.Timer(300,self.__BailingThread)
+        stoppingThread=threading.Timer(self.CalcTimeOut,self.__BailingThread)
         stoppingThread.start()
 
         self.__WorkingQueue.join()
         stoppingThread.cancel()
         
        
-        #print 'Calculating Values'
+        print 'Calculating Values'
         
             
             
