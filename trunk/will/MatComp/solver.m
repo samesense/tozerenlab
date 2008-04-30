@@ -1,12 +1,16 @@
 function W = solver(B)
 W = zeros(0,4);
 
+myMoves = zeros(0,5);
+myConnections = zeros(nnz(B),4);
+
 %shift everything avoid boundry conditions
 thisMat = zeros(size(B)+2);
 thisMat(2:end-1,2:end-1)=B;
 wiredMat = true(size(B)+2);
 wiredMat(2:end-1,2:end-1) = B>0;
-
+myNumMask = zeros(size(thisMat));
+myNumMask(thisMat(:)>0)=1:nnz(thisMat);
 
 
 pegs = unique(nonzeros(thisMat));
@@ -35,28 +39,49 @@ IJmat = cell2mat(IJpairs);
 
 
 for i = 1:nnz(bestScores<0)
-    thisMove = FindShortestPath(IJmat(inds(i),:));
+    testMove = FindShortestPath(IJmat(inds(i),:));
     
-    if ~isempty(thisMove) && size(thisMove,1)<2*IJmat(inds(i),5)
-        wiredMat(thisMove(:,1),thisMove(:,2))=1;
-        W=[W;thisMove];
+    if ~isempty(testMove) && size(testMove,1)<2*IJmat(inds(i),5)
+        wiredMat(testMove(:,1),testMove(:,2))=1;
+        pos1=myNumMask(IJmat(inds(i),1:2));
+        pos2=myNumMask(IJmat(inds(i),3:4));
+        myConnections(pos1,pos2) = [myConnections; IJmat(inds(i),1:4)];
+        myMoves=[myMoves;testMove ones(size(testMove,1),1)*length(myConnections)];
     end
+    
+    
+    
+    
+    
 end
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 %shift everything back
-W=W-1;
+W=myMoves(:,1:4)-1;
 
     function [Moves]=FindShortestPath(Pos)
         allotedMoves=2*Pos(5);
         %since order is unimportant, always create paths with ascending
         %numbers for easy of programming
-        if Pos(1) < Pos(3) || Pos(1) == Pos(3) && Pos(2) < Pos(4)
+%        if Pos(1) < Pos(3) || Pos(1) == Pos(3) && Pos(2) < Pos(4)
             startPos = Pos(1:2);
             endPos = Pos(3:4);
-        else
-            startPos = Pos(3:4);
-            endPos = Pos(1:2);
-        end
+%        else
+%            startPos = Pos(3:4);
+%            endPos = Pos(1:2);
+%        end
         
         Moves = zeros(allotedMoves,4);
         thiscounter = 0;
@@ -66,20 +91,23 @@ W=W-1;
             thiscounter=thiscounter+1;
             Moves(thiscounter,1:2)=currentPos;
             currentDist=sum(abs(currentPos-endPos));
-            thisMove = repmat(currentPos,[2,1])+eye(2);
-            thisDist = sum(abs(thisMove - repmat(endPos,[2,1])),2);
+            thisMove = repmat(currentPos,[4,1])+[eye(2); -eye(2)];
+            thisPoss = ~wiredMat(sub2ind(size(wiredMat),thisMove(:,1),thisMove(:,2)));
+            
+            thisDist = sum(abs(thisMove - repmat(endPos,[4,1])),2);
+
             if any(thisDist==0)
                 Moves(thiscounter,3:4)=thisMove(thisDist==0,:);
                 break
             end
-            if (~wiredMat(thisMove(1,1),thisMove(1,2)) && thisMat(thisMove(1,1),thisMove(1,2)) ~= Pos(5)) && thisDist(1)<currentDist
-                Moves(thiscounter,3:4)=thisMove(1,:);
-            elseif (~wiredMat(thisMove(2,1),thisMove(2,2)) && thisMat(thisMove(2,1),thisMove(2,2)) ~= Pos(5)) && thisDist(2)<currentDist
-                Moves(thiscounter,3:4)=thisMove(2,:);
-            else
+            thisMask = (thisDist+~thisPoss.*10000)< currentDist;
+            
+            if ~any(thisMask)
                 thiscounter=0;
                 break
             end
+            
+            Moves(thiscounter,3:4)=thisMove(find(thisMask,1),:);
             
             currentPos = Moves(thiscounter,3:4);
             

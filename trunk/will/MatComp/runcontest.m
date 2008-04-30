@@ -31,7 +31,7 @@ else          % step into each of the responses
         inputs = struct2cell(testsuite(k));
         responses{k} = solver(inputs{:});
         scores(k) = visualize(inputs{:},responses{k});
-        pause
+        pause(1)
     end
     timeElapsed = NaN;
 end
