@@ -24,7 +24,11 @@ if nargin == 0 % no board drawing
     timeElapsed = cputime-time0;
     for k = 1:numel(testsuite)
         inputs = struct2cell(testsuite(k));
+        try
         scores(k) = grade(inputs{:},responses{k});
+        catch
+            123
+        end
     end
 else          % step into each of the responses
     for k = 1:n
