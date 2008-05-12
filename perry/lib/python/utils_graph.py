@@ -38,3 +38,13 @@ def dumpEdges(afile, d):
                 seen[k2] = True
                 f.write(g1 + '\t' + g2 + '\n')
     f.close()
+
+def mkNodesFromEdges(afile):
+    nodes = {}
+    f = open(afile)
+    for line in f.xreadlines():
+        sp = line.split('\t')
+        nodes[sp[0]] = True
+        nodes[sp[1]] = True
+    f.close()
+    return nodes
