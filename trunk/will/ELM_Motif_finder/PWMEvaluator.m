@@ -119,7 +119,11 @@ end
 
 %check for values that are either Zero or >size(PWM_mat,2) because they
 %will disrupt indexing within the MEX function.
-MaxVal=max(cellfun(@max,NormalizedSeqs));
+try
+MaxVal=max(cellfun(@max,NormalizedSeqs(~cellfun('isempty',NormalizedSeqs))));
+catch
+    display('here')
+end
 AnyZeros=any(cellfun(@(x)(any(x==0)),NormalizedSeqs));
 if MaxVal>size(PWM_mat,1)||AnyZeros
     %add an extra column to the PWM_mat to give a value to the missing
