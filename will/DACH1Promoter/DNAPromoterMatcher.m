@@ -296,7 +296,7 @@ UniRows=I;
 %%%%%%%[GeneSymbol LLID POS STRAND ORIENT SEQ NUM_MISS]
 ExcelOutput=cell(length(UniGene),7);
 for i=1:length(UniGene)
-    ExcelOutput(i,1)=GeneNames(UniGene(i));
+    ExcelOutput{i,1}=['''' GeneNames{UniGene(i)}];
     ExcelOutput(i,2)=LLIDS(UniGene(i));
 
     switch ceil(UniRows(i)/length(seqs))
