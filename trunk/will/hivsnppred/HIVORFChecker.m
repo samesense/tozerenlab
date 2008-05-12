@@ -136,7 +136,7 @@ if ~WHOLE_GENOME_FLAG
     OUTPUT_SEQS=TRANS_SEQS{ORF_spot};
     temp_ref=cumsum([HIV_REF.AAPos(HIV_spot) isletter(alignments{HIV_spot,ORF_spot}(1,:))]);
     temp_clinical=cumsum([1 isletter(alignments{HIV_spot,ORF_spot}(3,:))]);
-    MAPPING=temp_ref(temp_clinical);
+    MAPPING=temp_ref(temp_clinical(diff([1 temp_clinical])~=0));
 else
 
     OUTPUT_SEQS=cell(length(HIV_REF.AAseqs),1);
@@ -151,7 +151,7 @@ else
         temp_ref=cumsum([HIV_REF.AAPos(protein_ind) isletter(alignments{protein_ind,orf_ind(protein_ind)}(1,:))]);
         temp_clinical=cumsum([1 isletter(alignments{protein_ind,orf_ind(protein_ind)}(3,:))]);
 
-        MAPPING{protein_ind}=temp_ref(temp_clinical);
+        MAPPING{protein_ind}=temp_ref(temp_clinical(diff([1 temp_clinical])~=0));
 
         scores(:,orf_ind(protein_ind))=NaN;
         scores(protein_ind,:)=NaN;
