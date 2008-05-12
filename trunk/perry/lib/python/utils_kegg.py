@@ -329,5 +329,21 @@ def getGraphicLinks(path):
                             edges[gene1][gene2][ relation['type'] + '/' + s['relation']  ] = True
                             edges[gene2][gene1][ relation['type'] + '/' + s['relation']  ] = True
     return edges
-                        
 
+def mkGene2GI(gene_dict):
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    #serv.get_genes_by_organism('sce')
+    # this must happen in groups of 100
+    # b/c of the limit allowed by the query
+    count = 1
+    new_d = {}
+    for gene in gene_dict.keys():
+        new_d[gene]=True
+        if count % 100 == 0:            
+            print serv.bget( dict2str(new_d) ).strip()
+            new_d = {}
+        count += 1
+    print serv.bget( dict2str(new_d) ).strip()#.split('///')
+    #for item in ls:
+    #    print item
