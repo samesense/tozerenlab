@@ -52,58 +52,84 @@ for i=1:length(ELM_STRUCT)
     MATCH_SPOTS(:,i)=cellfun(@(x,y)(y(x)),MATCH_SPOTS(:,i),MAPPING,'uniformoutput',false);
 end
 
+ELMSimple = num2cell(~cellfun('isempty',MATCH_SPOTS),2);
+ELMBinned = cell(length(SEQS),length(ELM_STRUCT));
+ELMPWMScore = cell(length(SEQS),length(ELM_STRUCT));
+ELMAnnot=cell(length(ELM_STRUCT),1);
 
-warning('off','stats:kmeans:EmptyCluster')
-N=size(MATCH_SPOTS,1);
-ELM_annot=cell(1,length(ELM_STRUCT));
-current_center=0;
-for i=1:length(ELM_STRUCT)
-    sizes=cellfun('length',MATCH_SPOTS(:,i));
-
-    if nnz(sizes)>length(SEQS)*0.1  %ONLY consider ELMs that are in at least 10% of sequences
-
-        max_length=max(sizes);
-
-        found_inds=sizes~=0;
-        ELM_locs=cell2mat(cellfun(@(x)([x NaN(1,max_length-length(x))]),MATCH_SPOTS(found_inds,i),'uniformoutput',false));
-
-%                 figure
-%                 hist(ELM_locs(:),1:3600)
-%                 hold
-
-        [ident centers]=kmeans(ELM_locs(~isnan(ELM_locs(:))),round(1.5*max_length),'emptyaction','drop','replicates',100,'start','cluster');
-
-        %%%%%Remove and rename clusters accounting for empty clusters
-        new_centers=centers(~isnan(centers));
-        new_index=cumsum([current_center; ~isnan(centers)]);
-        new_ident=new_index(ident);
-
-        current_center=new_index(end);
-
-
-        ELM_locs(~isnan(ELM_locs(:)))=new_ident;
-
-        MATCH_SPOTS(found_inds,i)=num2cell(ELM_locs,2);
-        MATCH_SPOTS(~found_inds,i)=num2cell(NaN(nnz(~found_inds),size(ELM_locs,2)),2);
-        ELM_annot{i}=[new_centers'; i*ones(1,length(new_centers))];
-
-%                 bar(centers(~isnan(centers)),nonzeros(histc(ident,1:length(centers))),'r')
+tic
+for i = 1:length(ELM_STRUCT)
+    time=(toc/i)*(length(length(ELM_STRUCT))-i);
+    waitbar(i/length(length(ELM_STRUCT)),WAITBAR_HANDLE, ['Applying Bins: ' num2str(time/60)])
+    if ~isempty(ELM_STRUCT(i).PosBins)
+        ELMBinned(:,i) = cellfun(@(x)(CheckBins(ELM_STRUCT(i).PosBins,x)),MATCH_SPOTS(:,i),'uniformoutput',false);
+        
+        PWMMat = NaN(size(SEQS,1),length(ELM_STRUCT(i).PosPWMs));
+        
+        for k = 1:length(ELM_STRUCT(i).PosPWMs)
+            WindowedSeqs=cellfun(@(x,y)(GetSeqWindow(ELM_STRUCT(i).PosBins(:,k),x,y)),MAPPING,SEQS,'uniformoutput',false);
+            
+            PWMVals = NaN(size(SEQS,1),1);
+            
+            windowMask = ~cellfun('isempty',WindowedSeqs);
+   
+            if any(windowMask)
+                determinedVals=PWMEvaluator(ELM_STRUCT(i).PosPWMs{k},WindowedSeqs(windowMask));
+                PWMVals(windowMask)=cellfun(@max,determinedVals);
+                PWMMat(:,k)=PWMVals;
+            end
+           
+        end
+        ELMPWMScore(:,i)=num2cell(PWMMat,2);
     end
 end
 
-ELM_vec=[ELM_annot{:}];
+for i = 1:length(PAT_STRUCT)
+    SeqInds = find(ALIGNMENT_INDS==i);
+    
+    if ~isempty(SeqInds)
+        tempSimple = sum(cell2mat(ELMSimple(SeqInds)),1)>0;
 
+        tempBinned = ELMBinned(SeqInds,:);
+        tempBinned = cat(2,tempBinned{:});
+        tempBinned = reshape(tempBinned,nnz(SeqInds),[]);
+        tempBinned = sum(tempBinned,1)>0;
 
+        tempPWMScore = ELMPWMScore(SeqInds,:);
+        tempPWMScore = cat(2,tempPWMScore{:});
+        tempPWMScore = reshape(tempPWMScore,nnz(SeqInds),[]);
+        tempPWMScore = max(tempPWMScore,[],1)>0;
 
-for i=1:length(PAT_STRUCT)
-
-    bool_vec=ismember(1:current_center,unique([MATCH_SPOTS{ALIGNMENT_INDS==i,:}]));
-
-    PAT_STRUCT{i}.ELM_simple=ismember(1:length(ELM_STRUCT),unique(ELM_vec(2,bool_vec)));
-    PAT_STRUCT{i}.ELM_vec=bool_vec;
-    PAT_STRUCT{i}.ELM_annot=ELM_vec;
+        PAT_STRUCT{i}.ELM_simple = tempSimple;
+        PAT_STRUCT{i}.ELM_vec = tempBinned;
+        PAT_STRUCT{i}.ELM_PWM = tempPWMScore;
+        
+    else
+        PAT_STRUCT{i}=rmfield(PAT_STRUCT{i},{'ELM_simple','ELM_vec','ELM_annot'});
+    end
+    
+    
+    
+    
 end
 
+
+
+
 close(WAITBAR_HANDLE)
+
+    function Vals=CheckBins(Bins,MatchedSpots)
+        if isempty(MatchedSpots)
+            Vals = false(1,size(Bins,2));
+        else
+            Vals = histc(MatchedSpots,[Bins(1,:) Bins(2,end)])>0;
+        end
+    end
+
+    function thisSeq=GetSeqWindow(Bin,Mapping,Seq)
+        TF = Mapping>Bin(1) & Mapping<Bin(2);
+        thisSeq=Seq(TF);
+
+    end
 
 end
