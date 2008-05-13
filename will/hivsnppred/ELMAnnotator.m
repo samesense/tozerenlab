@@ -55,16 +55,6 @@ end
 ELMSimple = num2cell(~cellfun('isempty',MATCH_SPOTS),2);
 ELMBinned = cell(length(SEQS),length(ELM_STRUCT));
 ELMPWMScore = cell(length(SEQS),length(ELM_STRUCT));
-ELMAnnot=cell(length(ELM_STRUCT),1);
-
-[ELMAnnot{:}]=deal(ELM_STRUCT(:).PosBins);
-for i=1:length(ELMAnnot)
-    if ~isempty(ELMAnnot{i})
-        ELMAnnot{i} = [i*ones(1,size(ELMAnnot{i},2)); ELMAnnot{i}];
-    end
-end
-
-AllBins = cat(2,ELMAnnot{:});
 
 %tic
 for i = 1:length(ELM_STRUCT)
@@ -95,6 +85,23 @@ for i = 1:length(ELM_STRUCT)
     end
 end
 
+ELMBinAnnot=cell(length(ELM_STRUCT),1);
+ELMPWMAnnot=cell(length(ELM_STRUCT),1);
+
+[ELMBins{1:length(ELM_STRUCT)}]=deal(ELM_STRUCT(:).PosBins);
+for i=1:length(ELMBinAnnot)
+    if ~isempty(ELM_STRUCT(i).PosBins)
+        ELMBinAnnot{i} = [i*ones(1,size(ELMBins{i},2)); ELMBins{i}];
+    end
+    if ~isempty(ELM_STRUCT(i).PosPWMs)
+        ELMPWMAnnot{i} = [i*ones(1,size(ELMBins{i},2)); ELMBins{i}];
+    end
+        
+end
+
+AllBins = cat(2,ELMBinAnnot{:});
+PWMBins = cat(2,ELMPWMAnnot{:});
+
 for i = 1:length(PAT_STRUCT)
     SeqInds = find(ALIGNMENT_INDS==i);
     
@@ -121,6 +128,7 @@ for i = 1:length(PAT_STRUCT)
         PAT_STRUCT{i}.ELM_vec = finalBinned;
         PAT_STRUCT{i}.ELM_PWM = finalScore;
         PAT_STRUCT{i}.ELM_annot = AllBins;
+        PAT_STRUCT{i}.ELM_PWMannot = PWMBins;
         
     else
         PAT_STRUCT{i}=rmfield(PAT_STRUCT{i},{'ELM_simple','ELM_vec','ELM_annot'});
@@ -135,9 +143,10 @@ end
 
     function Vals=CheckBins(Bins,MatchedSpots)
         if isempty(MatchedSpots)
-            Vals = false(1,size(Bins,2)+1);
+            Vals = false(1,size(Bins,2));
         else
             Vals = histc(MatchedSpots,[Bins(1,:) Bins(2,end)])>0;
+            Vals = Vals(1:end-1);
         end
     end
 

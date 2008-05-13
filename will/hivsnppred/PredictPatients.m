@@ -19,12 +19,15 @@ function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %
 %       Optional Parameters
 %
+%       ELM_STRUCT          Provide an ELM_STRUCT for labeling purposes.
+%
 %       LeaveInFrac         The fraction of samples to use a training data
 %                           in each iteration. DEFAULT = 0.66
 %
 %       PredictiveFeatures  A cell-array of the features to be used for
 %                           prediction. DEFAULT = {'DrugRegimine',
-%                           'BaseCalls','SimpleELM','PositionalELM'}
+%                           'BaseCalls','SimpleELM','PositionalELM',
+%                           'PositionalPWM'}
 %
 %       Display             Toggles a figure displaying the prediction
 %                           process as it happens. DEFAULT = false
@@ -54,18 +57,25 @@ function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 DISPLAY_FLAG=false;
 LEAVE_IN_FRAC=0.66;
 MAX_FEATURES=10;
-NUM_OPT_REPS=50;
+NUM_OPT_REPS=10;
 USE_DISTCOMP_FLAG=true;
 kNN_FLAG=false;
 SWR_FLAG=true;
-PRED_FEATURES={'DrugRegimine','BaseCalls','SimpleELM','PositionalELM'};
+PRED_FEATURES={'DrugRegimine','BaseCalls','SimpleELM','PositionalELM','PositionalPWM'};
 varargout=cell(4,1);
-
+ELM_STRUCT=[];
 
 %%%%%%%%%%%%%%%%%PARSE INPUTS%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 if ~isempty(varargin)
     for i=1:2:length(varargin)
         switch lower(varargin{i})
+            
+            case 'elm_struct'
+                if isstruct(varargin{i+1})
+                    ELM_STRUCT = varargin{i+1};
+                else
+                    error('PredictPatients:BAD_ELMSTRUCT','Arguement to ELM_STRUCT .')
+                end
             
             case 'leaveinfrac'
                 if isnumeric(varargin{i+1})&&isscalar(varargin{i+1})&&varargin{i+1}>0&&varargin{i+1}<1
@@ -129,7 +139,8 @@ end
 %%%%%%%%%%%%%%%%%%EXTRACT DATA FROM PATIENT STRUCTURE%%%%%%%%%%%%%%%%%%%%%%
 
 [ALL_FEATURES RESP_VAR PAT_IND_MATCHES FEATURE_NAMES CORR_LABELS]=...
-    GetPatientFeatures(PAT_STRUCT,[],PRED_FEATURES{:});
+    GetPatientFeatures(PAT_STRUCT,ELM_STRUCT,PRED_FEATURES{:});
+
 
 RESP_VAR=RESP_VAR==1;
 
@@ -147,7 +158,7 @@ WANTED_SENS=0:0.01:1;
 CLASS_PERF=classperf(RESP_VAR);
 
 if DISPLAY_FLAG
-    kNN_fig_handle=figure;
+%    kNN_fig_handle=figure;
     %SVM_fig_handle=figure;
     SWR_fig_handle=figure;
 end
@@ -195,7 +206,7 @@ for i=1:NUM_REPS
             figure(kNN_fig_handle)
             subplot(2,2,4), barh(mean(kNN_CORR_SPOTS(1:i,:),1))
             axis([0 1 0 size(kNN_CORR_SPOTS,2)])
-            set(gca,'ytick',CORR_LABELS,'Yticklabel',{'RX Data','SNP Data','Simple ELM','Positional ELM'});
+            set(gca,'ytick',CORR_LABELS,'Yticklabel',PRED_FEATURES);
             xlabel('Frequency Picked')
             subplot(2,2,3), hist(kNN_TRAIN_CLASS_CORRECT(1:i),0:0.01:1)
             ylabel('Frequency')
@@ -210,7 +221,7 @@ for i=1:NUM_REPS
 
         [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP,'inmodel',ismember(NAN_MASK,intial_inds),'display','off');
 
-        VALS=glmval([B_values(inmodel);0],TESTING_FEATURES(:,NAN_MASK(inmodel)),'identity');
+        VALS=glmval([B_values(inmodel);0],TESTING_FEATURES(:,NAN_MASK(inmodel)),'logit');
 
         [temp_AUC SWR_SPEC_VALS(i,:)]=CalculateROC(VALS,TESTING_RESP,WANTED_SENS);
 
@@ -262,7 +273,7 @@ end
         OUTPUT_MAT=zeros(MAX_FEATURES,MAX_K);
 
 
-        parfor (K_IND = 1:MAX_K)
+        for (K_IND = 1:MAX_K)
             temp_CLASS_PERF=classperf(RESP);
 
             F_IND=1;
@@ -278,8 +289,9 @@ end
                 
                 for inside=1:20
                     [this_train this_test]=crossvalind('leaveMout',NUM_OBSERVATIONS,round(.1*NUM_OBSERVATIONS));
-                    this_classified=knnclassify(FEATURES(this_test,1:F_IND),FEATURES(this_train,1:F_IND),RESP(this_train),K_IND,'hamming','consensus');
+                    this_classified=knnclassify(FEATURES(this_test,1:F_IND),FEATURES(this_train,1:F_IND),RESP(this_train),K_IND,[],'consensus');
                     temp_CLASS_PERF=classperf(temp_CLASS_PERF,this_classified,this_test);
+
                 end
 
                 OUTPUT_SLICE(F_IND)=temp_CLASS_PERF.CorrectRate;
@@ -330,7 +342,7 @@ end
 
                 [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
 
-                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off'); %#ok<PFBNS,SETNU>
+                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off','scale','on'); %#ok<PFBNS,SETNU>
                 VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
 
                 AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
@@ -374,8 +386,9 @@ end
             xlabel('AUC Val')
 
             subplot(2,2,3), barh([SPOT_FREQ',AUC_NORM_SPOT_FREQ']);
-            set(gca,'ytick',CORR_LABELS,'Yticklabel',{'RX Data','SNP Data','Simple ELM','Positional ELM'});
+            set(gca,'ytick',CORR_LABELS,'Yticklabel',PRED_FEATURES);
             legend('SPOT OCCURANCE','AUC Normalized')
+            drawnow
         end
         [Y_val I_val]=sort(AUC_NORM_SPOT_FREQ,'descend');
 
