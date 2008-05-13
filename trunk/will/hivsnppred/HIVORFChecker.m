@@ -115,7 +115,7 @@ alignments=cell(length(HIV_REF.AAseqs),length(TRANS_SEQS));
 for i=1:length(HIV_REF.AAseqs)
     for j=1:length(TRANS_SEQS)
         if WHOLE_GENOME_FLAG||(2*length(HIV_REF.AAseqs{i})>length(TRANS_SEQS{j})&&0.1*length(HIV_REF.AAseqs{i})<length(TRANS_SEQS{j}))
-            [scores(i,j) alignments{i,j}]=nwalign_mod(HIV_REF.AAseqs{i},TRANS_SEQS{j});
+            [scores(i,j) alignments{i,j}]=nwalign(HIV_REF.AAseqs{i},TRANS_SEQS{j});
         end
     end
 end
