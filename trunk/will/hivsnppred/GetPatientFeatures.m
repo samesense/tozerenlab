@@ -40,7 +40,8 @@ function varargout=GetPatientFeatures(PAT_STRUCT,ELM_STRUCT,varargin)
 %   PositionalELM   A binary indicator vector for the presence or absence
 %                   of ELMs at specific locations.
 %
-%
+%   PositionalPWM   A continious valued vector indicating the conservation
+%                   of the ELM relative to the reference genomic sequences.
 %
 %
 
@@ -118,11 +119,25 @@ for i=1:length(varargin)
             temp_names=cell(1,size(elm_annot,2));
 
             for k=1:size(temp_names,2)
-                temp_names{k}=[ELM_STRUCT(elm_annot(2,k)).Name ' at ' int2str(elm_annot(2,k))];
+                temp_names{k}=[ELM_STRUCT(elm_annot(1,k)).Name ' at [' int2str(elm_annot(2,k)) ',' int2str(elm_annot(3,k)) ']'];
             end
 
             name_cell{i}=temp_names;
             clear temp_names;
+
+        case 'positionalpwm'
+            [feature_cell{i} index_cell{i}]=PatientStructHelper(PAT_STRUCT,{'ELM_PWM','explodeNumeric'});
+            elm_annot=PAT_STRUCT{1}.ELM_PWMannot;
+            temp_names=cell(1,size(elm_annot,2));
+
+            for k=1:size(temp_names,2)
+                temp_names{k}=[ELM_STRUCT(elm_annot(1,k)).Name ' PWM at [' int2str(elm_annot(2,k)) ',' int2str(elm_annot(3,k)) ']'];
+            end
+
+            name_cell{i}=temp_names;
+            clear temp_names;
+            
+            
             
         case 'responder'
             %do nothing, responder is put in the last cell automatically.
