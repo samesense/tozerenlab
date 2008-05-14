@@ -115,8 +115,8 @@ for i=1:length(varargin)
             
         case 'positionalelm'
             [feature_cell{i} index_cell{i}]=PatientStructHelper(PAT_STRUCT,{'ELM_vec','explodeNumeric'});
-            [elm_annot junk]=PatientStructHelper(PAT_STRUCT(INDS{i}),{'ELM_annot','leaveCell'});
-            elm_annot=elm_annot{1};
+            [elm_annot junk]=PatientStructHelper(PAT_STRUCT,{'ELM_annot','leaveCell'});
+            elm_annot=elm_annot{find(~cellfun('isempty',elm_annot),1)};
             temp_names=cell(1,size(elm_annot,2));
 
             for k=1:size(temp_names,2)
@@ -128,8 +128,8 @@ for i=1:length(varargin)
 
         case 'positionalpwm'
             [feature_cell{i} index_cell{i}]=PatientStructHelper(PAT_STRUCT,{'ELM_PWM','explodeNumeric'});
-            [elm_annot junk]=PatientStructHelper(PAT_STRUCT(INDS{i}),{'ELM_PWMannot','leaveCell'});
-            elm_annot=elm_annot{1};
+            [elm_annot junk]=PatientStructHelper(PAT_STRUCT,{'ELM_PWMannot','leaveCell'});
+            elm_annot=elm_annot{find(~cellfun('isempty',elm_annot),1)};
             temp_names=cell(1,size(elm_annot,2));
 
             for k=1:size(temp_names,2)

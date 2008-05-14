@@ -160,7 +160,9 @@ end
         data=cell(size(input_struct));
         index_array=(1:length(data))';
         for k=1:length(input_struct)
-            data{k}=getfield(input_struct{k},field_name);
+            if isfield(input_struct{k},field_name)
+                data{k}=getfield(input_struct{k},field_name);
+            end
         end
 
     end
