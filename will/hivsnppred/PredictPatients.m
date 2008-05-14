@@ -4,7 +4,8 @@ function [varargout]=PredictPatients(PAT_STRUCT,NUM_REPS,varargin)
 %       power of the BASE_CALLS and ELM vectors in predicting patient
 %       response.
 %
-%       [PRED_VALS PRED_NORM PRED_STD]=PredictPatients(PAT_STRUCT,NUM_REPS)
+%       [PRED_VALS PRED_NORM PRED_STD PRED_COUNT]=PredictPatients(...
+%                                                   PAT_STRUCT,NUM_REPS)
 %
 %       PAT_STRUCT          A patient structure for testing.
 %
@@ -219,7 +220,7 @@ for i=1:NUM_REPS
 
         intial_inds=FindOptSWR(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP);
 
-        [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP,'inmodel',ismember(NAN_MASK,intial_inds));
+        [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(TRAINING_FEATURES(:,NAN_MASK),TRAINING_RESP,'inmodel',ismember(NAN_MASK,intial_inds),'display','off');
 
         VALS=glmval([B_values(inmodel);0],TESTING_FEATURES(:,NAN_MASK(inmodel)),'logit');
 
@@ -342,8 +343,8 @@ end
 
                 [this_train this_test]=crossvalind('holdout',groups(RESP+1),0.1,'classes',groups);
 
-                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off','scale','on'); %#ok<PFBNS,SETNU>
-                VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'identity');
+                [B_values,se,pval,inmodel,stats,nextstep,history]=stepwisefit(FEATURES(this_train,:),RESP(this_train),'inmodel',rand(MAX_FEATURES,1)<0.1,'display','off','scale','on','maxiter',1000); %#ok<PFBNS,SETNU>
+                VALS=glmval([B_values(inmodel);0],FEATURES(this_test,inmodel),'logit');
 
                 AUC_MAP(IND)=abs(CalculateROC(VALS,RESP(this_test))-0.5);
 
