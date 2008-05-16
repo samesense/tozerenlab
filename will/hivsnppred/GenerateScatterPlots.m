@@ -331,7 +331,7 @@ if any(FIGURES_TO_GENERATE==2)
         ylabel('CD4 cell count')
         legend(GROUP_LABELS{VALID_GROUPS})
     end
-    
+
 end
 
 %%%%%%%%Calculate the slopes of the patient's normalized data

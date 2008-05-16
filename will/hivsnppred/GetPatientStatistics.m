@@ -87,15 +87,13 @@ NumPerTherapy = histc(LOC, 1:length(TherapyRegimines));
 
 
 BasicStats = cell(max(length(StudiesIncluded)+length(TherapyRegimines)+1,4),4);
-try
+
 BasicStats(1:length(StudiesIncluded),1)=StudiesIncluded;
 BasicStats(1:length(StudiesIncluded),2)=num2cell(NumPerStudy);
 BasicStats(length(StudiesIncluded)+1,1)={'Therapies Considered'};
 BasicStats(length(StudiesIncluded)+2:end,1)=TherapyRegimines;
 BasicStats(length(StudiesIncluded)+2:end,2)=num2cell(NumPerTherapy);
-catch
-    123
-end
+
 
 BasicStats{1,3}='Responders';
 BasicStats{1,4}=NumResponders;
