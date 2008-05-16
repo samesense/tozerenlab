@@ -159,9 +159,9 @@ def printGenes2Path(species_code):
     serv = WSDL.Proxy(wsdl)
     pathways = serv.list_pathways(species_code)
     for path in pathways:
-        genes = serv.get_genes_by_pathway(path[entry_id])
+        genes = serv.get_genes_by_pathway(path['entry_id'])
         for g in genes:
-            print g + '\t' + path[entry_id]
+            print g + '\t' + path['entry_id']
 
 def getPathwayEdges(path):
     edges = dict()
