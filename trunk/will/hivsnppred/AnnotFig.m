@@ -40,9 +40,9 @@ end
 total_bar_height=bar_per*y_lim(2);
 ind_bar_height=total_bar_height/5;
 
-binary_mask=false(length(PLOT_ANNOT_CELL),length(x_axis_spots));
+binary_mask=false(size(PLOT_ANNOT_CELL,1),length(x_axis_spots));
 
-for k=1:length(PLOT_ANNOT_CELL)
+for k=1:size(PLOT_ANNOT_CELL,1)
     spots=sort(PLOT_ANNOT_CELL{k,1});
     first_spot=find(x_axis_spots>spots(1),1);
     second_spot=find(x_axis_spots>spots(2),1);
@@ -62,9 +62,10 @@ for k=1:length(PLOT_ANNOT_CELL)
 
     plot_row=find(sum(binary_mask(:,first_spot:second_spot),2)==0,1);
     binary_mask(plot_row,first_spot:second_spot)=true;
-    
+
     rectangle('position',[trans_spots(1) -plot_row*ind_bar_height trans_spots(2)-trans_spots(1) ind_bar_height],'facecolor',colors(rem(k,length(colors))+1,:));
     text('position',[trans_spots(1)+(trans_spots(2)-trans_spots(1))/2 -plot_row*ind_bar_height+.5*ind_bar_height],'string',PLOT_ANNOT_CELL{k,2},'fontunits','normalized','fontsize',.01)
+
 end
 
 end
