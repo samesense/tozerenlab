@@ -27,3 +27,19 @@ def printFASTA_forGenes(geneLsFile, FASTA_file, output_file):
                     if line == '': break
     f.close()
     fout.close()
+
+def prettyPrint_runner(geneid, seq_string):
+    breakcount = 50
+    line = '>' + geneid + '\n'
+    while len(seq_string) > breakcount:
+        line = line + seq_string[0:breakcount] + '\n'
+        seq_string = seq_string[breakcount:]
+    if seq_string != '':
+        line = line + seq_string
+    return line
+
+def prettyPrint(geneid, seq_string):
+    print prettyPrint_runner(geneid, seq_string)
+
+def prettyPrint_file(geneid, seq_string, file):
+    file.write( prettyPrint_runner(geneid, seq_string) + '\n')
