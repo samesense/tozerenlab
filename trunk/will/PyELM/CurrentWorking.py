@@ -23,35 +23,42 @@ class SeqAns:
 
 
 
-bkgHandle = open('bkg_aa_seq.fasta','rU')
-bkgSeqs=[]
-##bkgSeqs=pickle.load(bkgHandle)
-
-for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
-    bkgSeqs.append(thisSeq.seq.tostring())
-
-bkgHandle.close()
-
-
+##bkgHandle = open('bkg_aa_seq.fasta','rU')
+##bkgSeqs=[]
+####bkgSeqs=pickle.load(bkgHandle)
+##
+##for thisSeq in SeqIO.parse(bkgHandle,'fasta'):
+##    bkgSeqs.append(thisSeq.seq.tostring())
+##
+##bkgHandle.close()
 
 
-ELMAnal = PyELM()
+prevRun = open('backupData8.pkl','r')
 
-ELMAnal.ELMParser()
-##ELMAnal.AddELM('TESTCASE','CCCC')
-ELMAnal.LoadSeqs(bkgSeqs)
+ELMAnal = pickle.load(prevRun)
 
-ELMAnal.ELMMatchSeqs()
-ELMAnal.CalcTimeOut=1000
+prevRun.close()
+
+##ELMAnal = PyELM()
+##
+##ELMAnal.ELMParser()
+##ELMAnal.LoadSeqs(bkgSeqs)
+##
+##ELMAnal.ELMMatchSeqs()
+##ELMAnal.CalcTimeOut=1000
+print 'Calculating Bins'
 
 for wanted_elm in ELMAnal.GetELMIterator():
     print wanted_elm
+    if wanted_elm in ELMAnal.PreCalcELMBinDict:
+        print 'Already Calculated'
+        continue
 
     try:
         ELMAnal.CalculateBins(wanted_elm)
     finally:
         print 'Backing Up'
-        backupHandle = open('backupData.pkl','w')
+        backupHandle = open('backupData9.pkl','w')
         pickle.dump(ELMAnal,backupHandle)
         backupHandle.close()
     

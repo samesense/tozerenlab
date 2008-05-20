@@ -5,7 +5,7 @@ from pyQueueUtils import *
 from copy import *
 import threading
 import time
-
+import bisect
 
 class PyELM:
 
@@ -34,6 +34,7 @@ class PyELM:
         self.MaxWidth = 5
         self.MaxIter = 1000
         self.CalcTimeOut=300
+        self.ForceBins = [858, 1359, 1483, 1676, 2570, 3434, 3513]
 
     def ELMParser(self,DIRECTORY="C:\Documents and Settings\Will\My Documents\ELM_Motif_finder\ELM_RAW_DOWNLOAD\\"):
         """
@@ -462,10 +463,18 @@ class PyELM:
         return (thisBinVal[0], thisBinVal[1], thisBinVal[2] )
 
 
-    def __EvaluateAllBins(self,WANTED_ELM,allBins):
+    def __EvaluateAllBins(self,WANTED_ELM,thisBins):
         """
         Evaluates the values of the bins provided.  Uses a dictionary to avoid re-calculating values wherever possible
         """
+        
+        if len(self.ForceBins) > 0:
+            allBins = deepcopy(thisBins)
+            for forced in self.ForceBins:
+                bisect.insort(allBins,forced)
+        else:
+            allBins = thisBins
+        
         if not(tuple(allBins) in self.__allBinDict ):
             TotalEmpty=0
             TotalCorrect=0
@@ -485,6 +494,24 @@ class PyELM:
         #print 'Bins: ', allBins
         #print 'Vals: ', self.__allBinDict[tuple(allBins)]
         return self.__allBinDict[tuple(allBins)][3]
+
+    def GetAllBinError(self,WANTED_ELM,allBins):
+        """
+        Evaluates the values of the bins provided.
+        """
+
+        thisList = [];
+                
+        for i in xrange(len(allBins)-1):
+            ThisBin=self.__EvaluateBin(WANTED_ELM,(allBins[i],allBins[i+1]))
+                        
+            Empty = ThisBin[0]
+            Correct = ThisBin[1]
+            Wrong = ThisBin[2]
+
+            thisList.append((Empty,Correct,Wrong))    
+
+        return thisList
 
     def __BailingThread(self):
         print 'Exceded timeLimit, bailing on further exploration'
@@ -545,3 +572,18 @@ class PyELM:
         self.PreCalcELMBinDict[WANTED_ELM] = currentMinInd
         self.__WorkingQueue=None
         self.__FoundCorrect=None
+
+    def WriteBins(self,FileHandle):
+
+        for thisELM in self.ELMOrder:
+            FileHandle.write(thisELM+'\n')
+            for thisBin in self.PreCalcELMBinDict[thisELM]:
+                FileHandle.write(str(thisBin)+'\t')
+            FileHandle.write('\n')
+        
+
+
+
+
+
+        
