@@ -48,3 +48,14 @@ def mkNodesFromEdges(afile):
         nodes[sp[1]] = True
     f.close()
     return nodes
+
+def getConnected(ls_file, net_file):
+    ls = getNodes(ls_file)
+    net = getEdges(net_file)
+    second_level_ls = {}
+    for gene in ls.keys():
+        if net.has_key(gene):
+            for g2 in net[gene].keys():
+                if gene != g2:
+                    second_level_ls[g2] = True
+    return second_level_ls
