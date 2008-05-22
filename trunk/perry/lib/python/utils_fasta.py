@@ -28,6 +28,27 @@ def printFASTA_forGenes(geneLsFile, FASTA_file, output_file):
     f.close()
     fout.close()
 
+def loadFASTA(fasta_file):
+    fasta = {}
+    f = open(fasta_file)
+    name = ''
+    line = f.readline()
+    while line != '':
+        if line[0] == '>':
+            if name != '':
+                fasta[ name ] = seq
+            name = line[1:].strip()
+            seq = ''
+        else:
+            seq = seq + line.strip()
+        line = f.readline()
+    f.close()
+
+    if name != '':    
+        fasta[name ] = seq
+
+    return fasta
+
 def prettyPrint_runner(geneid, seq_string):
     breakcount = 50
     line = '>' + geneid + '\n'
