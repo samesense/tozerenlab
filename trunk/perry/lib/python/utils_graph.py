@@ -59,3 +59,20 @@ def getConnected(ls_file, net_file):
                 if gene != g2:
                     second_level_ls[g2] = True
     return second_level_ls
+
+def intersectLists(list_of_lists):
+    same = {}
+    for s in list_of_lists[0].keys():
+        count = 0
+        for ls in list_of_lists[1:]:
+            if ls.has_key(s): count += 1
+        if count == len(list_of_lists)-1:
+            same[s] = True
+    return same
+
+def unionLists(list_of_lists):
+    all = {}
+    for ls in list_of_lists:
+        for k in ls.keys():
+            all[k] = True
+    return all
