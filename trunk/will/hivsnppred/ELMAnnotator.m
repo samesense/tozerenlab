@@ -131,7 +131,10 @@ for i = 1:length(PAT_STRUCT)
         PAT_STRUCT{i}.ELM_PWMannot = PWMBins;
         
     else
-        PAT_STRUCT{i}=rmfield(PAT_STRUCT{i},{'ELM_simple','ELM_vec','ELM_annot'});
+        try
+            PAT_STRUCT{i}=rmfield(PAT_STRUCT{i},{'ELM_simple','ELM_vec','ELM_annot'});
+        catch
+        end
     end
 
 end
