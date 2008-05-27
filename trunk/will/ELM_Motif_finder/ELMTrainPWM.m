@@ -286,7 +286,7 @@ else
             ThisPWM = OriginalPWM;
             ThisPWM(ChangeSpots) = x
             PWM_CELL{counter,2}=ThisPWM;
-            PWM_CELL{counter,1}=[this_ELM TheseBins(:,g)];
+            PWM_CELL{counter,1}=[this_ELM*ones(2,1) TheseBins(:,g)];
             %[x fval]=fminsearch(@PWMObjective,OriginalPWM(ChangeSpots),options);
         end
         
