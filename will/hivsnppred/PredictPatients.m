@@ -257,6 +257,7 @@ if SWR_FLAG
     varargout{2}=PRED_NORM;
     varargout{3}=PRED_STD;
     varargout{4}=PRED_COUNT;
+    varargout{5}={WANTED_SENS,SWR_SPEC_VALS};
 end
 
 if kNN_FLAG
