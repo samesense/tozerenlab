@@ -74,6 +74,7 @@ if isempty(ELM_PWM)
 end
 
 ELM_PWM_INDS = cell2mat(ELM_PWM(:,1));
+ELM_PWM_INDS(2:2:end,:)=[];
 
 
 
@@ -86,7 +87,11 @@ for i = 1:length(ELM_STRUCT)
     
     if any(AnnotMask)
         thisELM.PosBins = ELM_POS{2}(2:end,AnnotMask);
+        try
         thisELM.PosPWMs = ELM_PWM(ELM_PWM_INDS(:,1)==i,2);
+        catch
+            123
+        end
 
     else
         thisELM.PosBins=[];
