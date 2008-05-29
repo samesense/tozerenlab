@@ -1,4 +1,5 @@
-import MySQLdb, sys
+import MySQLdb, sys, string
+import utils_graph
 
 gocats = ['Process', 'Component', 'Function']
 
@@ -8,9 +9,13 @@ gocatAlias['molecular_function'] = 'Function'
 gocatAlias['biological_process'] = 'Process'
 gocatAlias['universal'] = 'Universal'
 
-unknownGOterms = dict()
-for t in ['GO:0005554', 'GO:0008372', 'GO:0000004']:
-    unknownGOterms[t] = True
+def findWorkingTerm(termLs, d):
+    for t in termLs:
+        if d.has_key(t):
+            return t
+    print 'your fucked: utils_go.py'
+    print 'cannot find your GO term'
+    sys.exit(0)
 
 # connect to the GO database
 def getGOConnection_Cursor():
@@ -27,11 +32,11 @@ def getGOConnection_Cursor():
 #   return a dict of the term's proteins and
 #          an empty dict for the term's children
 #          an empty dict for the term's parents
-def getTermProperties(species):
+def getTermProperties(tax_id):
     ls = dict()
     try:
         [connection, cursor] = getGOConnection_Cursor()
-        cursor.execute("SELECT term_id, gene_product_id from association a inner join gene_product b on a.gene_product_id=b.id where b.species_id=" + speciesID[species] + ";")
+        cursor.execute("SELECT term_id, gene_product_id from association a inner join gene_product b on a.gene_product_id=b.id where b.species_id=(select id from species where ncbi_taxa_id=" + tax_id + ");")
         data = cursor.fetchall()
         for item in data:
             if not ls.has_key(item[0]):
@@ -108,7 +113,7 @@ def getDistanceFromRoot():
     connection.close()
     return [disDict, maxDist]
 
-def getDistanceFromRoot2():
+def getMaxDistanceFromRoot():
     try:
         [connection, cursor] = getGOConnection_Cursor()
         cursor.execute("SELECT term.id, p.distance FROM term INNER JOIN graph_path AS p ON (p.term2_id=term.id) INNER JOIN term AS root ON (p.term1_id=root.id) WHERE root.is_root=1;")
@@ -188,7 +193,41 @@ def getTermIDtoGOterm():
         sys.exit()
     cursor.close()
     connection.close()
-    return termInfo        
+    return termInfo
+
+def term2term_id():
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute("SELECT id, acc, term_type, name FROM term WHERE term_type='biological_process' or term_type='cellular_component' or term_type='molecular_function' or term_type='universal';")
+        data = cursor.fetchall()        
+        termInfo = dict()
+        for item in data:
+            if not termInfo.has_key(item[1]): termInfo[item[1]]={}
+            termInfo[ item[1] ][item[0]] = True
+    except MySQLdb.OperationalError, message:
+        print message[0]
+        print message[1]
+        sys.exit()
+    cursor.close()
+    connection.close()
+    return termInfo
+
+def term_id2term():
+    try:
+        [connection, cursor] = getGOConnection_Cursor()
+        cursor.execute("SELECT id, acc, term_type, name FROM term WHERE term_type='biological_process' or term_type='cellular_component' or term_type='molecular_function' or term_type='universal';")
+        data = cursor.fetchall()        
+        termInfo = dict()
+        for item in data:
+            if not termInfo.has_key(item[0]): termInfo[item[0]]={}
+            termInfo[ item[0] ][item[1]] = True
+    except MySQLdb.OperationalError, message:
+        print message[0]
+        print message[1]
+        sys.exit()
+    cursor.close()
+    connection.close()
+    return termInfo
 
 # given 2 dicts of terms,
 #  find the intersection,
@@ -210,9 +249,9 @@ def mkGOStandardFile(terms1, terms2, afile):
     for gocat in gocats:
         files[gocat].close()
 
-def getTerm_proteins_children_parents(species):
+def getTerm_proteins_children_parents(tax_id):
     [child2Parent, parent2Child] = getTermRelations()
-    termProperties = getTermProperties(species)
+    termProperties = getTermProperties(tax_id)
     fillInTermPropertiesWParents(termProperties, child2Parent, parent2Child)
     return termProperties
 
@@ -332,3 +371,120 @@ def expandTerm(goTerm):
     for c in descendants.keys():
         d[c] = True
     return d
+
+# GO_terms will be converted to GO_ids
+def parseGene2GO(gene2go_file, genes):
+    GO_ID2database_id = term2term_id()
+    gene2go = {}
+    f = open(gene2go_file)
+    f.readline()
+    for line in f.xreadlines():
+        [tax_id, GeneID, GO_ID,
+         Evidence, Qualifier,
+         GO_term, PubMed, Category] = map(string.strip,
+                                          line.split('\t'))
+        if genes.has_key(GeneID):
+            if not gene2go.has_key(GeneID): gene2go[GeneID] = {}
+            if not gene2go[GeneID].has_key(Category):
+                gene2go[GeneID][Category] = {}
+            gene2go[GeneID][Category][ GO_ID2database_id[GO_ID].keys()[0] ] = True
+    f.close()
+    return gene2go
+
+def getTaxID(geneLs, gene2go_file):
+    taxa = 'missing'
+    f = open(gene2go_file)
+    f.readline()
+    for line in f.xreadlines():
+        [tax_id, GeneID, GO_ID,
+         Evidence, Qualifier, GO_term,
+         PubMed, Category] = map(string.strip,
+                                 line.split('\t'))
+        if geneLs.has_key(GeneID):
+            taxa = tax_id
+            break
+    f.close()
+    return taxa
+
+def threshold(termProperties, thresh):
+    for k in termProperties.keys():
+        if len(termProperties[k][0].keys()) < thresh:
+            del termProperties[k]
+    meetsThreshold = dict()
+    for k in termProperties.keys():
+        addIt = True
+        children = termProperties[k][1]
+        for c in children.keys():
+            if termProperties.has_key(c):
+                addIt = False
+        if addIt: meetsThreshold[k] = True
+    return meetsThreshold
+
+def getInformativeTerms(tax_id, thresh):
+    [child2Parent, parent2Child] = getTermRelations()
+    termProperties = getTermProperties(tax_id)
+    fillInTermProperties(termProperties, child2Parent)
+    return threshold(termProperties, thresh)
+
+def getGOAnnotations_old(taxID, genes2go, child2Parents, ignoreISS):
+    workingTermDict = dict()
+    for gene in genes2go.keys():
+        for category in genes2go[gene].keys():
+            toAdd = dict()
+            for term in genes2go[gene][category].keys():
+                if not child2Parents.has_key(term):
+                    if not workingTermDict.has_key(term):
+                        termLs = getTermSynonym(term)
+                        workingTermDict[term] = termLs
+                    else:
+                        termLs = workingTermDict[term]
+                    term = findWorkingTerm(termLs, child2Parents)
+                parents = child2Parents[term]
+                for p in parents:
+                    if not unknownGOterms.has_key(p):
+                        toAdd[p] = True
+            for a in toAdd.keys():
+                genes2go[gene][category][a] = True
+
+def getGOAnnotations(taxID, genes2go, child2Parents):
+    missing = 0
+    workingTermDict = dict()
+    for gene in genes2go.keys():
+        for category in genes2go[gene].keys():
+            for term in genes2go[gene][category].keys():
+                for a in child2Parents[term].keys():
+                    genes2go[gene][category][a] = True
+
+def getChild2Parents(tax_id, termID2termName):
+    term2Parents = dict()
+    termProperties = getTerm_proteins_children_parents(tax_id)
+    for term in termProperties.keys():
+        #termName = termID2termName[term][0]
+        term2Parents[term] = dict()
+        for pID in termProperties[term][2]:
+            term2Parents[term][ pID ] = True
+    return term2Parents
+
+# call me
+# just use a file w/ a list of genes
+# and the gene2go file from ncbi
+#
+# you get each gene and all it's GO terms, their distances from the root, and their cats
+def annotate(entrez_gene_ls_file, gene2go_file):
+    genes = utils_graph.getNodes(entrez_gene_ls_file)
+    tax_id = getTaxID(genes, gene2go_file)
+    informative_terms = getInformativeTerms(tax_id, 0)
+    gene2go = parseGene2GO(gene2go_file, genes)   
+    termId2termName = getTermIDtoGOterm()
+    child2Parents = getChild2Parents(tax_id, termId2termName)
+    getGOAnnotations(tax_id, gene2go, child2Parents)
+    termID2term = term_id2term()
+    distances = getMaxDistanceFromRoot()
+    for protein in gene2go.keys():
+        for category in gene2go[protein].keys():
+            for goTerm in gene2go[protein][category].keys():
+                print protein + '\t' + termID2term[goTerm].keys()[0] + '\t' + str(distances[goTerm]) + '\t' + category
+    
+    
+    
+    
