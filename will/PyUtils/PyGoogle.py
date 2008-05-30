@@ -90,7 +90,7 @@ class GoogleSpreadInteract():
 
         if self.TrustMe != 1:
             val = self.__PerformMultiRecordCheck(recordList)
-            if val != 0:
+            if val != 1:
                 print 'A bad record was found: ', str(val)
                 raise IndexError
             
