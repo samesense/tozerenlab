@@ -121,6 +121,21 @@ class GoogleSpreadInteract():
             if self.__PerformTupleCheck(thisRecord) == 0:
                 return thisRecord
         return 1
+
+    def PrintFormFields(self):
+        """
+        PrintFormFields()
+            Lists the fields found in the form.
+        """        
+        for field in self.formDict.keys():
+            print field
+
+    def GetFormFields(self):
+        """
+        GetFormFields()
+            Accessor for the form field dictionary.
+        """        
+        return self.formDict
             
 
 
