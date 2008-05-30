@@ -484,7 +484,18 @@ def annotate(entrez_gene_ls_file, gene2go_file):
         for category in gene2go[protein].keys():
             for goTerm in gene2go[protein][category].keys():
                 print protein + '\t' + termID2term[goTerm].keys()[0] + '\t' + str(distances[goTerm]) + '\t' + category
-    
+
+def loadAnnotations(afile, levels, go_cats):
+    gene2go = {}
+    f = open(afile)
+    for line in f.xreadlines():
+        [gene, go, level, cat] = map(string.strip, line.split('\t'))
+        if levels.has_key(level) and go_cats.has_key(cat):
+            if not gene2go.has_key(gene):
+                gene2go[gene] = {}
+            gene2go[gene][go] = True
+    f.close()
+    return gene2go
     
     
     
