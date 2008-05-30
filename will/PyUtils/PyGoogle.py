@@ -84,7 +84,7 @@ class GoogleSpreadInteract():
 
     def SubmitMultiRecords(self,recordList):
         """
-        SubmitMultiReconds(recordList)
+        SubmitMultiRecords(recordList)
             Takes a list of lists of tuples.  Each element in the list is indiviually submitted to SubmitTupleList.
         """
 
