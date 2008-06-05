@@ -6,13 +6,20 @@ import subprocess
 import re
 
 class ClustalInterface():
-    def __init__(self,clustalPath='C:\\clustalw\\',InputSeqs=[],ParamPairs=[]):
+    """
+    ClustalInterface
+        An interface for doing alignments with ClustalW.  The Class interface can write fasta-files, call clustalW and read the .aln file that results.
+
+    """
+
+    
+    def __init__(self, clustalPath = 'C:\\clustalw\\', InputSeqs = [], ParamPairs=[]):
         self.clustalPath = clustalPath
         self.InputSeqs = InputSeqs
         self.FastaName = None
         self.OutputName = ''
-        self.ParamPairs=[]
-        self.alignedSeqs=[];
+        self.ParamPairs = []
+        self.alignedSeqs = [];
 
         self.FastaWritten = False
         self.ProcessRun = False
@@ -23,16 +30,16 @@ class ClustalInterface():
         self.MakeParamDict()
 
 
-    def WriteFASTA(self,InputSeqs=None):
+    def WriteFASTA(self, InputSeqs = None):
         """
-        WriteFASTA(InputSeqs=None)
+        WriteFASTA(InputSeqs = None)
             Uses NamedTemporaryFile to generate a unique filename and writes the sequences in FASTA format.  If InputSeqs is not empty then they are added to the class.
 
 
         """
 
         
-        newNamedFile = tempfile.NamedTemporaryFile(prefix='temp_',suffix='.fasta',dir=self.clustalPath)
+        newNamedFile = tempfile.NamedTemporaryFile(prefix='temp_', suffix='.fasta', dir=self.clustalPath)
 
         self.FastaName = newNamedFile.name
         newNamedFile.close()
@@ -94,45 +101,45 @@ class ClustalInterface():
 
         """
 
-        self.ParamDict['INFILE']=None               #input sequences
+        self.ParamDict['INFILE'] = None               #input sequences
 
         
         #***General settings:****
-        self.ParamDict['INTERACTIVE']=None          #:read command line, then enter normal interactive menus
-        self.ParamDict['QUICKTREE']=None            #:use FAST algorithm for the alignment guide tree
-        self.ParamDict['NEGATIVE']=None             #:protein alignment with negative values in matrix
-        self.ParamDict['OUTFILE']=None              #:sequence alignment file name
+        self.ParamDict['INTERACTIVE'] = None          #:read command line, then enter normal interactive menus
+        self.ParamDict['QUICKTREE'] = None            #:use FAST algorithm for the alignment guide tree
+        self.ParamDict['NEGATIVE'] = None             #:protein alignment with negative values in matrix
+        self.ParamDict['OUTFILE'] = None              #:sequence alignment file name
     
-        self.ParamDict['OUTORDER']=None             #:[INPUT] or ALIGNED
-        self.ParamDict['CASE']=None                 #:[LOWER] or UPPER (for GDE output only)
-        self.ParamDict['SEQNOS']=None               #:[OFF] or ON (for Clustal output only)
+        self.ParamDict['OUTORDER'] = None             #:[INPUT] or ALIGNED
+        self.ParamDict['CASE'] = None                 #:[LOWER] or UPPER (for GDE output only)
+        self.ParamDict['SEQNOS'] = None               #:[OFF] or ON (for Clustal output only)
 
         #***Fast Pairwise Alignments:***
-        self.ParamDict['KTUPLE']=None               #:word size [1]
-        self.ParamDict['TOPDIAGS']=None             #:number of best diags. [5]
-        self.ParamDict['WINDOW']=None               #:window around best diags. [5]
-        self.ParamDict['PAIRGAP']=None              #:gap penalty [3]
-        self.ParamDict['SCORE']=None                #:PERCENT or [ABSOLUTE]
+        self.ParamDict['KTUPLE'] = None               #:word size [1]
+        self.ParamDict['TOPDIAGS'] = None             #:number of best diags. [5]
+        self.ParamDict['WINDOW'] = None               #:window around best diags. [5]
+        self.ParamDict['PAIRGAP'] = None              #:gap penalty [3]
+        self.ParamDict['SCORE'] = None                #:PERCENT or [ABSOLUTE]
 
         #***Slow Pairwise Alignments:***
-        self.ParamDict['PWMATRIX']=None             #:Protein weight matrix=BLOSUM, PAM, [GONNET], ID or filename
-        self.ParamDict['PWDNAMATRIX']=None          #:DNA weight matrix=[IUB], CLUSTALW or filename²
-        self.ParamDict['PWGAPOPEN']=None            #:gap opening penalty [10]
-        self.ParamDict['PWGAPEXT']=None             #:gap extension penalty [0.1]
+        self.ParamDict['PWMATRIX'] = None             #:Protein weight matrix=BLOSUM, PAM, [GONNET], ID or filename
+        self.ParamDict['PWDNAMATRIX'] = None          #:DNA weight matrix=[IUB], CLUSTALW or filename²
+        self.ParamDict['PWGAPOPEN'] = None            #:gap opening penalty [10]
+        self.ParamDict['PWGAPEXT'] = None             #:gap extension penalty [0.1]
 
         #***Multiple Alignments:***
-        self.ParamDict['NEWTREE']=None              #:file for new guide tree
-        self.ParamDict['MATRIX']=None               #:Protein weight matrix=BLOSUM, PAM, [GONNET], ID or filename
-        self.ParamDict['DNAMATRIX']=None            #:DNA weight matrix=[IUB], CLUSTALW or filename
-        self.ParamDict['GAPOPEN']=None              #:gap opening penalty [10]
-        self.ParamDict['GAPEXT']=None               #:gap extension penalty [0.2]
-        self.ParamDict['ENDGAPS']=None              #:no end gap separation pen.
-        self.ParamDict['GAPDIST']=None              #:gap separation pen. range [4]
-        self.ParamDict['NOPGAP']=None               #:residue-specific gaps off
-        self.ParamDict['NOHGAP']=None               #:hydrophilic gaps off
-        self.ParamDict['HGAPRESIDUES']=None         #:list hydrophilic res. ['GPSNDQEKR']
-        self.ParamDict['MAXDIV']=None               #:% ident. for delay [30]
-        self.ParamDict['TYPE']=None                 #:PROTEIN or DNA [AUTO]
+        self.ParamDict['NEWTREE'] = None              #:file for new guide tree
+        self.ParamDict['MATRIX'] = None               #:Protein weight matrix=BLOSUM, PAM, [GONNET], ID or filename
+        self.ParamDict['DNAMATRIX'] = None            #:DNA weight matrix=[IUB], CLUSTALW or filename
+        self.ParamDict['GAPOPEN'] = None              #:gap opening penalty [10]
+        self.ParamDict['GAPEXT'] = None               #:gap extension penalty [0.2]
+        self.ParamDict['ENDGAPS'] = None              #:no end gap separation pen.
+        self.ParamDict['GAPDIST'] = None              #:gap separation pen. range [4]
+        self.ParamDict['NOPGAP'] = None               #:residue-specific gaps off
+        self.ParamDict['NOHGAP'] = None               #:hydrophilic gaps off
+        self.ParamDict['HGAPRESIDUES'] = None         #:list hydrophilic res. ['GPSNDQEKR']
+        self.ParamDict['MAXDIV'] = None               #:% ident. for delay [30]
+        self.ParamDict['TYPE'] = None                 #:PROTEIN or DNA [AUTO]
 
 
     def MakeCommand(self):
@@ -144,7 +151,7 @@ class ClustalInterface():
         command = 'clustalw ' + self.FastaName 
 
         for thisPair in self.ParamPairs:
-            self.ParamDict[thisPair[0]]=str(thisPair[1])
+            self.ParamDict[thisPair[0]] = str(thisPair[1])
 
         for thisParam in self.ParamDict:
             if self.ParamDict[thisParam] != None:
@@ -179,18 +186,18 @@ class ClustalInterface():
         for line in alnHandle:
             reOutput = reFilter.findall(line)
             if len(reOutput) == 1:
-                self.alignedSeqs[int(reOutput[0][0])]+=reOutput[0][1]
+                self.alignedSeqs[int(reOutput[0][0])] += reOutput[0][1]
 
 
         alnHandle.close()
 
-    def CleanUpFiles(self,fasta=True,aln=True,dnd=True):
+    def CleanUpFiles(self, fasta = True, aln = True, dnd = True):
         """
         CleanUpFiles(fasta=True,aln=True,dnd=True)
             Cleans up the .fasta; .aln; and .dnd files that are left over after the alignment finishes.
 
         """
-        if fasta==True:
+        if fasta == True:
             try:
                 os.remove(self.FastaName)
             except:
@@ -205,9 +212,9 @@ class ClustalInterface():
                 os.remove(self.FastaName[0:-6] + '.dnd')
             except:
                 print 'DND Already Removed'
-        self.CleanedUp=fasta&aln&dnd
+        self.CleanedUp = fasta&aln&dnd
         
-    def AlignSeqs(self,InputSeqs=None,ParamPairs=None):
+    def AlignSeqs(self, InputSeqs = None, ParamPairs = None):
         """
         AlignSeqs(InputSeqs=None,ParamPairs=None)
             A gateway function which takes a set of Input Sequences and Parameter Pairs and performs the Writing, Alignment, and Reading in one Call.
@@ -215,9 +222,9 @@ class ClustalInterface():
         """
 
         if InputSeqs != None:
-            self.CleanUpFiles(aln=False,dnd=False)
+            self.CleanUpFiles(aln = False, dnd = False)
             self.FastaWritten = False
-            self.InputSeqs=InputSeqs
+            self.InputSeqs = InputSeqs
 
         if ParamPairs != None:
             self.ParamPairs = ParamPairs
