@@ -3,7 +3,6 @@
 import tempfile
 import os
 import subprocess
-from Bio import SeqIO
 import re
 
 class ClustalInterface():
