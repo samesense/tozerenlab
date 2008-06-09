@@ -178,6 +178,7 @@ end
         colormap(myCOLOR)
         pcolor(THIS_HANDLE,StackedMat)
         shading flat
+        caxis([-1 1])
         
        
         AnnotFig(MIN_VAL:MAX_VAL,ANNOT_CELL)

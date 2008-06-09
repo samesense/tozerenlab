@@ -9,17 +9,34 @@ PredictiveFeatures{3}={'BaseCalls','SimpleELM','PositionalELM'};
 PredictiveFeatures{4}={'BaseCalls','SimpleELM','PositionalELM','PositionalPWM'};
 
 
-All_predvals=cell(length(INDS),4);
-All_prednorm=cell(length(INDS),4);
-All_predstd=cell(length(INDS),4);
-All_predcount=cell(length(INDS),4);
-All_ROCs=cell(length(INDS),4);
-for i = 1:length(INDS)
+% All_predvals=cell(length(INDS),4);
+% All_prednorm=cell(length(INDS),4);
+% All_predstd=cell(length(INDS),4);
+% All_predcount=cell(length(INDS),4);
+% All_ROCs=cell(length(INDS),4);
+
+i=9
+k=3
+
+PredictiveFeatures{k}
+        [All_predvals{i,k} All_prednorm{i,k} All_predstd{i,k} All_predcount{i,k} All_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',PredictiveFeatures{k});
+        save NewRunData All_predvals All_prednorm All_predstd All_predcount All_ROCs
+        
+i=9
+k=4
+
+PredictiveFeatures{k}
+        [All_predvals{i,k} All_prednorm{i,k} All_predstd{i,k} All_predcount{i,k} All_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',PredictiveFeatures{k});
+        save NewRunData All_predvals All_prednorm All_predstd All_predcount All_ROCs
+
+        
+
+for i = 10:length(INDS)
     i
     for k = 1:size(PredictiveFeatures,2)
         PredictiveFeatures{k}
         [All_predvals{i,k} All_prednorm{i,k} All_predstd{i,k} All_predcount{i,k} All_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',PredictiveFeatures{k});
-        save NewRunData All_predvals All_prednorm All_predstd All_predcount
+        save NewRunData All_predvals All_prednorm All_predstd All_predcount All_ROCs
     end
     
 end
