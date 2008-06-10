@@ -1,4 +1,4 @@
-function outputData=FindmiRNAislands(REF_SEQ,TEST_SEQS,MIN_LENGTH,CONS_CUTOFF,varargin)
+function [outputData, varargout]=FindmiRNAislands(REF_SEQ,TEST_SEQS,MIN_LENGTH,CONS_CUTOFF,varargin)
 %   FindmiRNAislands
 %       Finds islands of homology within the highly varying sequence using
 %       an alignment to a reference sample.
@@ -45,6 +45,7 @@ FIG_TOTAL=1;
 AX_HANDLE=[];
 FIGURES_TO_GENERATE=1:FIG_TOTAL;
 EXCEL_FILENAME=[];
+ALIGNMENT_PROP={'alphabet', 'nt'};
 
 
 %%%%%%%CHECK REF_SEQ%%%%%%%%%
@@ -82,6 +83,7 @@ end
 NUM_TEST_SEQS=length(TEST_SEQS_CELL);
 
 NEED_ALIGNMENT_FLAG=true;
+NEED_ALIGNMENT_OUTPUT=false;
 PROVIDED_ALIGNMENTS=[];
 
 for i=1:2:length(varargin)
@@ -105,7 +107,15 @@ for i=1:2:length(varargin)
             else
                 error('FindmiRNAislands:BAD_ALIGNMENT_PROP','Invalid nwalign arguements provided.');
             end
-
+        case {'alignment_output'}
+            if islogical(varargin{i+1})
+                NEED_ALIGNMENT_OUTPUT=varargin{i+1}&true;
+            else
+                error('FindmiRNAislands:BAD_ALIGNMENT_OUTPUT','Arguement to ALIGNMENT_OUTPUT must be a logical.');
+            end
+                
+                
+                
         case {'trust order','trust_order'}
             if islogical(varargin{i+1})&&varargin{i+1}
                 NEED_ALIGNMENT_FLAG=false;
@@ -152,7 +162,7 @@ if NEED_ALIGNMENT_FLAG
 
     %%%%%use provided alignments if possible
     if ~isempty(PROVIDED_ALIGNMENTS)
-        provided_indexes=MatchAlignments(REF_SEQ_CELL,TEST_SEQS_CELL,PROVIDED_ALIGNMENTS,false);
+        provided_indexes=MatchAlignments(REF_SEQ_CELL,TEST_SEQS_CELL,PROVIDED_ALIGNMENTS);
         ALIGNMENTS(provided_indexes~=0)=PROVIDED_ALIGNMENTS(nonzeros(provided_indexes));
     end
 
@@ -243,6 +253,12 @@ end
 if ~isempty(EXCEL_FILENAME)
     xlswrite(EXCEL_FILENAME,outputData);
 end
+
+
+if NEED_ALIGNMENT_OUTPUT
+    varargout{1}=PROVIDED_ALIGNMENTS;
+end
+    
 
 
 
