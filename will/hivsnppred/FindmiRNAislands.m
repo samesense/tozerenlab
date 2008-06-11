@@ -178,7 +178,7 @@ if NEED_ALIGNMENT_FLAG
             [junk ALIGNMENTS{needed_alignments(i)}]=nwalign_mod(REF_SEQ_CELL{1},TEST_SEQS_CELL{needed_alignments(i)},ALIGNMENT_PROP{:});
 
 
-            time=(toc/i)*(length(needed_alignments)-i)
+            time=(toc/i)*(length(needed_alignments)-i)/60
         end
 
 
