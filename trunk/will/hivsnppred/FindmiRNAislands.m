@@ -48,6 +48,17 @@ FIGURES_TO_GENERATE=1:FIG_TOTAL;
 EXCEL_FILENAME=[];
 ALIGNMENT_PROP={'alphabet', 'nt'};
 
+%%%%%%%CHECK INPUT NUMS%%%%%%
+if ~isdouble(MIN_LENGTH)||~isscalar(MIN_LENGTH)
+    error('FindmiRNAislands:MIN_LENGTH','MIN_LENGTH must be a scalar double!');
+end
+
+if ~isdouble(CONS_CUTOFF)
+    error('FindmiRNAislands:CONS_CUTOFF','CONS_CUTOFF must be a double!');
+end
+
+
+
 
 %%%%%%%CHECK REF_SEQ%%%%%%%%%
 if isstruct(REF_SEQ)&&isfield(REF_SEQ,'Sequence')&&numel(REF_SEQ)==1
