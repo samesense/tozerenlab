@@ -39,7 +39,8 @@ function [outputData, varargout]=FindmiRNAislands(REF_SEQ,TEST_SEQS,MIN_LENGTH,C
 
 
 
-
+PARFOR_BLOCK_SIZE=20;
+ALIGN_ONLY_FLAG=false;
 [INT_NT_MAP ALLOWABLE_CHARS]=AmbigiousNTMap;
 FIG_TOTAL=1;
 AX_HANDLE=[];
@@ -145,12 +146,22 @@ for i=1:2:length(varargin)
             else
                 error('FindmiRNAislands:BAD_EXCEL_FILENAME','Arguement to EXCEL_FILENAME must be a char-array.');
             end
+            
+        case {'alignments_only'}
+            if islogical(varargin{i+1})
+                ALIGN_ONLY_FLAG = varargin{i+1}&true;
+            else
+                error('FindmiRNAislands:BAD_ALIGNMENTS_ONLY','Arguement to ALIGNMENTS_ONLY must be a logical.');
+            end
 
         otherwise
             error('FindmiRNAislands:BAD_ARG','An unknown input arguements was provided: %s',varargin{i});
     end
 end
 
+if nargout == 2
+    NEED_ALIGNMENT_OUTPUT=true;
+end
 
 %%%%%%%DONE ARGUEMENT CHECKING
 
@@ -168,28 +179,40 @@ if NEED_ALIGNMENT_FLAG
 
 
     still_needed=cellfun('isempty',ALIGNMENTS);
-
-    if any(still_needed)
-
-        needed_alignments=find(still_needed)';
-
-        tic
-        for i=1:length(needed_alignments)
-            [junk ALIGNMENTS{needed_alignments(i)}]=nwalign_mod(REF_SEQ_CELL{1},TEST_SEQS_CELL{needed_alignments(i)},ALIGNMENT_PROP{:});
-
-
-            time=(toc/i)*(length(needed_alignments)-i)/60
+    keepTrack = still_needed;
+    DONE_COUNTER=0;
+    tic
+    while any(still_needed)
+ 
+        
+        needed_alignments = find(still_needed,PARFOR_BLOCK_SIZE)';
+        tempAlignments = cell(min(PARFOR_BLOCK_SIZE,length(needed_alignments)),1);
+        tempSeqs = TEST_SEQS_CELL(needed_alignments);
+        
+        parfor (LOOP_IND=1:min(PARFOR_BLOCK_SIZE,length(tempAlignments)))
+            [junk tempAlignments{LOOP_IND}]=nwalign(REF_SEQ_CELL{1},tempSeqs{LOOP_IND},ALIGNMENT_PROP{:});
         end
+        
+        DONE_COUNTER = DONE_COUNTER+PARFOR_BLOCK_SIZE;
 
+        still_needed(needed_alignments)=false;
+        ALIGNMENTS(needed_alignments)=tempAlignments;
+       
+        
+        time=(toc/DONE_COUNTER)*(nnz(still_needed))/60
 
         %%%%add the alignments preformed so they can be returned easily if
         %%%%desired
-        PROVIDED_ALIGNMENTS=[PROVIDED_ALIGNMENTS;ALIGNMENTS(still_needed)];
-
 
     end
+    PROVIDED_ALIGNMENTS=[PROVIDED_ALIGNMENTS;ALIGNMENTS(keepTrack)];
 else
     ALIGNMENTS=PROVIDED_ALIGNMENTS;
+end
+
+if ALIGN_ONLY_FLAG
+    outputData = PROVIDED_ALIGNMENTS;
+    return
 end
 
 snp_spot=false(NUM_TEST_SEQS,REF_SEQ_LENGTH);
