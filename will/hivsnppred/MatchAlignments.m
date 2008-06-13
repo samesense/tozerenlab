@@ -42,9 +42,9 @@ validSeqs = find(TopSeqs);
 
 
 BottomSeqHashes = cellfun(@(x)(hash(x(isletter(x)),'MD5')),BOTTOM_SEQS,'uniformoutput',false);
-ProvidedHashes = cellfun(@(x)(hash(x(end,isletter(x(end,:))),'MD5')),PROVIDED_ALIGNMENTS,'uniformoutput',false);
+ProvidedHashes = cellfun(@(x)(hash(x(end,isletter(x(end,:))),'MD5')),PROVIDED_ALIGNMENTS(TopSeqs),'uniformoutput',false);
 
-[junk INDEXES] = ismember(BottomSeqHashes,ProvidedHashes(TopSeqs));
+[junk INDEXES] = ismember(BottomSeqHashes,ProvidedHashes);
 
 INDEXES(INDEXES~=0) = validSeqs(INDEXES(INDEXES~=0));
 
