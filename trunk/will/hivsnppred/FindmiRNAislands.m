@@ -38,7 +38,7 @@ function [outputData, varargout]=FindmiRNAislands(REF_SEQ,TEST_SEQS,MIN_LENGTH,C
 
 
 
-
+GLOBAL_CUTOFF=0;
 PARFOR_BLOCK_SIZE=20;
 ALIGN_ONLY_FLAG=false;
 [INT_NT_MAP ALLOWABLE_CHARS]=AmbigiousNTMap;
@@ -58,7 +58,27 @@ if ~isnumeric(CONS_CUTOFF)
 end
 
 
+%%%%%%%%%%%%%%DEAL WITH MULTI REF_SEQS
 
+if isstruct(REF_SEQ)&&length(REF_SEQ)>1
+
+    outputData = cell(size(REF_SEQ));
+
+    for ind = 1:length(REF_SEQ)
+        outputData{ind} = FindmiRNAislands(REF_SEQ(ind),TEST_SEQS,MIN_LENGTH,CONS_CUTOFF,varargin{:},'fig_only',false);
+    end
+
+    
+    return
+
+end
+
+
+
+
+
+
+%%%%%%%%%%%%%%%DEAL WITH SINGLE REF_SEQS
 
 %%%%%%%CHECK REF_SEQ%%%%%%%%%
 if isstruct(REF_SEQ)&&isfield(REF_SEQ,'Sequence')&&numel(REF_SEQ)==1
@@ -125,9 +145,9 @@ for i=1:2:length(varargin)
             else
                 error('FindmiRNAislands:BAD_ALIGNMENT_OUTPUT','Arguement to ALIGNMENT_OUTPUT must be a logical.');
             end
-                
-                
-                
+
+
+
         case {'trust order','trust_order'}
             if islogical(varargin{i+1})&&varargin{i+1}
                 NEED_ALIGNMENT_FLAG=false;
@@ -143,26 +163,33 @@ for i=1:2:length(varargin)
             else
                 error('FindmiRNAislands:BAD_FIG_ONLY_ARG','Arguement to FIG_ONLY must either be a logical scalar or a numerical vector [1 %d].',FIG_TOTAL);
             end
-            
+
         case {'axes_handle','axes handle'}
             if ishandle(varargin{i+1})
                 AX_HANDLE = varargin{i+1};
             else
                 error('FindmiRNAislands:BAD_AXES_HANDLE','Arguement to AXES_HANDLE must be an axes handle.');
             end
-            
+
         case {'excel_output'}
             if ischar(varargin{i+1})
                 EXCEL_FILENAME=varargin{i+1};
             else
                 error('FindmiRNAislands:BAD_EXCEL_FILENAME','Arguement to EXCEL_FILENAME must be a char-array.');
             end
-            
+
         case {'alignments_only'}
             if islogical(varargin{i+1})
                 ALIGN_ONLY_FLAG = varargin{i+1}&true;
             else
                 error('FindmiRNAislands:BAD_ALIGNMENTS_ONLY','Arguement to ALIGNMENTS_ONLY must be a logical.');
+            end
+            
+        case {'global_cutoff'}
+            if isnumeric(varargin{i+1})&&varargin{i+1}<1
+                GLOBAL_CUTOFF = varargin{i+1};
+            else
+                error('FindmiRNAislands:BAD_GLOBAL_CUTOFF','Arguement to GLOBAL_CUTOFF must be a numeric between [0,1].');
             end
 
         otherwise
@@ -194,22 +221,22 @@ if NEED_ALIGNMENT_FLAG
     DONE_COUNTER=0;
     tic
     while any(still_needed)
- 
-        
+        display('Doing Alignments')
+
         needed_alignments = find(still_needed,PARFOR_BLOCK_SIZE)';
         tempAlignments = cell(min(PARFOR_BLOCK_SIZE,length(needed_alignments)),1);
         tempSeqs = TEST_SEQS_CELL(needed_alignments);
-        
+
         parfor (LOOP_IND=1:min(PARFOR_BLOCK_SIZE,length(tempAlignments)))
             [junk tempAlignments{LOOP_IND}]=nwalign(REF_SEQ_CELL{1},tempSeqs{LOOP_IND},ALIGNMENT_PROP{:});
         end
-        
+
         DONE_COUNTER = DONE_COUNTER+PARFOR_BLOCK_SIZE;
 
         still_needed(needed_alignments)=false;
         ALIGNMENTS(needed_alignments)=tempAlignments;
-       
-        
+
+
         time=(toc/DONE_COUNTER)*(nnz(still_needed))/60
 
         %%%%add the alignments preformed so they can be returned easily if
@@ -247,9 +274,9 @@ if any(FIGURES_TO_GENERATE==1)
     if isempty(AX_HANDLE)
         AX_HANDLE = axes;
     end
-    
+
     axes(AX_HANDLE);
-    
+
     image(validForward+validReverse)
     labels = arrayfun(@(x)(num2str(x)),CONS_CUTOFF,'uniformoutput',false);
     set(gca,'ytick',10*CONS_CUTOFF,'yticklabel',labels)
@@ -271,17 +298,21 @@ spots=find(headSpots);
 
 for i = 1:length(spots)
     [I J]=ind2sub(size(headSpots),spots(i));
-    
+
     outputData{i,1}=REF_SEQ_CELL{1}(J:J+headSpots(spots(i)));
     outputData{i,2}=J;
     outputData{i,3}=headSpots(spots(i));
     outputData{i,4}=CONS_CUTOFF(I);
-    
+
     temp = strfind(TEST_SEQS_CELL,REF_SEQ_CELL{1}(J:J+headSpots(spots(i))));
-    
-    
+
+
     outputData{i,5}=nnz(~cellfun('isempty',temp))/length(TEST_SEQS_CELL);
 end
+
+mask = cellfun(@(x)(x>GLOBAL_CUTOFF),outputData(:,5));
+
+outputData=outputData(mask,:);
 
 
 if ~isempty(EXCEL_FILENAME)
@@ -292,7 +323,7 @@ end
 if NEED_ALIGNMENT_OUTPUT
     varargout{1}=PROVIDED_ALIGNMENTS;
 end
-    
+
 
 
 
