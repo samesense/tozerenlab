@@ -3,7 +3,7 @@ import os
 import re
 from numpy import *
 
-def hybrid_min(Seq1, Seq2, Type = 'RNA', Temp = 37, Sodium = 1, Magnesium = 0,U NAFoldPath = 'C:\\UNAFold\\bin\\', ReturnType = 'tuple'):
+def hybrid_min(Seq1, Seq2, Type = 'RNA', Temp = 37, Sodium = 1, Magnesium = 0,UNAFoldPath = 'C:\\UNAFold\\bin\\', ReturnType = 'tuple'):
     """
     hybrid_min(Seq1,Seq2)
         Interfaces with the hybrid_min function of UNAFold and returns the free-energy binding of Seq1 with Seq2.
