@@ -44,7 +44,7 @@ class NotifContext:
         if self.method == 'test':
             self.updateTimeLimit = 60
         else:
-            self.updateTimeLimit = 60#60*60*2
+            self.updateTimeLimit = 60*60*2
             
         
         self.DefStartAnnounce = 'Starting Computation'
