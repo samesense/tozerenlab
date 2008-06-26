@@ -1,8 +1,11 @@
 #import twitter
 import threading
 import time
-
+from collections import deque
 import logging
+import getpass
+
+
 
 logging.basicConfig(level=logging.DEBUG,format='[%(threadName)-10s] %(message)s %(asctime)s')
 
@@ -23,8 +26,16 @@ class NotifContext:
         return self
 
 
-    def __init__(self,method='twitter',user='MozartComputer',password='easypass'):
+    def __init__(self,method='twitter',user=None,password=None):
 
+        if method == 'twitter' & user == None:
+            user = getpass.getpass(promt = 'Twitter Account Name: ')
+
+        if method == 'twitter' & password == None:
+            password = getpass.getpass(prompt = 'Twitter password for ' + user)
+
+
+        
         logging.debug('Initializing')
 #        self.tweetBird = twitter.Api(username = user, password = password)
         self.user=user
@@ -45,7 +56,7 @@ class NotifContext:
 
         self.ThisContAnnounce = [self.DefContAnnounce]
 
-        self.stillRunning = threading.Event()
+        self.finishedRunning = threading.Event()
 
         self.MaxTry = 5
     
@@ -54,14 +65,14 @@ class NotifContext:
     def __exit__(self,typeIn,valueIn,tracebackIn):
         """
         __exit__
-            Called when the main function has ended.  This sets the self.stillRunning Event,
+            Called when the main function has ended.  This sets the self.finishedRunning Event,
         .join()'s the pacing thread and then sends outputs based on whether the function
         errored or finished properly.
         """
         logging.debug('Made to Exit')
 
         #Set event so PaceThread will exit next time it checks
-        self.stillRunning.set()
+        self.finishedRunning.set()
 
         #while waiting, send out final message
         if typeIn == None:
@@ -74,6 +85,13 @@ class NotifContext:
 
         
 
+    def start(self):
+        """
+        start
+            Calls the .__enter__ method, allows easy usage with pre-"with" versions of python
+        """
+
+        return self.__enter__()
         
 
 
@@ -81,19 +99,21 @@ class NotifContext:
         """
         PaceAnnounce
             Acts as a thread which keeps the time and sends periodic calls of DoAnnounce.
-        It continually checks self.stillRunning to see if the function has ended.
+        It continually checks self.finishedRunning to see if the function has ended.
 
 
         """
         logging.debug('In PaceAnnouce')
-        while not(self.stillRunning.isSet()):
+        while not(self.finishedRunning.isSet()):
             logging.debug('Starting Sleep')
-            time.sleep(self.checkTime)
-            self.currentWaitTime += self.checkTime
-            if (not(self.stillRunning.isSet()) & self.currentWaitTime>self.UpdatewaitTime):
+            #wait until the Event has been triggered or until update limit is up
+            self.finishedRunning.wait(self.updateTimeLimit)
+            
+            if not(self.finishedRunning.isSet()):
+                #if the time-limit is up and the Event hasn't been .set() then display an update message
                 self.currentWaitTime=0
                 self.DoAnnounce(self.ThisContAnnounce.pop())
-                self.ThisContAnnounce = [self.DefContAnnounce]
+                self.ThisContAnnounce.append(self.DefContAnnounce)
 
 
     def UpdateMessage(self,message,now=False):
