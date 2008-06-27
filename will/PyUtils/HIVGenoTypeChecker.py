@@ -1,7 +1,15 @@
+"""
+HIVGenoTypeChecker
+    A module that will interact with the NCBI HIV Genotyping tool at
+    'http://www.ncbi.nlm.nih.gov/projects/genotyping/genotype.cgi' and determine
+    the contributing HIV-1 subtypes with a set of sequences.
+"""
+
 import re
 import os
-from PyMozilla import MozillaEmulator
+import PyMozilla 
 from Bio import SeqIO
+from urllib2 import URLError
 
 
 
@@ -22,12 +30,12 @@ def GetHIVGenotype(INPUT_SEQ):
 
     ncbi_cgi = 'http://www.ncbi.nlm.nih.gov/projects/genotyping/genotype.cgi'
     try:    
-        mozEmu = MozillaEmulator(cacher = None, trycount = 10)
+        mozEmu = PyMozilla.MozillaEmulator(cacher = None, trycount = 10)
         thisPost = 'BLAST_DATABASE=1&QUERY_SEQUENCE=' + INPUT_SEQ
         
         retData = mozEmu.download(ncbi_cgi, postdata = thisPost)
 
-    except:
+    except URLError:
         return ()
    
     try:
@@ -41,7 +49,7 @@ def GetHIVGenotype(INPUT_SEQ):
 
         outputData = (gi_names, numeric_data, num_windows)
         print 'Success'
-    except:
+    except AttributeError:
         print 'Failure'
         outputData = ()
         
@@ -142,8 +150,8 @@ class FastaDirIter:
         else:
             self.directory = DIRECTORY
             
-        self.currentHandle = open(self.directory + self.files.pop(), 'r')
-        self.currentIter = SeqIO.parse(self.currentHandle, 'fasta')
+        self.current_handle = open(self.directory + self.files.pop(), 'r')
+        self.current_iter = SeqIO.parse(self.current_handle, 'fasta')
         
 
     def __iter__(self):
@@ -161,13 +169,15 @@ class FastaDirIter:
 
         """
         try:
-            return self.currentIter.next()
+            return self.current_iter.next()
         except StopIteration:
-            self.currentHandle.close()
+            self.current_handle.close()
             if len(self.files)>0:
-                self.currentHandle = open(self.directory + self.files.pop(), 'r')
-                self.currentIter = SeqIO.parse(self.currentHandle, 'fasta')
-                return self.currentIter.next()
+                self.current_handle = open(self.directory + self.files.pop(),
+                                          'r')
+                
+                self.current_iter = SeqIO.parse(self.current_handle, 'fasta')
+                return self.current_iter.next()
             else:
                 raise StopIteration
         

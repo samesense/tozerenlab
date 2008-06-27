@@ -1,81 +1,94 @@
+"""
+pyHybrid
+    A set of functions for interfacing with the RNAhybrid program.
+"""
+
 import subprocess
-import os
 import re
-from Queue import *
+import Queue
 import string
 import threading
 from HIVGenoTypeChecker import FastaDirIter
-import time
 import logging
 import cPickle as pickle
 
 DIREC = 'C:\\Documents and Settings\\Will\\My Documents\\HIVRNAi\\'
-databaseName = 'human_predictions_4dwnload.txt'
+DATABASENAME = 'human_predictions_4dwnload.txt'
 
-logging.basicConfig(level=logging.DEBUG,format='[%(threadName)-10s] %(message)s %(asctime)s')
+logging.basicConfig(level = logging.DEBUG,
+                    format = '[%(threadName)-10s] %(message)s %(asctime)s')
 
 
-def ReadData(fileName):
+def ReadData(FILENAME):
     """
     ReadData
-        Reads the miRNA database from the website: http://www.microrna.org/microrna/getDownloads.do
+        Reads the miRNA database from the website:
+            http://www.microrna.org/microrna/getDownloads.do
 
         miRNADict=ReadData(fileName)
 
             fileName        The full path to the database file.
 
-            miRNADict       A dictionary where the KEY is a miRNA name and the value is the miRNA sequence
+            miRNADict       A dictionary where the KEY is a miRNA name and the
+                            value is the miRNA sequence
             
 
     """
-    miRNAList = {}
+    mi_rna_list = {}
 
-    fileHandle = open(fileName,mode = 'r')
+    file_handle = open(FILENAME, mode = 'r')
 
     #get rid of comment line
-    thisLine = fileHandle.next()
+    this_line = file_handle.next()
 
     splitter = re.compile('\t')
 
-    for thisLine in fileHandle:
-        data = splitter.split(thisLine)
-        miRNAList[data[3]] = string.upper(string.replace(data[5],'-',''))
+    for this_line in file_handle:
+        data = splitter.split(this_line)
+        mi_rna_list[data[3]] = string.upper(string.replace(data[5], '-', ''))
 
 
-    fileHandle.close()
+    file_handle.close()
 
-    return miRNAList
+    return mi_rna_list
 
-def Calibrate(Seq,NUM_SAMPLES=5000, PRECOMPUTE_DICT = None,miRNAname = None,
-              DUMP_QUEUE = None,CODING_FILE='C:\\RNAHybrid\\coding_HIV.txt',
-              RNAHybridPath = 'C:\\RNAHybrid\\',PICKLE_DICT = None):
+def Calibrate(SEQ, NUM_SAMPLES = 5000, PRECOMPUTE_DICT = None,
+              MI_RNA_NAME = None, DUMP_QUEUE = None,
+              CODING_FILE = 'C:\\RNAHybrid\\coding_HIV.txt',
+              RNAHybridPath = 'C:\\RNAHybrid\\', PICKLE_DICT = None):
     """
     Calibrate
-        Uses the RNAcalibrate function to determine the (delta,theta) of the extreme value
-        distribution required for the RNAhybrid calculation.
+        Uses the RNAcalibrate function to determine the (delta,theta) of the
+        extreme value distribution required for the RNAhybrid calculation.
 
-    Calibrate(Seq, NUM_SAMPLES = 5000, PRECOMPUTE_DICT = None, miRNAname = None,
+    Calibrate(SEQ, NUM_SAMPLES = 5000, PRECOMPUTE_DICT = None,
+              MI_RNA_NAME = None,
               DUMP_QUEUE = None,CODING_FILE='C:\\RNAHybrid\\coding_HIV.txt',
               RNAHybridPath = 'C:\\RNAHybrid\\',PICKLE_DICT = None)
 
-              Seq           The miRNA sequence to calibrate
+              SEQ           The miRNA sequence to calibrate
 
-              NUM_SAMPLES   The number of random sequences to generate while determining
-                            the extreme value distribution.
+              NUM_SAMPLES   The number of random sequences to generate
+                            while determining the extreme value distribution.
 
-              PRECOMPUTE_DICT   A dictionary in which the KEY is a miRNA sequence and the
-                                value is the (delta,theta) computed from a previous run.
+              PRECOMPUTE_DICT   A dictionary in which the KEY is a miRNA
+                                sequence and the value is the (delta,theta)
+                                computed from a previous run.
 
               DUMP_QUEUE    A Queue object to dump the resulting output tuple
 
-              miRNAName     The name of the miRNA being calibrated ... needed for DUMP_QUEUE
+              miRNAName     The name of the miRNA being
+                            calibrated ... needed for DUMP_QUEUE
 
-              CODING_FILE   The full path to a file which contains the dinucleotide
-                            frequencies for the background sequence.
+              CODING_FILE   The full path to a file which contains the
+                            dinucleotide frequencies for the background
+                            sequence.
 
-              RNAHybridPath The path to the directory where the RNAcalibrate.exe file is contained.
+              RNAHybridPath The path to the directory where the
+                            RNAcalibrate.exe file is contained.
 
-              PICKLE_DICT   The full path to a file in which to pickle a copy of the dict.
+              PICKLE_DICT   The full path to a file in which to pickle a copy
+                            of the dict.
 
     RETURNS:
 
@@ -84,66 +97,75 @@ def Calibrate(Seq,NUM_SAMPLES=5000, PRECOMPUTE_DICT = None,miRNAname = None,
 
         If DUMP_QUEUE != None
             The tuple is .put() onto the end of the queue
-            (miRNAname, delta, theta) --- as STRINGS
+            (MI_RNA_NAME, delta, theta) --- as STRINGS
     """
 
-    #If a pre-computed dictionary is provided, check to see if it has the data we need
+    #If a pre-computed dictionary is provided,
+    #check to see if it has the data we need
     try:
-        outputList = ('junk','junk',PRECOMPUTE_DICT[miRNAname][0],PRECOMPUTE_DICT[miRNAname][1])
+        outputList = ('junk', 'junk', PRECOMPUTE_DICT[MI_RNA_NAME][0],
+                      PRECOMPUTE_DICT[MI_RNA_NAME][1])
         logging.debug('Found Calib Data')
-    except:
+    except KeyError:
         logging.debug('Making Calib Data')
         command = RNAHybridPath + 'RNAcalibrate'
 
         command += ' -d ' + CODING_FILE
         command += ' -k ' + str(NUM_SAMPLES)
 
-        command += ' ' + Seq
+        command += ' ' + SEQ
 
-        SysCall = subprocess.Popen(command,shell=True,stdout = subprocess.PIPE)
+        sys_call = subprocess.Popen(command, shell = True,
+                                   stdout = subprocess.PIPE)
 
         logging.debug('starting waiting')
-        SysCall.wait()
+        sys_call.wait()
         logging.debug('done waiting')
 
-        output = SysCall.communicate()[0]
-        outputList = re.split(' |\n',output)
+        output = sys_call.communicate()[0]
+        outputList = re.split(' |\n', output)
 
     if DUMP_QUEUE == None:
-        return (outputList[2],outputList[3])
+        return (outputList[2], outputList[3])
     else:
-        DUMP_QUEUE.put((miRNAname,Seq,outputList[2],outputList[3]))
+        DUMP_QUEUE.put((MI_RNA_NAME, SEQ, outputList[2], outputList[3]))
 
     if PRECOMPUTE_DICT != None:
-        PRECOMPUTE_DICT[miRNAname] = (outputList[2],outputList[3])
+        PRECOMPUTE_DICT[MI_RNA_NAME] = (outputList[2], outputList[3])
 
     if PICKLE_DICT != None:
         logging.debug('pickling Data')
-        pickHandle = open(RNAHybridPath+'SavedCalib.pkl',mode='w')
-        pickle.dump(PRECOMPUTE_DICT,pickHandle)
+        pickHandle = open(RNAHybridPath + 'SavedCalib.pkl', mode = 'w')
+        pickle.dump(PRECOMPUTE_DICT, pickHandle)
         pickHandle.close()
         
     
-def HybridSeq(RNAiSeq,DeltaTheta,ChromSeq, miRNAname = None, ChomName = None, DUMP_QUEUE = None,RNAHybridPath = 'C:\\RNAHybrid\\'):
+def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ, MI_RNA_NAME = None,
+              CHROM_NAME = None, DUMP_QUEUE = None,
+              RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'):
     """
     HybridSeq
-        Makes a call to the RNAhybrid.exe to determine the likilyhood of the miRNA sequence binding to the Chomrosome
-        Sequence.  It uses the data from Calibrate to determine the statistical significance.
+        Makes a call to the RNAhybrid.exe to determine the likilyhood of the
+        miRNA sequence binding to the Chomrosome Sequence.  It uses the data
+        from Calibrate to determine the statistical significance.
 
-        HybridSeq(RNAiSeq,DeltaTheta,ChromSeq, miRNAname = None, ChomName = None, DUMP_QUEUE = None,RNAHybridPath = 'C:\\RNAHybrid\\'):
+        HybridSeq(RNA_SEQ,DELTA_THETA,CHROM_SEQ, MI_RNA_NAME = None,
+              CHROM_NAME = None, DUMP_QUEUE = None,
+              RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'):
 
-        RNAiSeq         The sequence of the short miRNA.
+        RNA_SEQ         The sequence of the short miRNA.
 
-        DeltaTheta      The output of Calibrate ... the shape of the extreme value distribution.
+        DELTA_THETA      The output of Calibrate ... the shape of the extreme
+                         value distribution.
 
-        ChromSeq        The long sequence of DNA or RNA to search for matches.
+        CHROM_SEQ        The long sequence of DNA or RNA to search for matches.
 
-        miRNAname       The name of the miRNA being tested
+        MI_RNA_NAME       The name of the miRNA being tested
         ChromName       The name of the chromosomal region being tested.
         
         DUMP_QUEUE      A queue to dump the resulting data into.
 
-        RNAHybridPath   The path to the folder that contains RNAhybrid
+        RNA_HYBRID_PATH   The path to the folder that contains RNAhybrid
 
 
     RETURNS
@@ -153,268 +175,311 @@ def HybridSeq(RNAiSeq,DeltaTheta,ChromSeq, miRNAname = None, ChomName = None, DU
 
         if DUMP_QUEUE != None
         The the following tuple is .put onto the Queue
-            (ChomName, miRNAname, position, energy, p-value)
+            (ChomName, MI_RNA_NAME, position, energy, p-value)
 
 
     """
-    command = RNAHybridPath + 'RNAhybrid'
+    command = RNA_HYBRID_PATH + 'RNAhybrid'
 
     command += ' -c'
-    command += ' -d ' + DeltaTheta[0] + ',' + DeltaTheta[1]
+    command += ' -d ' + DELTA_THETA[0] + ',' + DELTA_THETA[1]
     #command += ' -s ' + '3utr_human'
     command += ' -p 0.1' 
-    command += ' ' + ChromSeq
-    command += ' ' + RNAiSeq
+    command += ' ' + CHROM_SEQ
+    command += ' ' + RNA_SEQ
 
     #logging.debug('Doing Hybrid')
-    SysCall = subprocess.Popen(command,shell=True,stdout = subprocess.PIPE)
-    SysCall.wait()
+    sys_call = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE)
+    sys_call.wait()
     
 
-    output = SysCall.communicate()[0]
+    output = sys_call.communicate()[0]
+
+    output_reg_exp = '(.*?):.*?command_line:[\-\.\d]*:([\.\-\d]*):'
+    output_reg_exp += '([\.\-\d]*):([\.\-\d]*).*'
     
-    finalOutput = []
-    if len(output)>1:
-        allLines = re.split('\n',output)
+    final_output = []
+    if len(output) > 1:
+        all_lines = re.split('\n', output)
 	#print len(allLines)
-        for thisLine in allLines[0:-1]:
-            #print thisLine
-            finalOutput.append(re.match('(.*?):.*?command_line:[\-\.\d]*:([\.\-\d]*):([\.\-\d]*):([\.\-\d]*).*',thisLine).groups()[1:])
+        for this_line in all_lines[0:-1]:
+            #print this_line
+            final_output.append(re.match(output_reg_exp,
+                                         this_line).groups()[1:])
 
-    if DUMP_QUEUE==None:
-        return finalOutput
+    if DUMP_QUEUE == None:
+        return final_output
     else:
-        if len(finalOutput)>0:
-            for thisTup in finalOutput:
-                DUMP_QUEUE.put((ChomName,miRNAname,thisTup[2],thisTup[0],thisTup[1]))
+        if len(final_output) > 0:
+            for thistup in final_output:
+                DUMP_QUEUE.put((CHROM_NAME, MI_RNA_NAME, thistup[2],
+                                thistup[0], thistup[1]))
     
 
-def LoadSeqs(LOAD_QUEUE,DUMP_QUEUE,AllCalibFlag,FinishedLoadFlag,fastaDir,oneDone):
+def LoadSeqs(LOAD_QUEUE, DUMP_QUEUE, ALL_CALIB_FLAG, FINISHED_LOAD_FLAG,
+             FASTA_DIR, ONE_DONE):
     """
     LoadSeqs
-        Uses the FastaDirIter to match each miRNA (and it DeltaTheta value) from the LOAD_QUEUE
-        to the many sequence fragments returned by FastaDirIter.  It .put these onto the DUMP_QUEUE.
+        Uses the FastaDirIter to match each miRNA (and it DELTA_THETA value)
+        from the LOAD_QUEUE to the many sequence fragments returned by
+        FastaDirIter.  It .put these onto the DUMP_QUEUE.
 
-    LoadSeqs(LOAD_QUEUE,DUMP_QUEUE,AllCalibFlag,FinishedLoadFlag,fastaDir,oneDone)
+    LoadSeqs(LOAD_QUEUE,DUMP_QUEUE,ALL_CALIB_FLAG,FINISHED_LOAD_FLAG,
+             FASTA_DIR,ONE_DONE)
 
-        LOAD_QUEUE          A queue which is supplied by Calibrate where each element is a tuple:
-                                    (miRNAname, delta, theta)
+        LOAD_QUEUE          A queue which is supplied by Calibrate where each
+                            element is a tuple:
+                                    (MI_RNA_NAME, delta, theta)
 
         DUMP_QUEUE          The place where each element is appended as a tuple:
-                                    (ChromName, miRNAname, miRNAseq, ChromSeq, (delta, theta))
+                                    (ChromName, MI_RNA_NAME, miRNAseq,
+                                    CHROM_SEQ, (delta, theta))
 
-        AllCalibFlag        An event handle that is .set() when all calibrations have been completed
-                            after which this function can exit.
+        AllCalibFlag        An event handle that is .set() when all calibrations
+                            have been completed after which this function
+                            can exit.
 
-        FinishedLoadFlag    An event handle which will be .set() when all calibrations and sequences
-                            have been loaded into the DUMP_QUEUE
+        FinishedLoadFlag    An event handle which will be .set() when all
+                            calibrations and sequences have been loaded into
+                            the DUMP_QUEUE
 
-        fastaDir            The path to a directory with a collection of FASTA files.
+        fastaDir            The path to a directory with a collection of
+                            FASTA files.
 
-        oneDone             An event handle which will be .set() when at least one element has been
-                            loaded into the DUMP_QUEUE
+        oneDone             An event handle which will be .set() when at least
+                            one element has been loaded into the DUMP_QUEUE
                             
 
     """
     while True:
         try:
-            thisCalib = LOAD_QUEUE.get_nowait()
-        except:
-            if AllCalibFlag.isSet():
-                FinishedLoadFlag.set()
+            this_calib = LOAD_QUEUE.get_nowait()
+        except  :
+            if ALL_CALIB_FLAG.isSet():
+                FINISHED_LOAD_FLAG.set()
                 break
             else:
                 #print 'Didnt wait long enough'
                 continue
         LOAD_QUEUE.task_done()
-        logging.debug('Loading Seq')
-        oneDone.set()
-        for thisRec in FastaDirIter(fastaDir):
+        logging.debug('Loading SEQ')
+        ONE_DONE.set()
+        for this_rec in FastaDirIter(FASTA_DIR):
             
-            DUMP_QUEUE.put((thisRec.id,thisCalib[0],thisCalib[1],thisRec.seq.tostring(),(thisCalib[2],thisCalib[3])))
+            DUMP_QUEUE.put((this_rec.id, this_calib[0], this_calib[1],
+                            this_rec.seq.tostring(),
+                            (this_calib[2], this_calib[3])))
 
         
 
         
         
-def CalibWorker(LOAD_QUEUE,DumpingQueue,finishedEvent,oneDone,PreCompDict):
+def CalibWorker(LOAD_QUEUE, DUMPING_QUEUE, FINISHED_EVENT,
+                ONE_DONE, PRE_COMP_DICT):
     """
     CalibWorker
         A worker function which facilitates the threading of Calibrate.
 
-    CalibWorker(LOAD_QUEUE,DumpingQueue,finishedEvent,oneDone,PreCompDict)
+    CalibWorker(LOAD_QUEUE,DUMPING_QUEUE,FINISHED_EVENT,oneDone,PRE_COMP_DICT)
 
-        LOAD_QUEUE      A queue which contains tuples to be passed into Calibrate
-                            (miRNAname, miRNAseq)
+        LOAD_QUEUE      A queue which contains tuples to be passed into
+                        Calibrate:
+                            (MI_RNA_NAME, miRNAseq)
 
-        DumpingQueue    A queue where Calibrate will dump its results.
+        DUMPING_QUEUE    A queue where Calibrate will dump its results.
 
-        finishedEvent   An event handle which is .set() when the calibrating queue has been
-                        completely emptied.
+        FINISHED_EVENT   An event handle which is .set() when the calibrating
+                         queue has been completely emptied.
 
-        oneDone         An event handle which is .set() when at least one element has been
-                        loaded into the DumpingQueue
+        oneDone         An event handle which is .set() when at least one
+                        element has been loaded into the DUMPING_QUEUE
 
-        PreCompDict     A dictionary which holds any pre-computed Calibrations
+        PRE_COMP_DICT     A dictionary which holds any pre-computed Calibrations
 
 
     """
     while True:
         try:
-            thisMiRNA=LOAD_QUEUE.get_nowait()
-        except:
+            this_mirna = LOAD_QUEUE.get_nowait()
+        except  :
            #print 'Finished Calibrating'
-            finishedEvent.set()
+            FINISHED_EVENT.set()
             break
-       #print 'Calibrating: ' + thisMiRNA[0]
-        Calibrate(thisMiRNA[1],miRNAname=thisMiRNA[0],DUMP_QUEUE = DumpingQueue, PRECOMPUTE_DICT = PreCompDict)
-        oneDone.set()
+       #print 'Calibrating: ' + this_mirna[0]
+        Calibrate(this_mirna[1], MI_RNA_NAME = this_mirna[0],
+                  DUMP_QUEUE = DUMPING_QUEUE, PRECOMPUTE_DICT = PRE_COMP_DICT)
+        ONE_DONE.set()
         LOAD_QUEUE.task_done()
         
-def HybridWorker(LOAD_QUEUE,DumpingQueue,finishedLoad,finishedHybrid,oneDone):
+def HybridWorker(LOAD_QUEUE, DUMPING_QUEUE, FINISHED_LOAD,
+                 FINISHED_HYBRID, ONE_DONE):
     """
     HybridWorker
         A function which facilitates the threading of Hybrid.
 
-    HybridWorker(LOAD_QUEUE,DumpingQueue,finishedLoad,finishedHybrid,oneDone)
+    HybridWorker(LOAD_QUEUE,DUMPING_QUEUE,FINISHED_LOAD,
+                 FINISHED_HYBRID,ONE_DONE):
 
         LOAD_QUEUE      A queue which has the tuples:
-                            (ChromName,miRNAname,miRNAseq,ChromSeq,DeltaTheta)
+                        (ChromName,MI_RNA_NAME,miRNAseq,CHROM_SEQ,DELTA_THETA)
 
-        DumpingQueue    A queue to which Hybrid should dump is 'writable' data
+        DUMPING_QUEUE    A queue to which Hybrid should dump is 'writable' data
 
-        finishedLoad    An event handle which is .set() by LoadSeqs when all needed
-                        sequences have been loaded into the queue.
+        FINISHED_LOAD    An event handle which is .set() by LoadSeqs when all
+                        needed sequences have been loaded into the queue.
 
-        finishedHybrid  An event handle which is .set() when all of the hybridizations
-                        have been completed.
+        FINISHED_HYBRID  An event handle which is .set() when all of the
+                         hybridizations have been completed.
 
-        oneDone         An event handle which is .set() at least one Hyrbid has been
-                        finished and loaded into the DumpingQueue
+        oneDone         An event handle which is .set() at least one Hyrbid has
+                        been finished and loaded into the DUMPING_QUEUE
 
     """
     while True:
         try:
-            thisSet = LOAD_QUEUE.get_nowait()
-            #(ChromName,miRNAname,miRNAseq,ChromSeq,DeltaTheta)
-        except:
-            if finishedLoad.isSet():
+            this_set = LOAD_QUEUE.get_nowait()
+            #(ChromName,MI_RNA_NAME,miRNAseq,CHROM_SEQ,DELTA_THETA)
+        except  :
+            if FINISHED_LOAD.isSet():
                #print 'Finished Hybridizing'
-                finishedHybrid.set()
+                FINISHED_HYBRID.set()
                 break
             else:
                 #print 'Didnt wait long enough: HybridWorker'
                 continue
-       #print 'Hybing: ' + thisSet[0] + ' ' + thisSet[1]
-        HybridSeq(thisSet[2],thisSet[4],thisSet[3],miRNAname=thisSet[1],ChomName=thisSet[0],DUMP_QUEUE=DumpingQueue)
-        oneDone.set()
+       #print 'Hybing: ' + this_set[0] + ' ' + this_set[1]
+        HybridSeq(this_set[2], this_set[4], this_set[3],
+                  MI_RNA_NAME = this_set[1], CHROM_NAME = this_set[0],
+                  DUMP_QUEUE = DUMPING_QUEUE)
+        
+        ONE_DONE.set()
         LOAD_QUEUE.task_done()
 
-def WritingWorker(LOAD_QUEUE,fHandle,finishedHybrid):
+def WritingWorker(LOAD_QUEUE, FILE_HANDLE, FINISHED_HYBRID):
     """
     WritingWorker
         A function which writes the data from the LOAD_QUEUE into a file.
 
-    WritingWorker(LOAD_QUEUE,fHandle,finishedHybrid)
+    WritingWorker(LOAD_QUEUE,FILE_HANDLE,FINISHED_HYBRID)
 
         LOAD_QUEUE      A queue of tuples
 
-        fHandle         The handle to an open file where the data is written too.
+        FILE_HANDLE         The handle to an open file where the data is
+                            written too.
     
-        finishedHybrid  An event handle which is .set() when all data has been processed
-                        by the HybridWorker function.  This implies that when the LOAD_QUEUE
-                        is empty then all data is complete.
+        FINISHED_HYBRID  An event handle which is .set() when all data has
+                         been processed by the HybridWorker function.  This
+                         implies that when the LOAD_QUEUE is empty then all
+                         data is complete.
 
 
     """
     while True:
         try:
-            thisSet = LOAD_QUEUE.get_nowait()
-        except:
-            if finishedHybrid.isSet():
+            this_set = LOAD_QUEUE.get_nowait()
+        except  :
+            if FINISHED_HYBRID.isSet():
                #print 'Finished Writing'
                 break
             else:
                 #print 'Didt wait long enough: WritingWorker'
                 continue
         
-    #WriteData(fileName,thisSet)
+    #WriteData(fileName,this_set)
         logging.debug('writting Data')
-        fHandle.write(string.join(thisSet,sep='\t') + '\n')
+        FILE_HANDLE.write(string.join(this_set, sep = '\t') + '\n')
         LOAD_QUEUE.task_done()
 
 
-def DoAll(miRNADatabase,outputFile,NUM_CALIB = 1, NUM_HYBRID = 30):
+def DoAll(MI_RNA_DATABASE, OUTPUT_FILE, NUM_CALIB = 1, NUM_HYBRID = 30):
     """
     DoAll
-        A main function which initializes all of headwork and then begins the required threads.
+        A main function which initializes all of headwork and then begins the
+        required threads.
 
 
     """
-    miRNAdata = ReadData(miRNADatabase)
+    mi_rna_data = ReadData(MI_RNA_DATABASE)
 
     try:
-        pickHandle = open('C:\\RNAHybrid\\'+'SavedCalib.pkl',mode='r')
+        pickHandle = open('C:\\RNAHybrid\\' + 'SavedCalib.pkl', mode = 'r')
         preComputedCalibs = pickle.load(pickHandle)
         pickHandle.close()
         print 'Found SavedCalib File'
-    except:
+    except WindowsError:
         print 'Could not Find SavedCalib File'
         preComputedCalibs={}
     
-    NeedCalibQueue = Queue(-1)
-    finishedCalibQueue = Queue(-1)
-    NeedHybridQueue = Queue(500)
-    NeedWriteQueue = Queue(500)
+    need_calib_queue = Queue.Queue(-1)
+    finished_calib_queue = Queue.Queue(-1)
+    need_hybrid_queue = Queue.Queue(500)
+    need_write_queue = Queue.Queue(500)
 
-    counter=0
-    for thisKey in miRNAdata:
-        NeedCalibQueue.put_nowait((thisKey,miRNAdata[thisKey]))
+    for this_hey in mi_rna_data:
+        need_calib_queue.put_nowait((this_hey, mi_rna_data[this_hey]))
 
 
-    finishedCalib = threading.Event()
-    oneCalib = threading.Event()
-    finishedLoading = threading.Event()
-    oneLoad = threading.Event()
-    finishedHybriding = threading.Event()
-    oneHybrid = threading.Event()
-    finishedWriting = threading.Event()
+    finished_calib = threading.Event()
+    one_calib = threading.Event()
+    finished_loading = threading.Event()
+    one_load = threading.Event()
+    finished_hybriding = threading.Event()
+    one_hybrid = threading.Event()
 
-    #calibThreadVec = []
+
     for i in range(NUM_CALIB):
-        calibThread = threading.Thread(name='calibThread',target=CalibWorker,args=(NeedCalibQueue,finishedCalibQueue,finishedCalib,oneCalib,preComputedCalibs))
-    #calibThreadVec.append(calibThread)
-        calibThread.start()
-    #CalibWorker(NeedCalibQueue,finishedCalibQueue,finishedCalib)    
+        cailib_thread = threading.Thread(name = 'cailib_thread',
+                                         target = CalibWorker,
+                                         args = (need_calib_queue,
+                                                 finished_calib_queue,
+                                                 finished_calib, one_calib,
+                                                 preComputedCalibs))
 
-    oneCalib.wait()
-    LoadSeqThread = threading.Thread(name='LoadSeqThread',target=LoadSeqs,args=(finishedCalibQueue,NeedHybridQueue,finishedCalib,finishedLoading,'C:\\RNAHybrid\\seqs\\',oneLoad))
-    LoadSeqThread.start()
-    #LoadSeqs(finishedCalibQueue,NeedHybridQueue,finishedCalib,finishedLoading,'C:\\RNAHybrid\\seqs\\',oneLoad)
+        cailib_thread.start()
 
-    oneLoad.wait()
-    HybridThreadVec = []
+
+    one_calib.wait()
+    load_seq_thread = threading.Thread(name = 'load_seq_thread',
+                                       target = LoadSeqs,
+                                       args = (finished_calib_queue,
+                                               need_hybrid_queue,
+                                               finished_calib, finished_loading,
+                                               'C:\\RNAHybrid\\seqs\\',
+                                               one_load))
+    load_seq_thread.start()
+
+
+    one_load.wait()
+    hybrid_thread_vec = []
     for i in range(NUM_HYBRID):
-        HybridThread = threading.Thread(name='HybridThread' + str(i),target=HybridWorker,args=(NeedHybridQueue,NeedWriteQueue,finishedLoading,finishedHybriding,oneHybrid))
-        HybridThreadVec.append(HybridThread)
-        HybridThread.start()
+        hybrid_thread = threading.Thread(name = 'hybrid_thread' + str(i),
+                                         target = HybridWorker,
+                                         args = (need_hybrid_queue,
+                                                 need_write_queue,
+                                                 finished_loading,
+                                                 finished_hybriding,
+                                                 one_hybrid))
         
-    #HybridWorker(NeedHybridQueue,NeedWriteQueue,finishedLoading,finishedHybriding)
+        hybrid_thread_vec.append(hybrid_thread)
+        hybrid_thread.start()
+        
+    one_hybrid.wait()
+    output_handle = open(OUTPUT_FILE,'w+')
+    writting_thread = threading.Thread(name = 'writting_thread',
+                                      target = WritingWorker,
+                                      args = (need_write_queue, output_handle,
+                                              finished_hybriding))
+    
+    writting_thread.start()
 
-    oneHybrid.wait()
-    outputHandle = open(outputFile,'w+')
-    WrittingThread = threading.Thread(name='WrittingThread',target=WritingWorker,args=(NeedWriteQueue,outputHandle,finishedHybriding))
-    WrittingThread.start()
-    #WritingWorker(NeedWriteQueue,outputHandle,finishedHybriding)
-
-    WrittingThread.join()
-    outputHandle.close()
+    writting_thread.join()
+    output_handle.close()
     
 
 
 
 
-if __name__=='__main__':
-    DoAll(DIREC+databaseName,'C:\\RNAHybrid\\newoutput.txt')
+if __name__ == '__main__':
+    DoAll(DIREC + DATABASENAME, 'C:\\RNAHybrid\\newoutput.txt')
 
 
