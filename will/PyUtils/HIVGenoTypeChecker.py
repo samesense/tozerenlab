@@ -1,8 +1,8 @@
 import re
 import os
-from PyMozilla import *
+from PyMozilla import MozillaEmulator
 from Bio import SeqIO
-import time
+
 
 
 def GetHIVGenotype(INPUT_SEQ):
@@ -20,19 +20,26 @@ def GetHIVGenotype(INPUT_SEQ):
         If there was an error then it returns an empty tuple ()
     """
 
+    ncbi_cgi = 'http://www.ncbi.nlm.nih.gov/projects/genotyping/genotype.cgi'
     try:    
-        MozEmu = MozillaEmulator(cacher=None,trycount=10)
-        thisPost = 'BLAST_DATABASE=1&QUERY_SEQUENCE='+INPUT_SEQ
-        retData = MozEmu.download('http://www.ncbi.nlm.nih.gov/projects/genotyping/genotype.cgi',postdata=thisPost)
+        mozEmu = MozillaEmulator(cacher = None, trycount = 10)
+        thisPost = 'BLAST_DATABASE=1&QUERY_SEQUENCE=' + INPUT_SEQ
+        
+        retData = mozEmu.download(ncbi_cgi, postdata = thisPost)
 
     except:
         return ()
    
     try:
-        GI_NAMES=re.search('name="GI_POINTER" value="(.*)"',retData).group(1)
-        NUMERIC_DATA=re.search('name="SCORE_ARRAY" value="(.*)"',retData).group(1)
-        NUM_WINDOWS=re.search('name="NUMBER_OF_WINDOWS" value="(.*)"',retData).group(1)
-        outputData = (GI_NAMES,NUMERIC_DATA,NUM_WINDOWS)
+        gi_names = re.search('name="GI_POINTER" value="(.*)"', retData).group(1)
+
+        numeric_data = re.search('name="SCORE_ARRAY" value="(.*)"',
+                               retData).group(1)
+
+        num_windows = re.search('name="NUMBER_OF_WINDOWS" value="(.*)"',
+                              retData).group(1)
+
+        outputData = (gi_names, numeric_data, num_windows)
         print 'Success'
     except:
         print 'Failure'
@@ -40,7 +47,7 @@ def GetHIVGenotype(INPUT_SEQ):
         
     return outputData
 
-def WriteData(SIMPLE_FHANDLE,FULL_FHANDLE,NAME,HIV_GENO_DATA):
+def WriteData(SIMPLE_FHANDLE, FULL_FHANDLE, NAME, HIV_GENO_DATA):
     """
     WriteData(SIMPLE_FHANDLE,FULL_FHANDLE,HIV_GENO_DATA)
             SIMPLE_FHANDLE      A file handle to the Simple Output Data file
@@ -62,40 +69,50 @@ def WriteData(SIMPLE_FHANDLE,FULL_FHANDLE,NAME,HIV_GENO_DATA):
 
     """
 
-    BestSub = re.split(',',HIV_GENO_DATA[0])[0]
+    bestSub = re.split(',', HIV_GENO_DATA[0])[0]
 
-    SIMPLE_FHANDLE.write(NAME+','+BestSub+'\n')
+    SIMPLE_FHANDLE.write(NAME + ',' + bestSub + '\n')
 
-    FULL_FHANDLE.write(NAME+'\n')
-    FULL_FHANDLE.write(HIV_GENO_DATA[0]+'\n')
-    FULL_FHANDLE.write(HIV_GENO_DATA[1]+'\n')
-    FULL_FHANDLE.write(HIV_GENO_DATA[2]+'\n')
+    FULL_FHANDLE.write(NAME + '\n')
+    FULL_FHANDLE.write(HIV_GENO_DATA[0] + '\n')
+    FULL_FHANDLE.write(HIV_GENO_DATA[1] + '\n')
+    FULL_FHANDLE.write(HIV_GENO_DATA[2] + '\n')
 
     
 
 
-def CheckAllGenoTypes(FASTA_DIR,FULL_FILE,SIMPLE_FILE,MISSED_FILE):
-    FullFile = open(FULL_FILE,'w')
-    SimpleFile = open(SIMPLE_FILE,'w')
-    MissedFile = open(MISSED_FILE,'w')
+def CheckAllGenoTypes(FASTA_DIR, FULL_FILE, SIMPLE_FILE, MISSED_FILE):
+    """
+    CheckAllGenoTypes
+        Does all of the required actions for checking HIV-1 Genotypes.
+
+    CheckAllGenoType(FASTA_DIR, FULL_FILE, SIMPLE_FILE, MISSED_FILE)
+
+
+    """
+    fullFileHandle = open(FULL_FILE, 'w')
+    simpleFileHandle = open(SIMPLE_FILE, 'w')
+    missedFileHandle = open(MISSED_FILE, 'w')
     counter = 0
 
     for thisSeq in FastaDirIter(FASTA_DIR):
-        counter+=1
+        counter += 1
         
         print counter
-        GenoData = GetHIVGenotype(thisSeq.seq.tostring())
+        genoData = GetHIVGenotype(thisSeq.seq.tostring())
         
-        if len(GenoData) == 3:
-            WriteData(SimpleFile,FullFile,thisSeq.description,GenoData)
+        if len(genoData) == 3:
+            WriteData(simpleFileHandle, fullFileHandle,
+                      thisSeq.description, genoData)
         else:
-            MissedFile.write(thisSeq.description+'\n'+thisSeq.seq.tostring())
+            missedFileHandle.write(thisSeq.description +
+                                   '\n' + thisSeq.seq.tostring())
         #time.sleep(30)
 
 
-    FullFile.close()
-    SimpleFile.close()
-    MissedFile.close()
+    fullFileHandle.close()
+    simpleFileHandle.close()
+    missedFileHandle.close()
     
             
 	
@@ -107,29 +124,50 @@ def CheckAllGenoTypes(FASTA_DIR,FULL_FILE,SIMPLE_FILE,MISSED_FILE):
 
 
 class FastaDirIter:
-    def __init__(self,DIRECTORY):
-        self.Files=os.listdir(DIRECTORY)
-        if DIRECTORY[len(DIRECTORY)-1] != '\\' :
-            self.Directory=DIRECTORY+'\\'
+    """
+    FastaDirIter
+        An iterator class which steps through multiple fasta files in one
+    directory and then passes the SeqRecord back at each iteration.
+
+    """
+    def __init__(self, DIRECTORY):
+        """
+        __init__(self,DIRECTORY)
+
+        DIRECTORY defines the path to a directory of fasta files.
+        """
+        self.files = os.listdir(DIRECTORY)
+        if DIRECTORY[len(DIRECTORY)-1] != os.sep :
+            self.directory = DIRECTORY + os.sep
         else:
-            self.Directory=DIRECTORY
+            self.directory = DIRECTORY
             
-        self.CurrentHandle = open(self.Directory+self.Files.pop(),'r')
-        self.CurrentIter = SeqIO.parse(self.CurrentHandle,'fasta')
+        self.currentHandle = open(self.directory + self.files.pop(), 'r')
+        self.currentIter = SeqIO.parse(self.currentHandle, 'fasta')
         
 
     def __iter__(self):
+        """
+        __iter__(self)
+            Returns the class for iterations 
+
+        """
         return self
 
     def next(self):
+        """
+        next(self)
+            Returns the next record in the sequence.
+
+        """
         try:
-            return self.CurrentIter.next()
+            return self.currentIter.next()
         except StopIteration:
-            self.CurrentHandle.close()
-            if len(self.Files)>0:
-                self.CurrentHandle = open(self.Directory+self.Files.pop(),'r')
-                self.CurrentIter = SeqIO.parse(self.CurrentHandle,'fasta')
-                return self.CurrentIter.next()
+            self.currentHandle.close()
+            if len(self.files)>0:
+                self.currentHandle = open(self.directory + self.files.pop(), 'r')
+                self.currentIter = SeqIO.parse(self.currentHandle, 'fasta')
+                return self.currentIter.next()
             else:
                 raise StopIteration
         
