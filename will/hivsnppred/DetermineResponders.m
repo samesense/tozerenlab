@@ -36,6 +36,7 @@ NUM_BINS=6;
 TIMEPOINT_FLAG=false;
 NEED_PAT_STRUCT=false;
 NUM_TIME_POINTS_NEEDED=3;
+SD_METHOD_FLAG = false;
 
 if ~isempty(varargin)
     for i=1:2:length(varargin)
@@ -61,6 +62,12 @@ if ~isempty(varargin)
                     NEED_PAT_STRUCT=varargin{i+1};
                 else
                     error('DetermineResponders:NEED_PAT_STRUCT_ARG','Arguement to NEED_PAT_STRUCT must be logical');
+                end
+            case 'sdmethod'
+                if islogical(varargin{i+1})
+                    SD_METHOD_FLAG=varargin{i+1}&true;
+                else
+                    error('DetermineResponders:SD_METHOD','Arguement to SD_METHOD must be logical');
                 end
             otherwise
                 error('DetermineResponders:BADPARAM','An unknown parameter was provided: %s',varargin{i})
@@ -129,9 +136,17 @@ CD_time_norm=cell2mat(cellfun(@(x)(InterpolateVals(x)),CD_vecs,'uniformoutput',f
 
 
 
-RNA_time_diff=RNA_time_norm(:,1:end-1)-RNA_time_norm(:,2:end);
 
-RESPONDERS=nanmean(RNA_time_diff<0,2)>=0.4&mean(isnan(RNA_time_diff),2)<0.8;
+
+if ~SD_METHOD_FLAG
+    RNA_time_diff=RNA_time_norm(:,1:end-1)-RNA_time_norm(:,2:end);
+    RESPONDERS=nanmean(RNA_time_diff<0,2)>=0.4&mean(isnan(RNA_time_diff),2)<0.8;
+else
+
+    RESPONDERS = cellfun(@SD_Method,RNA_vecs);
+    
+    
+end
 
 
 
@@ -191,5 +206,28 @@ varargout=SetupOutput(nargout);
         end
     end
 
+    function status = SD_Method(input)
+        x_vals = unique(input(:,1));
+        if size(x_vals,1)<3
+            %not enough input values
+            status=false;
+        else
+            if size(x_vals,1)~=size(input,1)
+                %Average repeated vals
+                y_vals=zeros(size(x_vals));
+                for j=1:length(x_vals)
+                    y_vals(j)=mean(input(input(:,1)==x_vals(j),2));
+                end
+            else
+                y_vals=input(:,2);
+            end
 
+            FINAL=interp1(x_vals,y_vals,[0 8],'spline',NaN);
+            
+            status = diff(FINAL)<=-1.5;
+        end
+        
+        
+        
+    end
 end
