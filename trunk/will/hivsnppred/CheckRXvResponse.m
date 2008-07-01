@@ -2,49 +2,45 @@
 [RX_MASK INDS]=BreakoutPatients(NewPatPosStruct,200);
 
 
-PredictiveFeatures = cell(1,4);
-PredictiveFeatures{1}={'BaseCalls'};
-PredictiveFeatures{2}={'BaseCalls','SimpleELM'};
-PredictiveFeatures{3}={'BaseCalls','SimpleELM','PositionalELM'};
-PredictiveFeatures{4}={'BaseCalls','SimpleELM','PositionalELM','PositionalPWM'};
+PredictiveFeatures = cell(1,7);
+PredictiveFeatures{1}={'SimpleHumanMiRNA'};
+PredictiveFeatures{2}={'SimpleHumanMiRNA','BaseCalls'};
+PredictiveFeatures{3}={'BaseCalls'};
+PredictiveFeatures{4}={'BaseCalls','SimpleELM'};
+PredictiveFeatures{5}={'BaseCalls','SimpleELM','PositionalELM'};
+PredictiveFeatures{6}={'BaseCalls','SimpleELM','PositionalELM','PositionalPWM'};
+PredictiveFeatures{7}={'BaseCalls','SimpleELM','PositionalELM','PositionalPWM','SimpleHumanMiRNA'};
 
 
-% All_predvals=cell(length(INDS),4);
-% All_prednorm=cell(length(INDS),4);
-% All_predstd=cell(length(INDS),4);
-% All_predcount=cell(length(INDS),4);
-% All_ROCs=cell(length(INDS),4);
+my_predvals=cell(length(INDS),7);
+my_prednorm=cell(length(INDS),7);
+my_predstd=cell(length(INDS),7);
+my_predcount=cell(length(INDS),7);
+my_ROCs=cell(length(INDS),7);
 
-i=9
-k=3
+SD_predvals=cell(length(INDS),7);
+SD_prednorm=cell(length(INDS),7);
+SD_predstd=cell(length(INDS),7);
+SD_predcount=cell(length(INDS),7);
+SD_ROCs=cell(length(INDS),7);
 
-PredictiveFeatures{k}
-        [All_predvals{i,k} All_prednorm{i,k} All_predstd{i,k} All_predcount{i,k} All_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',PredictiveFeatures{k});
-        save NewRunData All_predvals All_prednorm All_predstd All_predcount All_ROCs
-        
-i=9
-k=4
 
-PredictiveFeatures{k}
-        [All_predvals{i,k} All_prednorm{i,k} All_predstd{i,k} All_predcount{i,k} All_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',PredictiveFeatures{k});
-        save NewRunData All_predvals All_prednorm All_predstd All_predcount All_ROCs
 
-        
-
-for i = 10:length(INDS)
+for i = 1:length(INDS)
     i
     for k = 1:size(PredictiveFeatures,2)
         PredictiveFeatures{k}
-        [All_predvals{i,k} All_prednorm{i,k} All_predstd{i,k} All_predcount{i,k} All_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',PredictiveFeatures{k});
-        save NewRunData All_predvals All_prednorm All_predstd All_predcount All_ROCs
+        [SD_predvals{i,k} SD_prednorm{i,k} SD_predstd{i,k} SD_predcount{i,k} SD_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',[{{'ResponderType','SD_method'}}, PredictiveFeatures{k}]);
+        [my_predvals{i,k} my_prednorm{i,k} my_predstd{i,k} my_predcount{i,k} my_ROCs{i,k}]=PredictPatients(NewPatPosStruct(INDS{i}),100,'ELM_STRUCT',NewELMPosStruct,'display',false,'predictivefeatures',PredictiveFeatures{k});
+        save AnotherRunData my_predvals my_prednorm my_predstd my_predcount my_ROCs SD_predvals SD_prednorm SD_predstd SD_predcount SD_ROCs
     end
     
 end
 % 
-% PredCount = cat(1,All_predcount{:});
-% PredNorm = cat(1,All_prednorm{:});
-% PredSTD = cat(1,All_predstd{:});
-% PredVals = cat(1,All_predvals{:});
+% PredCount = cat(1,my_predcount{:});
+% PredNorm = cat(1,my_prednorm{:});
+% PredSTD = cat(1,my_predstd{:});
+% PredVals = cat(1,my_predvals{:});
 % 
 % [FEATURES RESPONSE PAT_INDEX FEATURE_NAMES FEATURE_INDS]=GetPatientFeatures(PatPosStruct,ELM_POS_STRUCT,'DrugRegimine','BaseCalls','SimpleELM','PositionalELM','PositionalPWM');
 % 

@@ -1,16 +1,19 @@
-function varargout=GetPatientFeatures(PAT_STRUCT,ELM_STRUCT,varargin)
+function varargout=GetPatientFeatures(PAT_STRUCT,ELM_STRUCT,PROPS,varargin)
 %   GetPatientFeatures
 %       A helper function to retrieve the features for classification of
 %       patients.
 %
 %   [FEATURES RESPONSE PAT_INDEX FEATURE_NAMES FEATURE_INDS]= ...
-%               GetPatientFeatures(PAT_STRUCT,feature1,feature2, featureN)
+%               GetPatientFeatures(PAT_STRUCT,ELM_STRUCT,PROPS ,...
+%               feature1,feature2, featureN)
 %
 %   PAT_STRUCT      The patient structure to extract features from.
 %
 %   ELM_STRUCT      A structure describing the ELMs (as created by
 %                   ELMDownloadParser).  Can be left as [] if you don't
 %                   care about FEATURE_NAMES.
+%
+%   PROPS           A cell-array of modfiying properties
 %
 %   FEATURES        The feature-vectors for each patient.
 %
@@ -28,33 +31,78 @@ function varargout=GetPatientFeatures(PAT_STRUCT,ELM_STRUCT,varargin)
 %
 %   Possible Feature Choices
 %
-%   DrugRegimine    A binary indicator vector indicating the presence or
-%                   abscence of each Drug during the therapy.
+%   DrugRegimine        A binary indicator vector indicating the presence 
+%                       or abscence of each Drug during the therapy.
 %
-%   BaseCalls       A binary indicator vector for the SNP identity at spots
-%                   determined by MakeSNPCalls
+%   BaseCalls           A binary indicator vector for the SNP identity at 
+%                       spots determined by MakeSNPCalls
 %
-%   SimpleELM       A binary indicatory vector for the presence or absence
-%                   of each ELM in the sequence.
+%   SimpleELM           A binary indicatory vector for the presence or 
+%                       absence of each ELM in the sequence.
 %
-%   PositionalELM   A binary indicator vector for the presence or absence
-%                   of ELMs at specific locations.
+%   PositionalELM       A binary indicator vector for the presence or 
+%                       absence of ELMs at specific locations.
 %
-%   PositionalPWM   A continious valued vector indicating the conservation
-%                   of the ELM relative to the reference genomic sequences.
+%   PositionalPWM       A continious valued vector indicating the 
+%                       conservation of the ELM relative to the reference 
+%                       genomic sequences.
+%
+%   SimpleHumanMiRNA    A binary indicator vector indicating the prsence or
+%                       absennce of specific human miRNA recognition sites.
 %
 %
-
+%
+%   Property Choices
+%
+%   ResponderType       [(myMethod)|SD_method]  A switch to determine which
+%                       method is used for phenotypic calls.
+%
+%   miRNACutoff         [0.01]  The p-value for determining the presence or
+%                       absence calls for the Human miRNAs
+%
+%
 
 if isempty(ELM_STRUCT)
     %create a dummy variable incase needed
     ELM_STRUCT=struct('Name',arrayfun(@(x)(['ELM ' int2str(x)]),1:500,'uniformoutput',false));
 end
 
-
+HUMAN_MIRNA_P_CUTOFF = 0.01;
+RESPONDER_TYPE = 'myMethod';
 feature_cell=cell(length(varargin),1);
 name_cell=cell(length(varargin),1);
 index_cell=cell(length(varargin),1);
+
+%incase I made a stupid mistake and did not give a PROPS arguement
+if ischar(PROPS)
+    varargin = [PROPS,varargin];
+    PROPS=[];
+end
+
+if ~isempty(PROPS)
+    for i = 1:2:length(PROPS)
+       switch lower(PROPS{i}) 
+           case 'respondertype'
+               if ischar(PROPS{i+1}) 
+                   RESPONDER_TYPE = PROPS{i+1};
+               else
+                   error('GetPatientFeatures:BAD_RESPONDERTYPE', 'An unknown responder type was provided: %s',PROPS{i+1});
+               end
+               
+           case 'mirnacutoff'
+               if isnumeric(PROP{i+1})
+                   HUMAN_MIRNA_P_CUTOFF = PROP{i+1};
+               else
+                   error('GetPatientFeatures:BAD_MIRNACUTOFF', 'Arguement to miRNACutoff must be a numeric.');
+               end
+           otherwise
+                error('GetPatientFeatures:BAD_PROP', 'An unknown property was provided: %s',PROPS{i+1});
+       
+       end
+    end
+end
+
+
 
 for i=1:length(varargin)
     switch(lower(varargin{i}))
@@ -139,7 +187,14 @@ for i=1:length(varargin)
             name_cell{i}=temp_names;
             clear temp_names;
             
-            
+        case 'simplehumanmirna'
+            [temp index_cell{i}]=PatientStructHelper(PAT_STRUCT,{'SimpleHumanMiRNA','explodeNumeric'});
+            feature_cell{i} = temp < HUMAN_MIRNA_P_CUTOFF;
+       
+            [mirnaNames junk]=PatientStructHelper(PAT_STRUCT,{'HumanMiRNAnames','leaveCell'});
+            name_cell{i} = mirnaNames{find(~cellfun('isempty',mirnaNames),1)};
+
+            clear mirnaNames temp;
             
         case 'responder'
             %do nothing, responder is put in the last cell automatically.
@@ -149,8 +204,17 @@ for i=1:length(varargin)
     end
 end
 
-[resp_var resp_ind]=PatientStructHelper(PAT_STRUCT,{'IS_RESPONDER','leaveNumeric'});
 
+if strcmpi(RESPONDER_TYPE,'mymethod')
+    [resp_var resp_ind]=PatientStructHelper(PAT_STRUCT,{'IS_RESPONDER','leaveNumeric'});
+elseif strcmpi(RESPONDER_TYPE,'SD_method')
+    resp_var = DetermineResponders(PAT_STRUCT,'sdmethod',true);
+    resp_ind = 1:length(resp_var);
+    
+else
+    error('GetPatientFeatures:BAD_RESPONDERMETHOD', 'An unknown ResponderMethod was provided: %s',RESPONDER_TYPE);
+end
+    
 PAT_INDEX=resp_ind;
 %find the patient indexes that are in all of the features
 for i=1:length(index_cell)
