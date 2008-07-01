@@ -9,8 +9,10 @@ import Queue
 import string
 import threading
 from HIVGenoTypeChecker import FastaDirIter
+import collections
 import logging
 import cPickle as pickle
+import itertools
 
 DIREC = 'C:\\Documents and Settings\\Will\\My Documents\\HIVRNAi\\'
 DATABASENAME = 'human_predictions_4dwnload.txt'
@@ -476,10 +478,58 @@ def DoAll(MI_RNA_DATABASE, OUTPUT_FILE, NUM_CALIB = 1, NUM_HYBRID = 30):
     output_handle.close()
     
 
+def ReformatTable(INHANDLE,OUTHANDLE):
+    """
+    ReformatTable
+        Takes the output of DoAll and reformats the table into a more matlab
+    friendly input format.
+
+    SeqName \t miRNAname \t pos_1 \t E_1 \t p-val_1 \t pos_n \t E_n \t p-val_n
+
+
+    """
+
+    
+    current_dict = collections.defaultdict(list)
+
+    for this_line in INHANDLE:
+        
+        data = SplitData(this_line)
+        current_dict[data[0:2]] += list(data[2:])
+        
+    print 'Done reading'
+    for this_key in current_dict:
+        output_string = string.join(itertools.chain(this_key),'\t')
+        for this_element in current_dict[this_key]:
+            output_string += '\t' + string.strip(this_element)
+        OUTHANDLE.write(output_string + '\n')
 
 
 
-if __name__ == '__main__':
-    DoAll(DIREC + DATABASENAME, 'C:\\RNAHybrid\\newoutput.txt')
+
+def SplitData(INPUTLINE):
+    """
+    SplitData
+        A helper function which extracts the data out of the OUTPUT files.
+    """
+    first_split = re.split('\t', INPUTLINE)
+    name_split = re.split('_', first_split[0])
+    if name_split[0][0] == 'b':
+        this_name = string.join(name_split[0:3],'_')
+        rel_start = int(name_split[3])
+    elif name_split[0][0] == 'P':
+        this_name = string.join(name_split,'_')
+        rel_start = 1
+    else:
+        print 'Unknown Name found' + first_split[0]
+    this_pos = rel_start + int(first_split[2])
+    output = (this_name, first_split[1], str(this_pos),
+              first_split[3], first_split[4])
+
+    return output
+
+
+##if __name__ == '__main__':
+##    DoAll(DIREC + DATABASENAME, 'C:\\RNAHybrid\\newoutput.txt')
 
 
