@@ -1,95 +1,110 @@
+"""
+PyUNAFold
+    An interface for the UNAFold program for finding siRNA templates.
+"""
+
 import subprocess
-import os
 import re
-from numpy import *
+import numpy
 
-def hybrid_min(Seq1, Seq2, Type = 'RNA', Temp = 37, Sodium = 1, Magnesium = 0,UNAFoldPath = 'C:\\UNAFold\\bin\\', ReturnType = 'tuple'):
+def HybridMin(SEQ1, SEQ2, TYPE = 'RNA', TEMP = 37, SODIUM = 1, MAGNESIUM = 0,
+               UNAFOLDPATH = 'C:\\UNAFold\\bin\\', RETURNTYPE = 'tuple'):
     """
-    hybrid_min(Seq1,Seq2)
-        Interfaces with the hybrid_min function of UNAFold and returns the free-energy binding of Seq1 with Seq2.
-        Returns a tuple containing the three output results.
+    HybridMin(Seq1,Seq2)
+        Interfaces with the hybrid_min function of UNAFold and returns the
+        free-energy binding of Seq1 with Seq2.  Returns a tuple containing
+        the three output results.
 
-        Type=['RNA']|'DNA'
-        Temp=[37]
-        Sodium=[1]
-        Magnesium=[0]
-        UNAFoldPath=['c:\\UNAFold\\bin\\']
-        ReturnType=['tuple']|'array'
+        TYPE=['RNA']|'DNA'
+        TEMP=[37]
+        SODIUM=[1]
+        MAGNESIUM=[0]
+        UNAFOLDPATH=['c:\\UNAFold\\bin\\']
+        RETURNTYPE=['tuple']|'array'
             Returns the data either as a tuple of numpy array
 
     """
 
-    command = UNAFoldPath + 'hybrid-min '
-    command += ' --tmin=' + str(Temp)
-    command += ' --tmax=' + str(Temp)
-    command += ' --sodium=' + str(Sodium)
-    command += ' --magnesium=' + str(Magnesium)
-    command += ' --NA=' + Type
+    command = UNAFOLDPATH + 'hybrid-min '
+    command += ' --tmin=' + str(TEMP)
+    command += ' --tmax=' + str(TEMP)
+    command += ' --sodium=' + str(SODIUM)
+    command += ' --magnesium=' + str(MAGNESIUM)
+    command += ' --NA=' + TYPE
     command += ' -q '
 
-    command += Seq1 + ' ' + Seq2
+    command += SEQ1 + ' ' + SEQ2
 
 #    print command
-    SysCall = subprocess.Popen(command, shell=True, stdout = subprocess.PIPE)
-    SysCall.wait()
-    output = SysCall.communicate()[0]
+    sys_call = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE)
+    sys_call.wait()
+    output = sys_call.communicate()[0]
 
-    outputList = re.split('\t', output)
+    output_list = re.split('\t', output)
 
-    if ReturnType == 'tuple':
-        return (float(outputList[0]), float(outputList[1]), float(outputList[2]))
-    elif ReturnType == 'array':
-        return array([float(outputList[0]), float(outputList[1]), float(outputList[2])])
+    if RETURNTYPE == 'tuple':
+        return (float(output_list[0]), float(output_list[1]),
+                float(output_list[2]))
+    elif RETURNTYPE == 'array':
+        return numpy.array([float(output_list[0]), float(output_list[1]),
+                            float(output_list[2])])
     
 
-def hybrid(Seq1, Seq2, Tmin, Tmax, Tstep = 1, Type = 'RNA', Sodium = 1, Magnesium = 0, UNAFoldPath = 'C:\\UNAFold\\bin\\', ReturnType = 'tuple'):
+def Hybrid(SEQ1, SEQ2, TMIN, TMAX, TSTEP = 1, TYPE = 'RNA', SODIUM = 1,
+           MAGNESIUM = 0, UNAFOLDPATH = 'C:\\UNAFold\\bin\\',
+           RETURNTYPE = 'tuple'):
     """
-    hybrid(Seq1,Seq2,Tmin,Tmax,Tstep=1)
-        Interfaces with the hybrid_min function of UNAFold and returns the free-energy binding of Seq1 with Seq2 across multiple temperature ranges.
+    Hybrid(SEQ1,SEQ2,TMIN,TMAX,TSTEP=1)
+        Interfaces with the hybrid_min function of UNAFold and returns the
+        free-energy binding of Seq1 with Seq2 across multiple temperature
+        ranges.
+
         Returns a list of tuples containing:
             (Temp,Out1,Out2,Out3)
 
-        Type=['RNA']|'DNA'
-        Sodium=[1]
-        Magnesium=[0]
-        UNAFoldPath=['c:\\UNAFold\\bin\\']
-        ReturnType=['tuple']|'array'
+        TYPE=['RNA']|'DNA'
+        SODIUM=[1]
+        MAGNESIUM=[0]
+        UNAFOLDPATH=['c:\\UNAFold\\bin\\']
+        RETURNTYPE=['tuple']|'array'
             Returns the data either as a tuple of numpy array
     """
 
-    command = UNAFoldPath + 'hybrid-min '
-    command += ' --tmin=' + str(Tmin)
-    command += ' --tmax=' + str(Tmax)
-    command += ' --tinc=' + str(Tstep)
-    command += ' --sodium=' + str(Sodium)
-    command += ' --magnesium=' + str(Magnesium)
-    command += ' --NA=' + Type
+    command = UNAFOLDPATH + 'hybrid-min '
+    command += ' --tmin=' + str(TMIN)
+    command += ' --tmax=' + str(TMAX)
+    command += ' --tinc=' + str(TSTEP)
+    command += ' --sodium=' + str(SODIUM)
+    command += ' --magnesium=' + str(MAGNESIUM)
+    command += ' --NA=' + TYPE
     command += ' -q '
 
-    command += Seq1 + ' ' + Seq2
+    command += SEQ1 + ' ' + SEQ2
 
 #    print command
-    SysCall = subprocess.Popen(command, shell=True, stdout = subprocess.PIPE)
-    SysCall.wait()
-    output = SysCall.communicate()[0]
+    sys_call = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE)
+    sys_call.wait()
+    output = sys_call.communicate()[0]
 
-    outputList = re.split('\n', output)
+    output_list = re.split('\n', output)
 
-    if ReturnType == 'tuple':
-        finalList = []
-        for rowNum in range(len(outputList)-1):
-            temp = re.split('\t',outputList[rowNum])
+    if RETURNTYPE == 'tuple':
+        final_list = []
+        for row_num in range(len(output_list)-1):
+            temp = re.split('\t', output_list[row_num])
             print temp
-            finalList.append((Tmin+rowNum*Tstep, float(temp[0]), float(temp[1]), float(temp[2])))
+            final_list.append((TMIN+row_num*TSTEP, float(temp[0]),
+                               float(temp[1]), float(temp[2])))
 
-        return finalList
-    elif ReturnType == 'array':
-        finalArray = zeros((len(outputList)-1, 4))
-        for rowNum in range(len(outputList)-1):
-            temp = re.split('\t',outputList[rowNum])
-            finalArray[rowNum] = [Tmin+rowNum*Tstep, float(temp[0]), float(temp[1]), float(temp[2])]
+        return final_list
+    elif RETURNTYPE == 'array':
+        final_array = numpy.zeros((len(output_list)-1, 4))
+        for row_num in range(len(output_list)-1):
+            temp = re.split('\t', output_list[row_num])
+            final_array[row_num] = [TMIN+row_num*TSTEP, float(temp[0]),
+                                   float(temp[1]), float(temp[2])]
 
-        return finalArray
+        return final_array
 
 
 
