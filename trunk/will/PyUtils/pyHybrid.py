@@ -1,5 +1,5 @@
 """
-pyHybrid
+PyHybrid
     A set of functions for interfacing with the RNAhybrid program.
 """
 
@@ -256,7 +256,7 @@ def LoadSeqs(LOAD_QUEUE, DUMP_QUEUE, ALL_CALIB_FLAG, FINISHED_LOAD_FLAG,
     while True:
         try:
             this_calib = LOAD_QUEUE.get_nowait()
-        except  :
+        except Queue.Empty:
             if ALL_CALIB_FLAG.isSet():
                 FINISHED_LOAD_FLAG.set()
                 break
@@ -303,7 +303,7 @@ def CalibWorker(LOAD_QUEUE, DUMPING_QUEUE, FINISHED_EVENT,
     while True:
         try:
             this_mirna = LOAD_QUEUE.get_nowait()
-        except  :
+        except Queue.Empty:
            #print 'Finished Calibrating'
             FINISHED_EVENT.set()
             break
@@ -341,7 +341,7 @@ def HybridWorker(LOAD_QUEUE, DUMPING_QUEUE, FINISHED_LOAD,
         try:
             this_set = LOAD_QUEUE.get_nowait()
             #(ChromName,MI_RNA_NAME,miRNAseq,CHROM_SEQ,DELTA_THETA)
-        except  :
+        except Queue.Empty:
             if FINISHED_LOAD.isSet():
                #print 'Finished Hybridizing'
                 FINISHED_HYBRID.set()
@@ -379,7 +379,7 @@ def WritingWorker(LOAD_QUEUE, FILE_HANDLE, FINISHED_HYBRID):
     while True:
         try:
             this_set = LOAD_QUEUE.get_nowait()
-        except  :
+        except Queue.Empty:
             if FINISHED_HYBRID.isSet():
                #print 'Finished Writing'
                 break
@@ -410,7 +410,7 @@ def DoAll(MI_RNA_DATABASE, OUTPUT_FILE, NUM_CALIB = 1, NUM_HYBRID = 30):
         print 'Found SavedCalib File'
     except WindowsError:
         print 'Could not Find SavedCalib File'
-        preComputedCalibs={}
+        preComputedCalibs = {}
     
     need_calib_queue = Queue.Queue(-1)
     finished_calib_queue = Queue.Queue(-1)
