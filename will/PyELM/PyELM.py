@@ -1,75 +1,80 @@
 import os
-from numpy import *
+import numpy
 import re
 from pyQueueUtils import *
 from copy import *
 import threading
 import time
 import bisect
+import Queue
 
 class PyELM:
 
     def __init__(self):
 
-        self.ELMDict={}
-        self.ELMOrder=[]
-        self.Sequences=[]
-        self.ELMreDict={}
-        self.MaxSize=0
+        self.elm_dict = {}
+        self.elm_order = []
+        self.sequences = []
+        self.elm_re_dict = {}
+        self.max_size = 0
 
-        self.__FoundCorrect = False
+        self.__found_correct = False
 
-        self.PreCalchistArray=[]        
-        self.PreCalcELMMatchSeqs=[]
-        self.PreCalcELMBinDict={}
+        self.precalc_hist_array = []        
+        self.precalc_elm_match_seqs = []
+        self.precalc_elm_bin_dict = {}
 
-        self.__singlebinDict={}
-        self.__allBinDict={}
-        self.__DepthChecked=[]
-        self.__WorkingQueue=None
+        self.__singlebin_dict = {}
+        self.__all_bin_dict = {}
+        self.__depth_checked = []
+        self.__working_queue = None
 
-        self.__GlobalCounter=0
-        self.MaxBreadth = 4
-        self.MaxDepth = 100
-        self.MaxWidth = 5
-        self.MaxIter = 1000
-        self.CalcTimeOut=300
-        self.ForceBins = [858, 1359, 1483, 1676, 2570, 3434, 3513]
+        self.__global_counter = 0
+        self.max_breadth = 4
+        self.max_depth = 100
+        self.max_width = 5
+        self.max_iter = 1000
+        self.calc_time_out = 300
+        self.force_bins = [858, 1359, 1483, 1676, 2570, 3434, 3513]
 
-    def ELMParser(self,DIRECTORY="C:\Documents and Settings\Will\My Documents\ELM_Motif_finder\ELM_RAW_DOWNLOAD\\"):
+    def ELMParser(self, DIRECTORY = None):
         """
         Parser
-            Parses a directory of HTML files to extract the ELM names and Regular Expressions and instanciates it into SELF.
+            Parses a directory of HTML files to extract the ELM names and
+            Regular Expressions and instanciates it into SELF.
 
             Parser(DIRECTORY)
 
-            DIRECTORY       The directory containing the HTML files downloaded from the ELM database.
-                            If left empty then C:\Documents and Settings\Will\My Documents\PyELM\ELM_RAW_DOWNLOAD\
+            DIRECTORY       The directory containing the HTML files downloaded
+                            from the ELM database.  If left empty then
+            C:\Documents and Settings\Will\My Documents\PyELM\ELM_RAW_DOWNLOAD\
 
         """
+        if DIRECTORY == None:
+            DIRECTORY = "C:\\Documents and Settings\\Will\\My Documents\\ELM_Motif_finder\\ELM_RAW_DOWNLOAD\\"
 
-
-        fileList=os.listdir(DIRECTORY)
-        allRegExps={}
+        file_list = os.listdir(DIRECTORY)
+        all_reg_exps = {}
         
-        for i in xrange(1,len(fileList)-1):
+        for i in xrange(1, len(file_list) - 1):
             
-            thisFile=open(DIRECTORY+fileList[i],'r')
-            ELMname=fileList[i].rpartition('.')
-            self.ELMOrder.append(ELMname[0])
-            currentLine=''
+            this_file = open(DIRECTORY + file_list[i], 'r')
+            elm_name = file_list[i].rpartition('.')
+            self.elm_order.append(elm_name[0])
+            current_line = ''
             
-            while currentLine.find('Pattern:') == -1:
-                currentLine=thisFile.readline()
+            while current_line.find('Pattern:') == -1:
+                current_line = this_file.readline()
             
-            currentLine=thisFile.readline()
+            current_line = this_file.readline()
             
-            allRegExps[ELMname[0]]=currentLine[currentLine.find('>')+1:currentLine.find('/')-2]
-            thisFile.close()
+            all_reg_exps[elm_name[0]] = current_line[current_line.find('>') +
+                                                     1:current_line.find('/') - 2]
+            this_file.close()
         
-        self.ELMDict=allRegExps
+        self.elm_dict = all_reg_exps
 
-    def AddELM(self,Name,RegExp):
+    def AddELM(self, NAME, REG_EXP):
         """ 
         AddELM
             Loads a single ELM RegExp into the database.
@@ -77,13 +82,13 @@ class PyELM:
         AddELM(Name,RegExp)
 
         """
-        self.ELMOrder.append(Name)
-        self.ELMDict[Name] = RegExp
-        self.ELMreDict[Name] = re.compile(RegExp)
-        self.PreCalcELMMatchSeqs=[]
-        self.PreCalchistArray=[]
+        self.elm_order.append(NAME)
+        self.elm_dict[NAME] = REG_EXP
+        self.elm_re_dict[NAME] = re.compile(REG_EXP)
+        self.precalc_elm_match_seqs = []
+        self.precalc_hist_array = []
         
-    def LoadSeqs(self,SEQUENCES):
+    def LoadSeqs(self, SEQUENCES):
         """
         LoadSeqs
             Loads a set of sequences into this instance for further analysis.
@@ -95,11 +100,11 @@ class PyELM:
 
         """
 
-        self.Sequences = SEQUENCES
-        self.MaxSize=0
-        for i in xrange(len(self.Sequences)):
-            if len(self.Sequences[i]) > self.MaxSize :
-                self.MaxSize=len(self.Sequences[i])
+        self.sequences = SEQUENCES
+        self.max_size = 0
+        for i in xrange(len(self.sequences)):
+            if len(self.sequences[i]) > self.max_size :
+                self.max_size = len(self.sequences[i])
 
 
     
@@ -107,87 +112,95 @@ class PyELM:
     def ELMMatchSeqs(self):
         """
         ELMMatchSeqs
-            Searches for the regular expressions of ELM_DICT within the SEQUENCES provided.
+            Searches for the regular expressions of ELM_DICT within the
+            SEQUENCES provided.
 
         ELM_MATCH_VEC = ELMMatchSeqs()
 
 
-        ELM_MATCH_VEC   A LIST corresponding to each BioSeq object provided.  Each element in the list is a
-                        DICT where each element indicates a matched ELM location.
+        ELM_MATCH_VEC   A LIST corresponding to each BioSeq object provided.
+                        Each element in the list is a DICT where each element
+                        indicates a matched ELM location.
 
         """
 
-        if len(self.ELMDict) == 0:
+        if len(self.elm_dict) == 0:
             print 'ELMParser must be run first!'
             return
-        if len(self.Sequences) == 0:
+        if len(self.sequences) == 0:
             print 'LoadSeqs must be run first!'
             return
 
 
-        if len(self.PreCalcELMMatchSeqs) == 0:
+        if len(self.precalc_elm_match_seqs) == 0:
             #compile all of the re's
-            if self.ELMreDict != None:
-                ELMreDict={}
-                for thisELM in self.ELMOrder:
-                    ELMreDict[thisELM]=re.compile(self.ELMDict[thisELM],re.I)
-                self.ELMreDict=ELMreDict
+            if self.elm_re_dict != None:
+                elm_re_dict = {}
+                for this_elm in self.elm_order:
+                    elm_re_dict[this_elm] = re.compile(self.elm_dict[this_elm],
+                                                       re.I)
+                self.elm_re_dict = elm_re_dict
             
-            SeqELMDict=[]
-            for thisSeq in self.Sequences:
-                thisELMSeq={}
-                for thisELM in self.ELMOrder:
-                    thisIndex=[];
-                    #each search only finds one match, so repeat the search until no more are found
-                    spot = self.ELMreDict[thisELM].search(thisSeq)
+            seq_elm_dict = []
+            for this_seq in self.sequences:
+                this_elm_seq = {}
+                for this_elm in self.elm_order:
+                    this_index = []
+                    #each search only finds one match
+                    #so repeat the search until no more are found
+                    spot = self.elm_re_dict[this_elm].search(this_seq)
                     while spot != None:
-                        thisIndex.append(spot.start())
-                        spot = self.ELMreDict[thisELM].search(thisSeq,spot.start()+1)
-                    thisELMSeq[thisELM]=thisIndex
-                SeqELMDict.append(thisELMSeq)
+                        this_index.append(spot.start())
+                        spot = self.elm_re_dict[this_elm].search(this_seq,
+                                                                 spot.start()
+                                                                 + 1)
+                    this_elm_seq[this_elm] = this_index
+                seq_elm_dict.append(this_elm_seq)
 
 
-            self.PreCalcELMMatchSeqs=SeqELMDict
+            self.precalc_elm_match_seqs = seq_elm_dict
 
         
-        return self.PreCalcELMMatchSeqs
+        return self.precalc_elm_match_seqs
         
     def ELMHistGen(self):
         """
         ELMHistGen
-            Generates a count-matrix of ELM matches at specific locations in the sequences.
+            Generates a count-matrix of ELM matches at specific locations in
+            the sequences.
 
         ELM_COUNT_MAT = ELMHistGen()
 
-        ELM_COUNT_MAT   An [maxSeqLength x len(ELM_DICT)] each Row represent an ELM and each Column
-                        is a seqLocation.
+        ELM_COUNT_MAT   An [maxSeqLength x len(ELM_DICT)] each Row represent
+                        an ELM and each Column is a seqLocation.
 
         """
-        if len(self.ELMDict) == 0:
+        if len(self.elm_dict) == 0:
             print 'ELMParser must be run first!'
             return
-        if len(self.Sequences) == 0:
+        if len(self.sequences) == 0:
             print 'LoadSeqs must be run first!'
             return
 
-        if len(self.PreCalcELMMatchSeqs) == 0:
+        if len(self.precalc_elm_match_seqs) == 0:
             self.ELMMatchSeqs()
 
-        if len(self.PreCalchistArray) == 0:
+        if len(self.precalc_hist_array) == 0:
 
-            histArray=zeros((len(self.ELMOrder),self.MaxSize))
+            hist_array = numpy.zeros((len(self.elm_order), self.max_size))
 
-            counter=0
-            for thisELM in self.ELMOrder:
-                for i in xrange(len(self.PreCalcELMMatchSeqs)):
-                    histArray[counter,self.PreCalcELMMatchSeqs[i][thisELM]] += 1
-                counter+=1
+            counter = 0
+            for this_elm in self.elm_order:
+                for i in xrange(len(self.precalc_elm_match_seqs)):
+                    hist_array[counter,
+                               self.precalc_elm_match_seqs[i][this_elm]] += 1
+                counter += 1
 
-            self.PreCalchistArray=histArray
+            self.precalc_hist_array = hist_array
         
-        return self.PreCalchistArray
+        return self.precalc_hist_array
 
-    def SimpleELMCall(self,SEQ_IND,WANTED_ELM):
+    def SimpleELMCall(self, SEQ_IND, WANTED_ELM):
         """
         SimpleELMCall
             Returns a simple Presence/Absence Call for the ELM.
@@ -197,25 +210,26 @@ class PyELM:
         SEQ_IND     The index of the desired sequence
         WANTED_ELM  The desired ELM
 
-        PACall      Returns 1 if the ELM is present in the sequence and 0 otherwise.
+        PACall      Returns 1 if the ELM is present in the sequence and
+                    0 otherwise.
 
         """
 
-        if SEQ_IND > len(self.Sequences) | SEQ_IND < 0:
-            print 'Arguement SEQ_IND must be between 0 and len(self.Sequences)'
+        if SEQ_IND > len(self.sequences) | SEQ_IND < 0:
+            print 'Arguement SEQ_IND must be between 0 and len(self.sequences)'
             raise IndexError
         
-        if len(self.PreCalcELMMatchSeqs) == 0:
+        if len(self.precalc_elm_match_seqs) == 0:
             self.ELMMatchSeqs()
 
-        if len(self.PreCalcELMMatchSeqs[SEQ_IND][WANTED_ELM]) >= 1:
+        if len(self.precalc_elm_match_seqs[SEQ_IND][WANTED_ELM]) >= 1:
             return 1
         else:
             return 0
 
 
 
-    def MultiELMCall(self,SEQ_IND,WANTED_ELM):
+    def MultiELMCall(self, SEQ_IND, WANTED_ELM):
         """
         MultiELMCall
             Returns the binned Presence/Absence Call for the ELM.
@@ -225,16 +239,18 @@ class PyELM:
         SEQ_IND     The index of the desired sequence
         WANTED_ELM  The desired ELM
 
-        PACall      Returns 1 if the ELM is present in the sequence and 0 otherwise.
+        PACall      Returns 1 if the ELM is present in the sequence and
+                    0 otherwise.
 
         """
-        if WANTED_ELM not in self.PreCalcELMBinDict:
+        if WANTED_ELM not in self.precalc_elm_bin_dict:
             raise KeyError
             
         thisCall = []
-        allBins = self.PreCalcELMBinDict[WANTED_ELM]
-        for i in xrange(len(allBins)-1):
-            if sum(self.ELMPosGen(SEQ_IND,allBins[i],allBins[i+1],WANTED_ELM)) > 0:
+        allBins = self.precalc_elm_bin_dict[WANTED_ELM]
+        for i in xrange(len(allBins) - 1):
+            if sum(self.ELMPosGen(SEQ_IND, allBins[i], allBins[i+1],
+                                  WANTED_ELM)) > 0:
                 thisCall.append(1)
             else:
                 thisCall.append(0)
@@ -244,15 +260,17 @@ class PyELM:
         
 
 
-    def ELMPosGen(self,SEQ_IND,POS_START,POS_STOP,WANTED_ELM):
+    def ELMPosGen(self, SEQ_IND, POS_START, POS_STOP, WANTED_ELM):
         """
         ELMPosGen
-            Generates a [len(ELM_MATCH_VEC) MAX_SIZE] matrix in which each position is a 1 if the ELM is present at that location
-        and 0 otherwise.
+            Generates a [len(ELM_MATCH_VEC) MAX_SIZE] matrix in which each
+            position is a 1 if the ELM is present at that location and 0
+            otherwise.
 
             ELM_POS_DICT = ELMPosGen(POS_START,POS_STOP,WANTED_ELM)
 
-        ELM_POS_DICT    A DICT which is 'keyed' by ELM name and each value is a matrix.
+        ELM_POS_DICT    A DICT which is 'keyed' by ELM name and each value
+                        is a matrix.
 
 
             ELM_POS_ARRAY = ELMPosGen(..., WANTED_ELM)
@@ -261,297 +279,349 @@ class PyELM:
         """
 
         #check to see if calculation can be performed
-        if len(self.PreCalcELMMatchSeqs) == 0:
+        if len(self.precalc_elm_match_seqs) == 0:
             self.ELMMatchSeqs()
 
-        if POS_START < 0 | POS_STOP <= POS_START | POS_START > self.MaxSize | POS_STOP > self.MaxSize:
+        if POS_START < 0 | POS_STOP <= POS_START | POS_START > self.max_size | POS_STOP > self.max_size:
             print 'Arguements to POS_START >0 & POS_STOP > POS_START'
             raise IndexError
 
-        if SEQ_IND > len(self.Sequences) | SEQ_IND < 0:
-            print 'Arguement SEQ_IND must be between 0 and len(self.Sequences)'
+        if SEQ_IND > len(self.sequences) | SEQ_IND < 0:
+            print 'Arguement SEQ_IND must be between 0 and len(self.sequences)'
             raise IndexError
 
-        if not(WANTED_ELM in self.ELMOrder):
-            print 'WANTED_ELM not found in ELMOrder'
+        if not(WANTED_ELM in self.elm_order):
+            print 'WANTED_ELM not found in elm_order'
             raise KeyError
 
-        boolArray = zeros((1,POS_STOP-POS_START),'bool')
-        for i in xrange(POS_START,POS_STOP):
-            boolArray[0,i-POS_START]=i in self.PreCalcELMMatchSeqs[SEQ_IND][WANTED_ELM]
+        boolArray = numpy.zeros((1, POS_STOP - POS_START), 'bool')
+        for i in xrange(POS_START, POS_STOP):
+            boolArray[0, i - POS_START] = i in self.precalc_elm_match_seqs[SEQ_IND][WANTED_ELM]
             
         return boolArray
 
     def GetELMIterator(self):
         """
         GetELMIterator
-            Returns an iterator which will iterate over the items in the ELMDict.
+            Returns an iterator which will iterate over the items in
+            the elm_dict.
         """
         return self.ELMIterator(self)
         
 
     class ELMIterator():
-        def __init__(self,instance):
-            self.__list=instance.ELMOrder
-            self.__thisSpot=-1
+        """
+        ELMIterator
+            An interator which passes over multiple ELMS
+        """
+        def __init__(self, INSTANCE):
+            self.__list = INSTANCE.elm_order
+            self.__this_spot = -1
 
             
         def __iter__(self):
             return self
 
         def next(self):
-            self.__thisSpot += 1
-            if self.__thisSpot < len(self.__list):
-                return self.__list[self.__thisSpot]
+            """
+            next
+                Procededs to the next ELM
+            """
+            self.__this_spot += 1
+            if self.__this_spot < len(self.__list):
+                return self.__list[self.__this_spot]
             else:
                 raise StopIteration
     
-    def GetSeqIterator(self,WANTED_ELM=None,WANTED_RANGE=None):
+    def GetSeqIterator(self, WANTED_ELM = None, WANTED_RANGE = None):
         """
         GetSeqIterator
-            Will allow for easy iteration and retrival of data in a Seq-Order manner.
+            Will allow for easy iteration and retrival of data in a
+            Seq-Order manner.
 
         GetSeqIterator('ELMPosDict',WANTED_ELM,WANTED_RANGE)
-            WANTED_RANGE        A tuple indicating the range of positions desired.  If left empty then the
-                                entire sequence is provided.
+            WANTED_RANGE        A tuple indicating the range of positions
+                                desired.  If left empty then the entire
+                                sequence is provided.
             
-            This creates an iterator which will return the ELMPos Array data in Sequence order. If WANTED_ELM
-            is left empty then Data is returned as an Array in which each row represents one ELM.
+            This creates an iterator which will return the ELMPos Array data
+            in Sequence order. If WANTED_ELM is left empty then Data is
+            returned as an Array in which each row represents one ELM.
         """
-        if (WANTED_ELM == None) | (WANTED_ELM in self.ELMOrder):
+        if (WANTED_ELM == None) | (WANTED_ELM in self.elm_order):
             if WANTED_RANGE == None:
-                WANTED_RANGE = (0,self.MaxSize-1)
+                WANTED_RANGE = (0, self.max_size - 1)
             elif len(WANTED_RANGE) != 2:
                 print 'WANTED_RANGE must be len == 2 or None'
                 raise IndexError
             elif WANTED_RANGE[0] < 0 | WANTED_RANGE[1] <= WANTED_RANGE[0]:
                 print 'WANTED_RANGE[0] > 0 and WANTED_RANGE[1] > WANTED_RANGE[0]'
                 raise IndexError
-            elif WANTED_RANGE[0] > self.MaxSize | WANTED_RANGE[1] > self.MaxSize:
-                print 'WANTED_RANGE[0] < MaxSize and WANTED_RANGE[1] < MaxSize'
+            elif WANTED_RANGE[0] > self.max_size | WANTED_RANGE[1] > self.max_size:
+                print 'WANTED_RANGE[0] < max_size and WANTED_RANGE[1] < max_size'
                 raise IndexError
                
-            return self.SeqIterator(self,WANTED_ELM,WANTED_RANGE)
+            return self.SeqIterator(self, WANTED_ELM, WANTED_RANGE)
         else:
             print 'Provided an unknown ELM key'
             raise KeyError
             
 
     class SeqIterator:
-        def __init__(self,instance,WANTED_ELM,WANTED_RANGE):
-            self.__WantedELM=WANTED_ELM
-            self.__WantedRange=WANTED_RANGE
-            self.__listSize=len(instance.Sequences)
-            self.__thisSpot=-1
-            self.__MaxSize=instance.MaxSize
-            self.__ELMOrder=instance.ELMOrder
-            self.ELMOrder=instance.ELMOrder
-            self.PreCalcELMMatchSeqs=instance.PreCalcELMMatchSeqs
-            self.ELMPosGen=instance.ELMPosGen
+        """
+        SeqIterator
+            An iterator which passes over all sequences in the database
+        """
+        def __init__(self, INSTANCE, WANTED_ELM, WANTED_RANGE):
+            self.__wanted_elm = WANTED_ELM
+            self.__wanted_range = WANTED_RANGE
+            self.__list_size = len(INSTANCE.sequences)
+            self.__this_spot = -1
+            self.__max_size = INSTANCE.max_size
+            self.__elm_order = INSTANCE.elm_order
+            self.elm_order = INSTANCE.elm_order
+            self.precalc_elm_match_seqs = INSTANCE.precalc_elm_match_seqs
+            self.ELMPosGen = INSTANCE.ELMPosGen
 
         def __iter__(self):
             return self
 
         def next(self):
-            self.__thisSpot += 1
-            if self.__thisSpot < self.__listSize:
-                if self.__WantedELM != None:
-                    return self.ELMPosGen(self.__thisSpot,self.__WantedRange[0],self.__WantedRange[1],self.__WantedELM)
+            """
+            next
+                Procedes onto the next sequence in the database.
+            """
+            self.__this_spot += 1
+            if self.__this_spot < self.__list_size:
+                if self.__wanted_elm != None:
+                    return self.ELMPosGen(self.__this_spot,
+                                          self.__wanted_range[0],
+                                          self.__wanted_range[1],
+                                          self.__wanted_elm)
                 else:
-                    OutArray=zeros((len(self.__ELMOrder),self.__WantedRange[1]-self.__WantedRange[0]))
-                    for i in xrange(len(self.__ELMOrder)):
-                        OutArray[i,:]=self.ELMPosGen(self.__thisSpot,self.__WantedRange[0],self.__WantedRange[1],self.__ELMOrder[i])
-                    return OutArray
+                    out_array = numpy.zeros((len(self.__elm_order),
+                                             self.__wanted_range[1] -
+                                             self.__wanted_range[0]))
+                    
+                    for i in xrange(len(self.__elm_order)):
+                        out_array[i,:] = self.ELMPosGen(self.__this_spot,
+                                                        self.__wanted_range[0],
+                                                        self.__wanted_range[1],
+                                                        self.__elm_order[i])
+                    return out_array
             else:
                 raise StopIteration
 
-    def __QueueWorker(self,WANTED_ELM):
+    def __QueueWorker(self, WANTED_ELM):
         """
         A helper function to manage the Priority Queue and Threads
         """
         while True:
-            self.__GlobalCounter +=1 
+            self.__global_counter += 1 
             try:
-                print 'Worker qsize: ', self.__WorkingQueue.qsize()
-                thisItem = self.__WorkingQueue.get(True, 30)
+                print 'Worker qsize: ', self.__working_queue.qsize()
+                thisItem = self.__working_queue.get(True, 30)
                 
-            except:
+            except Queue.Empty:
                 #print 'queue empty'
                 break
             
-            if self.__FoundCorrect.isSet():
+            if self.__found_correct.isSet():
                 #print 'Detected Bailing, dumping stuff out of queue'
-                self.__WorkingQueue.task_done()
+                self.__working_queue.task_done()
                 continue
 
-            self.__MakeBreadth(WANTED_ELM,thisItem[0],thisItem[1],thisItem[2])
-            self.__WorkingQueue.task_done()
+            self.__MakeBreadth(WANTED_ELM, thisItem[0],
+                               thisItem[1], thisItem[2])
+            self.__working_queue.task_done()
                 
 
-    def __MakeBreadth(self,WANTED_ELM,allBins,BreadthCounter,DepthCounter):
+    def __MakeBreadth(self, WANTED_ELM, ALL_BINS, B_COUNTER, D_COUNTER):
         """
         __MakeBreadth
 
-        Performs a breadth-first search.  All nodes are added to the Queue and processes in order.
+        Performs a breadth-first search.  All nodes are added to the Queue and
+        processes in order.
 
 
         """
-        #print (BreadthCounter,DepthCounter,self.__EvaluateAllBins(WANTED_ELM,allBins),self.__WorkingQueue.qsize(),WANTED_ELM)
-        #print allBins
-        if DepthCounter > self.MaxDepth:
+        
+        if D_COUNTER > self.max_depth:
             return
 
-        if (BreadthCounter > self.MaxBreadth) & (allBins in self.__DepthChecked):
+        if (B_COUNTER > self.max_breadth) & (ALL_BINS in
+                                                  self.__depth_checked):
             return
             
-        LocalQueue = []
-        LocalVals = []
+        local_q = []
+        local_vals = []
             
-        for k in xrange(len(allBins)-1):
-            thisBinSet = deepcopy(allBins)
-            newBinEdge=thisBinSet[k]+int((thisBinSet[k+1]-thisBinSet[k])/2)
-            thisBinSet.insert(k+1,newBinEdge)
-            LocalQueue.append(thisBinSet)
-            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+        for k in xrange(len(ALL_BINS) - 1):
+            bin_set = deepcopy(ALL_BINS)
+            new_edge = bin_set[k] + int((bin_set[k + 1] - bin_set[k]) / 2)
+            bin_set.insert(k + 1, new_edge)
+            local_q.append(bin_set)
+            local_vals.append(self.__EvaluateAllBins(WANTED_ELM, bin_set))
 
-        for k in xrange(1,len(allBins)-1):
-            thisBinSet = deepcopy(allBins)
-            thisBinSet.pop(k)
-            LocalQueue.append(thisBinSet)
-            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+        for k in xrange(1, len(ALL_BINS) - 1):
+            bin_set = deepcopy(ALL_BINS)
+            bin_set.pop(k)
+            local_q.append(bin_set)
+            local_vals.append(self.__EvaluateAllBins(WANTED_ELM, bin_set))
 
-        for k in xrange(1,len(allBins)-1):
-            thisBinSet = deepcopy(allBins)
-            newBinMove = int((thisBinSet[k+1]-thisBinSet[k])/2)
-            LocalQueue.append(thisBinSet)
-            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+        for k in xrange(1, len(ALL_BINS) - 1):
+            bin_set = deepcopy(ALL_BINS)
+            bin_move = int((bin_set[k+1]-bin_set[k])/2)
+            local_q.append(bin_set)
+            local_vals.append(self.__EvaluateAllBins(WANTED_ELM, bin_set))
 
-        for k in xrange(1,len(allBins)-1):
-            thisBinSet = deepcopy(allBins)
-            newBinMove=int((thisBinSet[k]-thisBinSet[k-1])/2)
-            thisBinSet[k]=thisBinSet[k]-newBinMove
-            LocalQueue.append(thisBinSet)
-            LocalVals.append(self.__EvaluateAllBins(WANTED_ELM,thisBinSet))
+        for k in xrange(1, len(ALL_BINS) - 1):
+            bin_set = deepcopy(ALL_BINS)
+            bin_move = int((bin_set[k] - bin_set[k - 1]) / 2)
+            bin_set[k] = bin_set[k] - bin_move
+            local_q.append(bin_set)
+            local_vals.append(self.__EvaluateAllBins(WANTED_ELM, bin_set))
 
-        BestInds=argsort(LocalVals)
+        best_inds = numpy.argsort(local_vals)
 
 
-        if BreadthCounter < self.MaxBreadth:
-            for k in xrange(min(self.MaxWidth,len(BestInds))-1,0,-1):
-                self.__WorkingQueue.put(((LocalQueue[BestInds[k]],BreadthCounter+1,DepthCounter),LocalVals[BestInds[k]]))
+        if B_COUNTER < self.max_breadth:
+            for k in xrange(min(self.max_width, len(best_inds)) - 1, 0, -1):
+                self.__working_queue.put(((local_q[best_inds[k]],
+                                           B_COUNTER + 1, D_COUNTER),
+                                          local_vals[best_inds[k]]))
         else:
-            if (LocalVals[BestInds[0]] < self.__EvaluateAllBins(WANTED_ELM,allBins)):
-                self.__DepthChecked.append(allBins)
-                self.__WorkingQueue.put(((LocalQueue.pop(BestInds[0]),BreadthCounter+1,DepthCounter+1),LocalVals[BestInds[0]]))
+            if (local_vals[best_inds[0]] < self.__EvaluateAllBins(WANTED_ELM,
+                                                                 ALL_BINS)):
+
+                self.__depth_checked.append(ALL_BINS)
+                self.__working_queue.put(((local_q.pop(best_inds[0]),
+                                           B_COUNTER + 1, D_COUNTER+ 1),
+                                          local_vals[best_inds[0]]))
 
 
     
 
-    def __EvaluateBin(self,WANTED_ELM,binEdges):
+    def __EvaluateBin(self, WANTED_ELM, BIN_EDGES):
         """
         Evaluates the values of the single bin provided.
         """
-        thisBinVal=[0,0,0]
-        for thisSeq in self.GetSeqIterator(WANTED_ELM,(binEdges[0],binEdges[1])):
-            CurrentBin=sum(thisSeq)
-            if CurrentBin == 0:
-                thisBinVal[0]+=1
-            elif CurrentBin == 1:
-                thisBinVal[1]+=1
+        bin_val = [0, 0, 0]
+        for this_seq in self.GetSeqIterator(WANTED_ELM,
+                                            (BIN_EDGES[0], BIN_EDGES[1])):
+            current_bin = sum(this_seq)
+            if current_bin == 0:
+                bin_val[0] += 1
+            elif current_bin == 1:
+                bin_val[1] += 1
             else:
-                thisBinVal[2]+=1
-        return (thisBinVal[0], thisBinVal[1], thisBinVal[2] )
+                bin_val[2] += 1
+        return (bin_val[0], bin_val[1], bin_val[2] )
 
 
-    def __EvaluateAllBins(self,WANTED_ELM,thisBins):
+    def __EvaluateAllBins(self, WANTED_ELM, THESE_BINS):
         """
-        Evaluates the values of the bins provided.  Uses a dictionary to avoid re-calculating values wherever possible
+        Evaluates the values of the bins provided.  Uses a dictionary to avoid
+        re-calculating values wherever possible
         """
         
-        if len(self.ForceBins) > 0:
-            allBins = deepcopy(thisBins)
-            for forced in self.ForceBins:
-                bisect.insort(allBins,forced)
+        if len(self.force_bins) > 0:
+            all_bins = deepcopy(THESE_BINS)
+            for forced in self.force_bins:
+                bisect.insort(all_bins,forced)
         else:
-            allBins = thisBins
+            all_bins = THESE_BINS
         
-        if not(tuple(allBins) in self.__allBinDict ):
-            TotalEmpty=0
-            TotalCorrect=0
-            TotalWrong=0
-            for i in xrange(len(allBins)-1):
-                if (allBins[i],allBins[i+1]) not in self.__singlebinDict:
-                    self.__singlebinDict[(allBins[i],allBins[i+1])] = self.__EvaluateBin(WANTED_ELM,(allBins[i],allBins[i+1]))
+        if not(tuple(all_bins) in self.__all_bin_dict ):
+            total_empty = 0
+            total_correct = 0
+            total_wrong = 0
+            for i in xrange(len(all_bins) - 1):
+                if (all_bins[i], all_bins[i + 1]) not in self.__singlebin_dict:
+                    self.__singlebin_dict[(all_bins[i], all_bins[i + 1])] = self.__EvaluateBin(WANTED_ELM, (all_bins[i], all_bins[i + 1]))
                 
-                TotalEmpty += self.__singlebinDict[(allBins[i],allBins[i+1])][0]
-                TotalCorrect += self.__singlebinDict[(allBins[i],allBins[i+1])][1]
-                TotalWrong += self.__singlebinDict[(allBins[i],allBins[i+1])][2]
-            funVal = (.25*TotalEmpty + TotalWrong) / (TotalCorrect + 1)
-            self.__allBinDict[tuple(allBins)]=(TotalEmpty,TotalCorrect,TotalWrong,funVal)
-            if (self.__allBinDict[tuple(allBins)][2] == 0) & (self.__allBinDict[tuple(allBins)][0] == 0):
-                #print self.__allBinDict[tuple(allBins)][2], 'found best', self.__allBinDict[tuple(allBins)][0]
-                self.__FoundCorrect.set()
-        #print 'Bins: ', allBins
-        #print 'Vals: ', self.__allBinDict[tuple(allBins)]
-        return self.__allBinDict[tuple(allBins)][3]
+                total_empty += self.__singlebin_dict[(all_bins[i],
+                                                     all_bins[i + 1])][0]
+                total_correct += self.__singlebin_dict[(all_bins[i],
+                                                       all_bins[i + 1])][1]
+                total_wrong += self.__singlebin_dict[(all_bins[i],
+                                                     all_bins[i + 1])][2]
+            funVal = (.25*total_empty + total_wrong) / (total_correct + 1)
+            self.__all_bin_dict[tuple(all_bins)] = (total_empty, total_correct,
+                                                    total_wrong, funVal)
+            if (self.__all_bin_dict[tuple(all_bins)][2] == 0) & (self.__all_bin_dict[tuple(all_bins)][0] == 0):
 
-    def GetAllBinError(self,WANTED_ELM,allBins):
+                self.__found_correct.set()
+        return self.__all_bin_dict[tuple(all_bins)][3]
+
+    def GetAllBinError(self, WANTED_ELM, ALL_BINS):
         """
         Evaluates the values of the bins provided.
         """
 
-        thisList = [];
+        this_list = [];
                 
-        for i in xrange(len(allBins)-1):
-            ThisBin=self.__EvaluateBin(WANTED_ELM,(allBins[i],allBins[i+1]))
+        for i in xrange(len(ALL_BINS) - 1):
+            this_bin=self.__EvaluateBin(WANTED_ELM,
+                                       (ALL_BINS[i], ALL_BINS[i + 1]))
                         
-            Empty = ThisBin[0]
-            Correct = ThisBin[1]
-            Wrong = ThisBin[2]
+            empty = this_bin[0]
+            correct = this_bin[1]
+            wrong = this_bin[2]
 
-            thisList.append((Empty,Correct,Wrong))    
+            this_list.append((empty, correct, wrong))    
 
-        return thisList
+        return this_list
 
     def __BailingThread(self):
+        """
+        __BailingThread
+            Bails out of the current calculation.
+        """
         print 'Exceded timeLimit, bailing on further exploration'
-        self.__FoundCorrect.set()
+        self.__found_correct.set()
         return
 
-    def CalculateBins(self,WANTED_ELM):
-        numThreads=10
-        if len(self.PreCalcELMMatchSeqs) == 0:
+    def CalculateBins(self, WANTED_ELM):
+        """
+        CalculateBins
+            Uses a dynamic programing algorithm to find the optimal binning solution
+        """
+        num_thread = 10
+        if len(self.precalc_elm_match_seqs) == 0:
             self.ELMMatchSeqs()
 
-        self.__singlebinDict={}
-        self.__allBinDict={}
-        self.__DepthChecked=[]
-        self.__FoundCorrect = threading.Event()
-        self.__GlobalCounter=0
+        self.__singlebin_dict = {}
+        self.__all_bin_dict = {}
+        self.__depth_checked = []
+        self.__found_correct = threading.Event()
+        self.__global_counter = 0
         
-        self.__WorkingQueue = PriorityQueue(-1)
-        theseBins = [0, int(self.MaxSize/2), self.MaxSize]
+        self.__working_queue = PriorityQueue(-1)
+        these_bins = [0, int(self.max_size / 2), self.max_size]
 
-        self.__WorkingQueue.put(((theseBins,0,0),0))
+        self.__working_queue.put(((these_bins, 0, 0), 0))
 
-        workerThreads = []
-        for i in range(numThreads-1):
+        worker_threads = []
+        for i in range(num_thread-1):
             print 'Starting Thread: ', i
-            t=threading.Thread(target=self.__QueueWorker,args=(WANTED_ELM,))
-            workerThreads.append(t)
+            t = threading.Thread(target = self.__QueueWorker,
+                                 args = (WANTED_ELM,))
+            worker_threads.append(t)
             time.sleep(15)
             t.start()
 
             
         print 'Starting Bailing Thread'
-        stoppingThread=threading.Timer(self.CalcTimeOut,self.__BailingThread)
-        stoppingThread.start()
+        stopping_thread = threading.Timer(self.calc_time_out,
+                                         self.__BailingThread)
+        stopping_thread.start()
 
-        self.__WorkingQueue.join()
-        stoppingThread.cancel()
+        self.__working_queue.join()
+        stopping_thread.cancel()
 
         
-        for thisThread in workerThreads:
+        for thisThread in worker_threads:
             print 'Joining Thread'
             thisThread.join()
         
@@ -564,22 +634,26 @@ class PyELM:
 
         currentMin = 50000
         currentMinInd = 0
-        for i in self.__allBinDict:
-            if self.__allBinDict[i][3] < currentMin:
+        for i in self.__all_bin_dict:
+            if self.__all_bin_dict[i][3] < currentMin:
                 currentMinInd = i
-                currentMin = self.__allBinDict[currentMinInd][3]
+                currentMin = self.__all_bin_dict[currentMinInd][3]
 
-        self.PreCalcELMBinDict[WANTED_ELM] = currentMinInd
-        self.__WorkingQueue=None
-        self.__FoundCorrect=None
+        self.precalc_elm_bin_dict[WANTED_ELM] = currentMinInd
+        self.__working_queue = None
+        self.__found_correct = None
 
-    def WriteBins(self,FileHandle):
+    def WriteBins(self, F_HANDLE):
+        """
+        WriteBins
+            Creates an output file describing the binning solution.
+        """
 
-        for thisELM in self.ELMOrder:
-            FileHandle.write(thisELM+'\n')
-            for thisBin in self.PreCalcELMBinDict[thisELM]:
-                FileHandle.write(str(thisBin)+'\t')
-            FileHandle.write('\n')
+        for this_elm in self.elm_order:
+            F_HANDLE.write(this_elm + '\n')
+            for this_bin in self.precalc_elm_bin_dict[this_elm]:
+                F_HANDLE.write(str(this_bin) + '\t')
+            F_HANDLE.write('\n')
         
 
 
