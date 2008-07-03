@@ -7,6 +7,7 @@ import threading
 import time
 import bisect
 import Queue
+import types
 
 class PyELM:
 
@@ -299,6 +300,92 @@ class PyELM:
             boolArray[0, i - POS_START] = i in self.precalc_elm_match_seqs[SEQ_IND][WANTED_ELM]
             
         return boolArray
+
+    def GetIter(self, ITER_TYPE, ITER_RETURN, ITER_RANGE):
+        """
+        SetIterMethod
+            Sets the iterator method to the desired type and output.
+
+        SetIterMethod(ITER_TYPE,ITER_RETURN)
+
+        Potential Combinations:
+            ITER_TYPE       ITER_RETURN     ITER_RANGE
+            'ELM'           'Name'          None
+            Iterates over the names in ELMDict
+
+            'ELM'           [SeqNum]        None
+            Iterates over the Presence/Absence calls of each ELM over the
+            SeqNum'th Sequence
+            
+            'SEQ'           'Sequence'      [RANGE]
+            Iterates over each Sequence and returns the sequence from RANGE[0]
+            to RANGE[1].  If RANGE == None then the entire sequence is returned
+            
+            'SEQ'           'ELMname'       None
+            Iterates over each sequence and returns P/A call of the ELMname
+            
+            'SEQ'           'ELMname'       [RANGE]
+            Iterates over each sequence and returns a numpy.zeros(bool) for
+            each sequence from RANGE[0] to RANGE[1]
+
+        """
+        #Method 1
+        if (ITER_TYPE == 'ELM') & (ITER_RETURN == 'Name'):
+            return self.elm_order.__iter__()
+
+        #Method 2
+        if (ITER_TYPE == 'ELM') & (types.IntType == type(ITER_RETURN)):
+            if len(self.precalc_elm_match_seqs) == 0:
+                self.ELMMatchSeqs()
+            
+            return self.PyELMIterator(ITER_TYPE, ITER_RETURN, ITER_RANGE,
+                                      (self.elm_order, self.precalc_elm_match_seqs),
+                                      len(self.elm_order), 2)
+
+        #Method 3
+        if (ITER_TYPE == 'SEQ') & (ITER_RETURN == 'Sequence') & (ITER_RANGE == None):
+            return self.sequences.__iter__()
+        if (ITER_TYPE == 'SEQ') & (ITER_RETURN == 'Sequence'):
+            return self.PyELMIterator(ITER_TYPE, ITER_RETURN, ITER_RANGE,
+                                      self.sequences, len(self.sequences), 3)
+        #Method 4
+        if (ITER_TYPE == 'SEQ') & (self.elm_dict.has_key(ITER_RETURN)) & (ITER_RANGE == None):
+            if len(self.precalc_elm_match_seqs) == 0:
+                self.ELMMatchSeqs()
+            return self.PyELMIterator(ITER_TYPE, ITER_RETURN, ITER_RANGE,
+                                      self.precalc_elm_match_seqs,
+                                      len(self.sequences), 4)
+
+        raise KeyError
+        
+
+    class PyELMIterator():
+        def __init__(self, ITER_TYPE, ITER_RETURN, ITER_RANGE,
+                     NEEDED_DATA, MAX_ITER, METHOD):
+            self.iter_type = ITER_TYPE
+            self.iter_return = ITER_RETURN
+            self.iter_range = ITER_RANGE
+            self.counter = -1
+            self.method = METHOD
+            self.iter_data = NEEDED_DATA
+            self.max_iter = MAX_ITER
+
+
+        def __iter__(self):
+            return self
+
+        def next(self):
+            self.counter += 1
+            if self.counter == self.max_iter:
+                raise StopIteration
+            if self.method == 2:
+                wanted_elm = self.iter_data[0][self.counter]
+                return len(self.iter_data[1][self.iter_return][wanted_elm]) > 0
+            if self.method == 3:
+                return self.iter_data[self.counter][self.iter_range[0]:self.iter_range[1]]
+            if self.method == 4:
+                return len(self.iter_data[self.counter][self.iter_return]) > 0
+
 
     def GetELMIterator(self):
         """
