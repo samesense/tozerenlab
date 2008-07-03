@@ -221,7 +221,7 @@ for i=1:length(index_cell)
     PAT_INDEX=intersect(PAT_INDEX,index_cell{i});
 end
 
-num_feat=cumsum([0; cellfun('size',feature_cell,2)]);
+num_feat=cumsum([0; cellfun('size',feature_cell(:),2)]);
 
 FEATURES=zeros(length(PAT_INDEX),num_feat(end));
 
