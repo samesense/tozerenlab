@@ -44,11 +44,11 @@ class NotifContext:
         if (METHOD == 'twitter') & (PASSWORD == None):
             self.password = getpass.getpass(prompt = 'Passw for ' + self.user)
 
-
-        
-        #logging.debug('Initializing')
-        self.tweet_bird = twitter.Api(username = self.user,
-                                      password = self.password)
+        if METHOD == 'twitter':
+            self.tweet_bird = twitter.Api(username = self.user,
+                                          password = self.password)
+        else:
+            self.tweet_bird = None
 
         self.method = METHOD
 
@@ -102,10 +102,15 @@ class NotifContext:
             Calls the .__enter__ method, allows easy usage with pre-"with"
             versions of python
         """
-
         self.__enter__()
-        
 
+    def Finished(self):
+        """
+        Finished
+            Calls the .__exit__ method, allows easy usage with pre-"with"
+            versions of python
+        """
+        self.__exit__(None, None, None)
 
     def PaceAnnounce(self):
         """
@@ -115,8 +120,6 @@ class NotifContext:
             the function has ended.
 
         """
-        
-        #logging.debug('In PaceAnnouce')
         while not(self.finished_running.isSet()):
             #wait until the Event has been triggered or until update limit is up
             self.finished_running.wait(self.update_time_limit)
@@ -139,16 +142,21 @@ class NotifContext:
             If now is False then the message will be sent out at the next
             scheduled update.  If now is True then the timer is reset and the
             message will be sent immediately.
-
-
         """
 
         if NOW:
-            self.DoAnnounce(MESSAGE)
+            return self.DoAnnounce(MESSAGE)
         else:
             self.this_cont_ann.append(MESSAGE)
+            return False
+
+    def UpdateNow(self, MESSAGE):
+        """
+        UpdateNow
+            A short-cut for .UpdateMessage(MESSAGE, NOW = True)
+        """
+        return self.DoAnnounce(MESSAGE)
         
-           
 
     def DoAnnounce(self, MESSAGE):
         """
@@ -166,7 +174,7 @@ class NotifContext:
 
         """
         if self.method == 'test':
-            logging.info('Sending Tweet: ' + MESSAGE)
+            print 'Sending Tweet: ' + MESSAGE
             return True
         elif self.method == 'twitter':
             for i in xrange(self.max_try):
@@ -177,13 +185,11 @@ class NotifContext:
                     time.sleep(15)
             return False
 
-
-
-def testNotif(NOTIF, WAIT_TIME = 20, NUM_REPS = 10, UPDATE_ITER = 4,
-              ERROR_ITER = -1):
+def testNotif():
     """
     An example snipet of code.
     """
+    cont = NotifContext(METHOD = 'test')
     
     #with NotifContext(method='twitter') as notif:
     for i in range(NUM_REPS):
