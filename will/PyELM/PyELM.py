@@ -8,6 +8,99 @@ import time
 import bisect
 import Queue
 import types
+import itertools
+
+
+def ParseELMs(SEQ, ELM_DICT):
+    """
+    ParseELMs
+        Searches for the regular expressions of ELM_DICT within the
+        SEQUENCES provided.
+
+    RESULT_DICT = ELMMatchSeqs(SEQ,ELM_DICT)
+
+    SEQ             The sequence to be parsed.
+    ELM_DICT        A dict keyed by ELM names and has a value of re.compile
+
+
+    RESULT_DICT     A map keyed by ELM names with a numpy array of matched
+                    positions
+
+    """
+    
+    seq_elm_dict = {}
+
+    for this_elm in ELM_DICT:
+        this_index = []
+        #each search only finds one match
+        #so repeat the search until no more are found
+        spot = ELM_DICT[this_elm].search(SEQ)
+        while spot != None:
+            this_index.append(spot.start())
+            spot = ELM_DICT[this_elm].search(SEQ, spot.start() + 1)
+        seq_elm_dict[this_elm] = numpy.array(this_index)
+    
+    return seq_elm_dict
+
+class SeqObject:
+    def __init__(self, SEQ, ELM_DICT = None):
+        self.sequence = SEQ
+
+        if ELM_DICT != None:
+            self.elm_positions = ParseELMs(self.sequence, ELM_DICT)
+
+
+    def GetResult(self, WANTED_ELM, RANGE, OUTPUT_TYPE = 'count'):
+        """
+        GetResult
+            Returns the results of of the ELM parsing in various formats based
+            on the input sets.
+
+        OUTPUT = GetResult(WANTED_ELM, RANGE, OUTPUT_TYPE)
+
+        RANGE       OUTPUT_TYPE         OUTPUT
+        'None'      'count'             The total number of WANTED_ELM matches
+                                        along the sequence
+
+        [B E]       'count'             The number of WANTED_ELM matches between
+                                        B and E
+
+        [B E]       'array'             A boolean array where each spot
+                                        indicates a presence/absence call.
+        """
+
+        if RANGE == None:
+            RANGE = (0, len(self.sequence))
+
+        this_array = self.elm_positions[WANTED_ELM]
+
+        if OUTPUT_TYPE == 'count':
+            return numpy.sum(numpy.logical_and(this_array >= RANGE[0],
+                                               this_array <= RANGE[1]))
+        
+        if OUTPUT_TYPE == 'array':
+            valid_spots = numpy.logical_and(this_array >= RANGE[0],
+                                            this_array <= RANGE[1])
+            modified_spots = this_array[valid_spots] - RANGE[0]
+            output_array = numpy.zeros((RANGE[1] - RANGE[0], 1))
+            output_array[modified_spots] = 1
+            return output_array
+
+    def AddELM(self, ELM_NAME, REG_EXPR):
+        """
+        AddELM
+            Adds new ELMs to the parsed database.
+
+            AddELM(ELM_NAME, REG_EXPR)
+
+        """
+
+        temp_dict = {}
+        temp_dict[ELM_NAME] = REG_EXPR
+
+        self.elm_positions.update(ParseELMs(self.sequence,temp_dict))
+        
+
 
 class PyELM:
 
@@ -21,8 +114,6 @@ class PyELM:
 
         self.__found_correct = False
 
-        self.precalc_hist_array = []        
-        self.precalc_elm_match_seqs = []
         self.precalc_elm_bin_dict = {}
 
         self.__singlebin_dict = {}
@@ -83,11 +174,13 @@ class PyELM:
         AddELM(Name,RegExp)
 
         """
+
         self.elm_order.append(NAME)
         self.elm_dict[NAME] = REG_EXP
         self.elm_re_dict[NAME] = re.compile(REG_EXP)
-        self.precalc_elm_match_seqs = []
-        self.precalc_hist_array = []
+
+        for this_seq in self.sequences:
+            this_seq.AddELM(NAME, self.elm_re_dict[NAME])
         
     def LoadSeqs(self, SEQUENCES):
         """
@@ -101,107 +194,24 @@ class PyELM:
 
         """
 
-        self.sequences = SEQUENCES
-        self.max_size = 0
-        for i in xrange(len(self.sequences)):
-            if len(self.sequences[i]) > self.max_size :
-                self.max_size = len(self.sequences[i])
-
-
-    
-
-    def ELMMatchSeqs(self):
-        """
-        ELMMatchSeqs
-            Searches for the regular expressions of ELM_DICT within the
-            SEQUENCES provided.
-
-        ELM_MATCH_VEC = ELMMatchSeqs()
-
-
-        ELM_MATCH_VEC   A LIST corresponding to each BioSeq object provided.
-                        Each element in the list is a DICT where each element
-                        indicates a matched ELM location.
-
-        """
-
-        if len(self.elm_dict) == 0:
-            print 'ELMParser must be run first!'
-            return
-        if len(self.sequences) == 0:
-            print 'LoadSeqs must be run first!'
-            return
-
-
-        if len(self.precalc_elm_match_seqs) == 0:
-            #compile all of the re's
-            if self.elm_re_dict != None:
-                elm_re_dict = {}
-                for this_elm in self.elm_order:
-                    elm_re_dict[this_elm] = re.compile(self.elm_dict[this_elm],
-                                                       re.I)
-                self.elm_re_dict = elm_re_dict
-            
-            seq_elm_dict = []
-            for this_seq in self.sequences:
-                this_elm_seq = {}
-                for this_elm in self.elm_order:
-                    this_index = []
-                    #each search only finds one match
-                    #so repeat the search until no more are found
-                    spot = self.elm_re_dict[this_elm].search(this_seq)
-                    while spot != None:
-                        this_index.append(spot.start())
-                        spot = self.elm_re_dict[this_elm].search(this_seq,
-                                                                 spot.start()
-                                                                 + 1)
-                    this_elm_seq[this_elm] = this_index
-                seq_elm_dict.append(this_elm_seq)
-
-
-            self.precalc_elm_match_seqs = seq_elm_dict
-
         
-        return self.precalc_elm_match_seqs
-        
-    def ELMHistGen(self):
+        for this_seq in SEQUENCES:
+            self.sequences.append(SeqObject(this_seq, ELM_DICT = self.elm_re_dict))
+
+    def GetSequence(self, SEQ_IND, RANGE = None):
         """
-        ELMHistGen
-            Generates a count-matrix of ELM matches at specific locations in
-            the sequences.
+        GetSequence
+            Returns the sequence held by the object.
 
-        ELM_COUNT_MAT = ELMHistGen()
-
-        ELM_COUNT_MAT   An [maxSeqLength x len(ELM_DICT)] each Row represent
-                        an ELM and each Column is a seqLocation.
-
+        GetSequence(RANGE = None)
         """
-        if len(self.elm_dict) == 0:
-            print 'ELMParser must be run first!'
-            return
-        if len(self.sequences) == 0:
-            print 'LoadSeqs must be run first!'
-            return
+        if RANGE == None:
+            return self.sequences[SEQ_IND].sequence
+        else:
+            return self.sequences[SEQ_IND].sequence[RANGE[0]:RANGE[1]]
 
-        if len(self.precalc_elm_match_seqs) == 0:
-            self.ELMMatchSeqs()
-
-        if len(self.precalc_hist_array) == 0:
-
-            hist_array = numpy.zeros((len(self.elm_order), self.max_size))
-
-            counter = 0
-            for this_elm in self.elm_order:
-                for i in xrange(len(self.precalc_elm_match_seqs)):
-                    hist_array[counter,
-                               self.precalc_elm_match_seqs[i][this_elm]] += 1
-                counter += 1
-
-            self.precalc_hist_array = hist_array
-        
-        return self.precalc_hist_array
-
-    def SimpleELMCall(self, SEQ_IND, WANTED_ELM):
+    def SimpleELMCall(self, SEQ_IND, WANTED_ELM,
+                      WANTED_RANGE = None, OUTPUT_TYPE = 'bool'):
         """
         SimpleELMCall
             Returns a simple Presence/Absence Call for the ELM.
@@ -215,20 +225,10 @@ class PyELM:
                     0 otherwise.
 
         """
-
-        if SEQ_IND > len(self.sequences) | SEQ_IND < 0:
-            print 'Arguement SEQ_IND must be between 0 and len(self.sequences)'
-            raise IndexError
-        
-        if len(self.precalc_elm_match_seqs) == 0:
-            self.ELMMatchSeqs()
-
-        if len(self.precalc_elm_match_seqs[SEQ_IND][WANTED_ELM]) >= 1:
-            return 1
-        else:
-            return 0
-
-
+        if OUTPUT_TYPE == 'bool':
+            return self.sequences[SEQ_IND].GetResult(WANTED_ELM, WANTED_RANGE) > 0
+        elif OUTPUT_TYPE == 'count':
+            return self.sequences[SEQ_IND].GetResult(WANTED_ELM, WANTED_RANGE)
 
     def MultiELMCall(self, SEQ_IND, WANTED_ELM):
         """
@@ -250,56 +250,12 @@ class PyELM:
         thisCall = []
         allBins = self.precalc_elm_bin_dict[WANTED_ELM]
         for i in xrange(len(allBins) - 1):
-            if sum(self.ELMPosGen(SEQ_IND, allBins[i], allBins[i+1],
-                                  WANTED_ELM)) > 0:
+            if self.SimpleELMCall(SEQ_IND, WANTED_ELM,
+                                  WANTED_RANGE = (allBins[i], allBins[i+1])):
                 thisCall.append(1)
             else:
                 thisCall.append(0)
         return thisCall
-
-
-        
-
-
-    def ELMPosGen(self, SEQ_IND, POS_START, POS_STOP, WANTED_ELM):
-        """
-        ELMPosGen
-            Generates a [len(ELM_MATCH_VEC) MAX_SIZE] matrix in which each
-            position is a 1 if the ELM is present at that location and 0
-            otherwise.
-
-            ELM_POS_DICT = ELMPosGen(POS_START,POS_STOP,WANTED_ELM)
-
-        ELM_POS_DICT    A DICT which is 'keyed' by ELM name and each value
-                        is a matrix.
-
-
-            ELM_POS_ARRAY = ELMPosGen(..., WANTED_ELM)
-        Will return only the desired array.
-
-        """
-
-        #check to see if calculation can be performed
-        if len(self.precalc_elm_match_seqs) == 0:
-            self.ELMMatchSeqs()
-
-        if POS_START < 0 | POS_STOP <= POS_START | POS_START > self.max_size | POS_STOP > self.max_size:
-            print 'Arguements to POS_START >0 & POS_STOP > POS_START'
-            raise IndexError
-
-        if SEQ_IND > len(self.sequences) | SEQ_IND < 0:
-            print 'Arguement SEQ_IND must be between 0 and len(self.sequences)'
-            raise IndexError
-
-        if not(WANTED_ELM in self.elm_order):
-            print 'WANTED_ELM not found in elm_order'
-            raise KeyError
-
-        boolArray = numpy.zeros((1, POS_STOP - POS_START), 'bool')
-        for i in xrange(POS_START, POS_STOP):
-            boolArray[0, i - POS_START] = i in self.precalc_elm_match_seqs[SEQ_IND][WANTED_ELM]
-            
-        return boolArray
 
     def GetIter(self, ITER_TYPE, ITER_RETURN, ITER_RANGE):
         """
@@ -310,23 +266,34 @@ class PyELM:
 
         Potential Combinations:
             ITER_TYPE       ITER_RETURN     ITER_RANGE
+        Method 1
             'ELM'           'Name'          None
             Iterates over the names in ELMDict
-
+        Method 2
             'ELM'           [SeqNum]        None
             Iterates over the Presence/Absence calls of each ELM over the
             SeqNum'th Sequence
-            
+        Method 3    
             'SEQ'           'Sequence'      [RANGE]
             Iterates over each Sequence and returns the sequence from RANGE[0]
             to RANGE[1].  If RANGE == None then the entire sequence is returned
-            
+        Method 4    
             'SEQ'           'ELMname'       None
             Iterates over each sequence and returns P/A call of the ELMname
-            
+        Method 5    
             'SEQ'           'ELMname'       [RANGE]
-            Iterates over each sequence and returns a numpy.zeros(bool) for
-            each sequence from RANGE[0] to RANGE[1]
+            Iterates over each sequence and returns P/A call of ELMs found
+            over desired range.
+        Method 6
+            'COUNT'         'ELMname'       None
+            Iterates over each sequence and returns count of the ELMs in the
+            sequence.
+        Method 7
+            'COUNT'         'ELMname'       [RANGE]
+            Iterates over each sequence and returns count of the ELMs over the
+            RANGE.
+
+            
 
         """
         #Method 1
@@ -335,169 +302,35 @@ class PyELM:
 
         #Method 2
         if (ITER_TYPE == 'ELM') & (types.IntType == type(ITER_RETURN)):
-            if len(self.precalc_elm_match_seqs) == 0:
-                self.ELMMatchSeqs()
-            
-            return self.PyELMIterator(ITER_TYPE, ITER_RETURN, ITER_RANGE,
-                                      (self.elm_order, self.precalc_elm_match_seqs),
-                                      len(self.elm_order), 2)
+            return itertools.imap(self.SimpleELMCall,
+                                  itertools.repeat(ITER_RETURN),
+                                  self.elm_order.__iter__())
 
         #Method 3
-        if (ITER_TYPE == 'SEQ') & (ITER_RETURN == 'Sequence') & (ITER_RANGE == None):
-            return self.sequences.__iter__()
-        if (ITER_TYPE == 'SEQ') & (ITER_RETURN == 'Sequence'):
-            return self.PyELMIterator(ITER_TYPE, ITER_RETURN, ITER_RANGE,
-                                      self.sequences, len(self.sequences), 3)
-        #Method 4
-        if (ITER_TYPE == 'SEQ') & (self.elm_dict.has_key(ITER_RETURN)) & (ITER_RANGE == None):
-            if len(self.precalc_elm_match_seqs) == 0:
-                self.ELMMatchSeqs()
-            return self.PyELMIterator(ITER_TYPE, ITER_RETURN, ITER_RANGE,
-                                      self.precalc_elm_match_seqs,
-                                      len(self.sequences), 4)
+        if (ITER_TYPE == 'SEQ'):
+            if (ITER_RETURN == 'Sequence'):
+                return itertools.imap(self.GetSequence, itertools.count(),
+                                      itertools.repeat(ITER_RANGE,
+                                                       len(self.sequences)))
+        #Method 4 & 5
+            if (self.elm_dict.has_key(ITER_RETURN)):
+                return itertools.imap(self.SimpleELMCall,
+                                      itertools.count(),
+                                      itertools.repeat(ITER_RETURN,
+                                                       len(self.sequences)),
+                                      itertools.repeat(ITER_RANGE))
+        #Method 6 & 7
+        if (ITER_TYPE == 'COUNT'):
+            if (self.elm_dict.has_key(ITER_RETURN)):
+                return itertools.imap(self.SimpleELMCall,
+                                      itertools.count(),
+                                      itertools.repeat(ITER_RETURN,
+                                                       len(self.sequences)),
+                                      itertools.repeat(ITER_RANGE),
+                                      itertools.repeat('count'))
+            
 
         raise KeyError
-        
-
-    class PyELMIterator():
-        def __init__(self, ITER_TYPE, ITER_RETURN, ITER_RANGE,
-                     NEEDED_DATA, MAX_ITER, METHOD):
-            self.iter_type = ITER_TYPE
-            self.iter_return = ITER_RETURN
-            self.iter_range = ITER_RANGE
-            self.counter = -1
-            self.method = METHOD
-            self.iter_data = NEEDED_DATA
-            self.max_iter = MAX_ITER
-
-
-        def __iter__(self):
-            return self
-
-        def next(self):
-            self.counter += 1
-            if self.counter == self.max_iter:
-                raise StopIteration
-            if self.method == 2:
-                wanted_elm = self.iter_data[0][self.counter]
-                return len(self.iter_data[1][self.iter_return][wanted_elm]) > 0
-            if self.method == 3:
-                return self.iter_data[self.counter][self.iter_range[0]:self.iter_range[1]]
-            if self.method == 4:
-                return len(self.iter_data[self.counter][self.iter_return]) > 0
-
-
-    def GetELMIterator(self):
-        """
-        GetELMIterator
-            Returns an iterator which will iterate over the items in
-            the elm_dict.
-        """
-        return self.ELMIterator(self)
-        
-
-    class ELMIterator():
-        """
-        ELMIterator
-            An interator which passes over multiple ELMS
-        """
-        def __init__(self, INSTANCE):
-            self.__list = INSTANCE.elm_order
-            self.__this_spot = -1
-
-            
-        def __iter__(self):
-            return self
-
-        def next(self):
-            """
-            next
-                Procededs to the next ELM
-            """
-            self.__this_spot += 1
-            if self.__this_spot < len(self.__list):
-                return self.__list[self.__this_spot]
-            else:
-                raise StopIteration
-    
-    def GetSeqIterator(self, WANTED_ELM = None, WANTED_RANGE = None):
-        """
-        GetSeqIterator
-            Will allow for easy iteration and retrival of data in a
-            Seq-Order manner.
-
-        GetSeqIterator('ELMPosDict',WANTED_ELM,WANTED_RANGE)
-            WANTED_RANGE        A tuple indicating the range of positions
-                                desired.  If left empty then the entire
-                                sequence is provided.
-            
-            This creates an iterator which will return the ELMPos Array data
-            in Sequence order. If WANTED_ELM is left empty then Data is
-            returned as an Array in which each row represents one ELM.
-        """
-        if (WANTED_ELM == None) | (WANTED_ELM in self.elm_order):
-            if WANTED_RANGE == None:
-                WANTED_RANGE = (0, self.max_size - 1)
-            elif len(WANTED_RANGE) != 2:
-                print 'WANTED_RANGE must be len == 2 or None'
-                raise IndexError
-            elif WANTED_RANGE[0] < 0 | WANTED_RANGE[1] <= WANTED_RANGE[0]:
-                print 'WANTED_RANGE[0] > 0 and WANTED_RANGE[1] > WANTED_RANGE[0]'
-                raise IndexError
-            elif WANTED_RANGE[0] > self.max_size | WANTED_RANGE[1] > self.max_size:
-                print 'WANTED_RANGE[0] < max_size and WANTED_RANGE[1] < max_size'
-                raise IndexError
-               
-            return self.SeqIterator(self, WANTED_ELM, WANTED_RANGE)
-        else:
-            print 'Provided an unknown ELM key'
-            raise KeyError
-            
-
-    class SeqIterator:
-        """
-        SeqIterator
-            An iterator which passes over all sequences in the database
-        """
-        def __init__(self, INSTANCE, WANTED_ELM, WANTED_RANGE):
-            self.__wanted_elm = WANTED_ELM
-            self.__wanted_range = WANTED_RANGE
-            self.__list_size = len(INSTANCE.sequences)
-            self.__this_spot = -1
-            self.__max_size = INSTANCE.max_size
-            self.__elm_order = INSTANCE.elm_order
-            self.elm_order = INSTANCE.elm_order
-            self.precalc_elm_match_seqs = INSTANCE.precalc_elm_match_seqs
-            self.ELMPosGen = INSTANCE.ELMPosGen
-
-        def __iter__(self):
-            return self
-
-        def next(self):
-            """
-            next
-                Procedes onto the next sequence in the database.
-            """
-            self.__this_spot += 1
-            if self.__this_spot < self.__list_size:
-                if self.__wanted_elm != None:
-                    return self.ELMPosGen(self.__this_spot,
-                                          self.__wanted_range[0],
-                                          self.__wanted_range[1],
-                                          self.__wanted_elm)
-                else:
-                    out_array = numpy.zeros((len(self.__elm_order),
-                                             self.__wanted_range[1] -
-                                             self.__wanted_range[0]))
-                    
-                    for i in xrange(len(self.__elm_order)):
-                        out_array[i,:] = self.ELMPosGen(self.__this_spot,
-                                                        self.__wanted_range[0],
-                                                        self.__wanted_range[1],
-                                                        self.__elm_order[i])
-                    return out_array
-            else:
-                raise StopIteration
 
     def __QueueWorker(self, WANTED_ELM):
         """
@@ -506,7 +339,7 @@ class PyELM:
         while True:
             self.__global_counter += 1 
             try:
-                print 'Worker qsize: ', self.__working_queue.qsize()
+                #print 'Worker qsize: ', self.__working_queue.qsize()
                 thisItem = self.__working_queue.get(True, 30)
                 
             except Queue.Empty:
@@ -594,9 +427,8 @@ class PyELM:
         Evaluates the values of the single bin provided.
         """
         bin_val = [0, 0, 0]
-        for this_seq in self.GetSeqIterator(WANTED_ELM,
-                                            (BIN_EDGES[0], BIN_EDGES[1])):
-            current_bin = sum(this_seq)
+        for current_bin in self.GetIter('COUNT', WANTED_ELM,
+                                        (BIN_EDGES[0], BIN_EDGES[1])):
             if current_bin == 0:
                 bin_val[0] += 1
             elif current_bin == 1:
@@ -674,9 +506,7 @@ class PyELM:
         CalculateBins
             Uses a dynamic programing algorithm to find the optimal binning solution
         """
-        num_thread = 10
-        if len(self.precalc_elm_match_seqs) == 0:
-            self.ELMMatchSeqs()
+        num_thread = 4
 
         self.__singlebin_dict = {}
         self.__all_bin_dict = {}
