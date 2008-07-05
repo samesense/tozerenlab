@@ -2,8 +2,9 @@ import PyELM
 import pickle
 import os
 import nose.tools
-import SeqAns
 import sys
+import re
+import numpy
 
 class SeqAns:
     def __init__(self):
@@ -36,7 +37,7 @@ def AlignObs(shorterBins,longerBins):
 
 def FileSetup(FILENAME):
     imported_data = SeqAns()
-    file_loc = "C:\\Documents and Settings\\Will\\My Documents\\PyELM\\"
+    file_loc = "C:\\Documents and Settings\\William Dampier\\My Documents\\PyELM\\"
     
     easy_handle = open(file_loc + FILENAME, 'r')
     data = pickle.load(easy_handle)
@@ -48,6 +49,29 @@ def FileSetup(FILENAME):
     imported_data.ELM = data[3]
 
     return imported_data
+
+
+def testSeqObject():
+
+    test_dict = {}
+    test_dict['TEST'] = re.compile('T')
+    seq_obj = PyELM.SeqObject('AAAAAAAATAAA', ELM_DICT = test_dict)
+    nose.tools.assert_not_equal(seq_obj, None)
+
+def testGetResult():
+
+    test_dict = {}
+    test_dict['TEST'] = re.compile('T')
+    seq_obj = PyELM.SeqObject('AAAAAAAATAAA', ELM_DICT = test_dict)
+
+    nose.tools.assert_equal(seq_obj.GetResult('TEST', None), 1,
+                            'Incorrect Count (No RANGE)')
+    
+    nose.tools.assert_equal(seq_obj.GetResult('TEST', (0, 6)), 0,
+                            'Incorrect Count (with RANGE)')
+
+    output = seq_obj.GetResult('TEST', None, OUTPUT_TYPE = 'array')
+
 
 def testImport():
     py_elm = PyELM.PyELM()
@@ -74,14 +98,15 @@ def CheckImportELM(THIS_FILE):
     imported_data = FileSetup(THIS_FILE)
     py_elm = PyELM.PyELM()
     py_elm.AddELM('TESTCASE', imported_data.ELM)
+    py_elm.LoadSeqs(imported_data.seq)
 
-def testParser():
-    py_elm = PyELM.PyELM()
-    py_elm.ELMParser()
-
-    nose.tools.assert_not_equal(py_elm.elm_dict, None)
-    nose.tools.assert_not_equal(py_elm.elm_order, None)
-    nose.tools.assert_not_equal(py_elm.elm_re_dict, None)
+##def testParser():
+##    py_elm = PyELM.PyELM()
+##    py_elm.ELMParser()
+##
+##    nose.tools.assert_not_equal(py_elm.elm_dict, None)
+##    nose.tools.assert_not_equal(py_elm.elm_order, None)
+##    nose.tools.assert_not_equal(py_elm.elm_re_dict, None)
 
 
 def CheckSimpleELM(THIS_FILE):
@@ -174,10 +199,10 @@ def testIterator4():
     
     imported_data = FileSetup('MedData.pkl')
 
-    print str(len(imported_data.SimpleAns)) + str(len(imported_data.seq))
     py_elm = PyELM.PyELM()
-    py_elm.LoadSeqs(imported_data.seq)
     py_elm.AddELM('TESTCASE', imported_data.ELM)
+    py_elm.LoadSeqs(imported_data.seq)
+
 
     counter = 0
     for this_val in py_elm.GetIter(ITER_TYPE, ITER_RETURN, ITER_RANGE):
@@ -191,10 +216,10 @@ def testIterator4():
 
 
 
-##def testMultiELM():
-##    file_list = ['EasyData.pkl', 'MedData.pkl']
-##    for this_file in file_list:
-##        yield CheckMultiELM, this_file
+def testMultiELM():
+    file_list = ['EasyData.pkl', 'MedData.pkl', 'HardData.pkl']
+    for this_file in file_list:
+        yield CheckMultiELM, this_file
 
 def CheckMultiELM(THIS_FILE):
 
@@ -202,6 +227,7 @@ def CheckMultiELM(THIS_FILE):
     num_seqs = len(imported_data.seq)
 
     py_elm = PyELM.PyELM()
+    py_elm.force_bins = []
     py_elm.LoadSeqs(imported_data.seq)
     py_elm.AddELM('TESTCASE', imported_data.ELM)
 
