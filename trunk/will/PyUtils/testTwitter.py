@@ -11,6 +11,17 @@ def testNotif():
     context = Notif.NotifContext(METHOD = 'test')
     nose.tools.assert_false(context == None)
 
+def testTwitterAPI():
+    """
+    Test twitter API
+    """
+    context = Notif.NotifContext(METHOD = 'twitter',
+                                 USER = 'testuser',
+                                 PASSWORD = 'testpass')
+
+    nose.tools.assert_not_equal(context, None)
+
+
 def testDoAnnnounce():
     """
     Test that DoAnnounce returns a value
@@ -76,7 +87,6 @@ def testUpdateNow():
     nose.tools.assert_true(context.UpdateNow('Just A Test'),
                            'UpdateNow returned wrong value')
     
-
 
 
 
