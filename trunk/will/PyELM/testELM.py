@@ -7,6 +7,10 @@ import re
 import numpy
 
 class SeqAns:
+    """
+    SeqAns
+        A simple setup for keeping data and together for testing.
+    """
     def __init__(self):
         self.seq = []
         self.SimpleAns = []
@@ -14,6 +18,10 @@ class SeqAns:
         self.ELM = []
 
 def AlignObs(shorterBins,longerBins):
+    """
+    AlignObs
+        A function for aligning observations which are of different length
+    """
     if len(shorterBins)==len(longerBins):
         matchVal=0
         for i in xrange(len(shorterBins)):
@@ -36,6 +44,10 @@ def AlignObs(shorterBins,longerBins):
 
 
 def FileSetup(FILENAME):
+    """
+    FileSetup
+        Loads and imports the SimpleAns data.
+    """
     imported_data = SeqAns()
     file_loc = "C:\\Documents and Settings\\William Dampier\\My Documents\\PyELM\\"
     
@@ -52,6 +64,9 @@ def FileSetup(FILENAME):
 
 
 def testSeqObject():
+    """
+    Test the SeqObject interface
+    """
 
     test_dict = {}
     test_dict['TEST'] = re.compile('T')
@@ -59,6 +74,9 @@ def testSeqObject():
     nose.tools.assert_not_equal(seq_obj, None)
 
 def testGetResult():
+    """
+    Test window SeqObject searching
+    """
 
     test_dict = {}
     test_dict['TEST'] = re.compile('T')
@@ -74,11 +92,17 @@ def testGetResult():
 
 
 def testImport():
+    """
+    Test PyELM import
+    """
     py_elm = PyELM.PyELM()
     nose.tools.assert_not_equal(py_elm, None)
 
 
 def testImportSeq():
+    """
+    Test loading Sequence
+    """
     file_list = ['EasyData.pkl', 'MedData.pkl', 'HardData.pkl']
     for this_file in file_list:
         yield CheckImportSeq, this_file
@@ -90,6 +114,9 @@ def CheckImportSeq(THIS_FILE):
 
 
 def testImportELM():
+    """
+    Test ELM importing
+    """
     file_list = ['EasyData.pkl', 'MedData.pkl', 'HardData.pkl']
     for this_file in file_list:
         yield CheckImportELM, this_file
@@ -100,13 +127,16 @@ def CheckImportELM(THIS_FILE):
     py_elm.AddELM('TESTCASE', imported_data.ELM)
     py_elm.LoadSeqs(imported_data.seq)
 
-##def testParser():
-##    py_elm = PyELM.PyELM()
-##    py_elm.ELMParser()
-##
-##    nose.tools.assert_not_equal(py_elm.elm_dict, None)
-##    nose.tools.assert_not_equal(py_elm.elm_order, None)
-##    nose.tools.assert_not_equal(py_elm.elm_re_dict, None)
+def testParser():
+    """
+    Test ELM file parsing
+    """
+    py_elm = PyELM.PyELM()
+    py_elm.ELMParser()
+
+    nose.tools.assert_not_equal(py_elm.elm_dict, None)
+    nose.tools.assert_not_equal(py_elm.elm_order, None)
+    nose.tools.assert_not_equal(py_elm.elm_re_dict, None)
 
 
 def CheckSimpleELM(THIS_FILE):
@@ -129,11 +159,17 @@ def CheckSimpleELM(THIS_FILE):
     nose.tools.assert_true(spec > 0.9, msg = 'SimpleELM Spec: ' + str(spec))
 
 def testSimpleELM():
+    """
+    Test SimpleELM call interface
+    """
     file_list = ['EasyData.pkl', 'MedData.pkl', 'HardData.pkl']
     for this_file in file_list:
         yield CheckSimpleELM, this_file
 
 def testIterator1():
+    """
+    Test iterator type 1
+    """
     ITER_TYPE = 'ELM'
     ITER_RETURN = 'Name'
     ITER_RANGE = None
@@ -151,6 +187,9 @@ def testIterator1():
         counter += 1
 
 def testIterator2():
+    """
+    Test iterator type 2
+    """
     ITER_TYPE = 'ELM'
     ITER_RETURN = 0
     ITER_RANGE = None
@@ -173,6 +212,9 @@ def testIterator2():
         
 
 def testIterator3():
+    """
+    Test iterator type 3
+    """
     ITER_TYPE = 'SEQ'
     ITER_RETURN = 'Sequence'
 
@@ -193,6 +235,9 @@ def testIterator3():
                                 200, 'Sequence Iteration Failed')
         
 def testIterator4():
+    """
+    Test iterator type 4
+    """
     ITER_TYPE = 'SEQ'
     ITER_RETURN = 'TESTCASE'
     ITER_RANGE = None
@@ -211,12 +256,10 @@ def testIterator4():
         counter += 1
 
 
-
-
-
-
-
 def testMultiELM():
+    """
+    Test MultiELM
+    """
     file_list = ['EasyData.pkl', 'MedData.pkl', 'HardData.pkl']
     for this_file in file_list:
         yield CheckMultiELM, this_file
