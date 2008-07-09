@@ -1,4 +1,4 @@
-import sys
+import sys, os
 from SOAPpy import WSDL
 
 def parseKO_name(description_st):
@@ -163,6 +163,32 @@ def printGenes2Path(species_code):
         for g in genes:
             print g + '\t' + path['entry_id']
 
+def getPathwayBoxes(path):
+    edges = dict()
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    elements = serv.get_elements_by_pathway(path)
+    relations = serv.get_element_relations_by_pathway(path)
+    elementid2gene = dict()
+    for element in elements:
+        if element['type'] == 'gene':            
+            elementid = element['element_id']
+            names = element['names']
+            elementid2gene[elementid] = dict()
+            for n in names:
+                elementid2gene[elementid][n.split(':')[-1]] = True
+    return elementid2gene
+
+def getHitBoxes(path, geneLs):
+    element2box = getPathwayBoxes(path)
+    hit_boxes = {}
+    for e in element2box.keys():
+        for gene in element2box[e].keys():
+            if geneLs.has_key(gene):
+                hit_boxes[e] = True
+                break
+    return hit_boxes
+
 def getPathwayEdges(path):
     edges = dict()
     wsdl = 'http://soap.genome.jp/KEGG.wsdl'
@@ -201,17 +227,23 @@ def getPathwayEdges(path):
                         edges[gene2][gene1][ relation['type'] + '/' + s['relation'] ] = True
     return edges
 
-def getPathwayGenes(path):
-    genes = dict()
+def getPathways(species_code):
     wsdl = 'http://soap.genome.jp/KEGG.wsdl'
     serv = WSDL.Proxy(wsdl)
-    elements = serv.get_elements_by_pathway(path)
-    for element in elements:
-        if element['type'] == 'gene':            
-            names = element['names']            
-            for n in names:
-                genes[n.split(':')[1]] = True
-    return genes
+    pathways = serv.list_pathways(species_code)
+    paths = {}
+    for path in pathways:
+        paths[ path['entry_id'] ] = True
+    return paths
+
+# these are stripped of the prefix
+def getPathwayGenes(path):
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    ls = {}
+    for gene in serv.get_genes_by_pathway(path):
+        ls[gene.split(':')[1]] = True
+    return ls
 
 def getKODictForPathway(path):
     complex2gene = dict()
@@ -347,3 +379,26 @@ def mkGene2GI(gene_dict):
     print serv.bget( dict2str(new_d) ).strip()#.split('///')
     #for item in ls:
     #    print item
+
+def color(pathway, genes, fg, bg):
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    #genes = serv.get_genes_by_pathway(pathway)
+    #fg_list = []
+    #bg_list = []
+    #for gene in genes:
+    #    fg_list.append('#ff0000')
+    #    bg_list.append('yellow')
+    
+    #fg_list  = ['#ff0000', '#00ff00']
+    #bg_list  = ['#ffff00', 'yellow']
+    #print genes.has_key('b3559')
+    #print genes.has_key('b3560')
+    #elements = serv.get_elements_by_pathway(path)
+    #for element in elements:
+    #    if element['type'] == 'gene':            
+    #        names = element['names']            
+    #        for n in names:
+    #            genes[n.split(':')[1]] = True
+    url = serv.color_pathway_by_objects(pathway, genes, fg, bg)
+    os.system('wget ' + url)
