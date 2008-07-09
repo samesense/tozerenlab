@@ -259,17 +259,13 @@ def testIterator4():
         counter += 1
 
 
-def testMultiELM():
-<<<<<<< .mine
-    file_list = ['EasyData.pkl']#, 'MedData.pkl', 'HardData.pkl']
-=======
-    """
-    Test MultiELM
-    """
-    file_list = ['EasyData.pkl', 'MedData.pkl', 'HardData.pkl']
->>>>>>> .r185
-    for this_file in file_list:
-        yield CheckMultiELM, this_file
+##def testMultiELM():
+##    """
+##    Test MultiELM
+##    """
+##    file_list = ['EasyData.pkl']#, 'MedData.pkl', 'HardData.pkl']
+##    for this_file in file_list:
+##        yield CheckMultiELM, this_file
 
 def CheckMultiELM(THIS_FILE):
 

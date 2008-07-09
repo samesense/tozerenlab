@@ -28,10 +28,13 @@ class ViralSeq():
                 self.tested_subtype = None
                 self.seq_name = None
 
-
-
-
-
+        def DetSubtype(self):
+                """
+                DetSubtype
+                        Determines the subtype of the sequence using the
+                HIVSubtype module.
+                """
+                raise NotImplemented
 
 class BkgSeq(ViralSeq):
         def __init__(self, TEST_SEQ):
