@@ -11,7 +11,17 @@ import PyMozilla
 from Bio import SeqIO
 from urllib2 import URLError
 
+def GetSimple(INPUT_SEQ):
+    """
+    GetSimpleGenotype
+        A simple interface to retrieve only the highest homology subtype.
+    """
 
+    temp_data = GetHIVGenotype(INPUT_SEQ)
+    best_sub = re.split(',', temp_data[0])[0]
+
+    return best_sub
+    
 
 def GetHIVGenotype(INPUT_SEQ):
     """
@@ -48,9 +58,7 @@ def GetHIVGenotype(INPUT_SEQ):
                               retData).group(1)
 
         outputData = (gi_names, numeric_data, num_windows)
-        print 'Success'
     except AttributeError:
-        print 'Failure'
         outputData = ()
         
     return outputData
