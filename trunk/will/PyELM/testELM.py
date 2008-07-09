@@ -49,7 +49,7 @@ def FileSetup(FILENAME):
         Loads and imports the SimpleAns data.
     """
     imported_data = SeqAns()
-    file_loc = "C:\\Documents and Settings\\William Dampier\\My Documents\\PyELM\\"
+    file_loc = "C:\\Documents and Settings\\Will\\My Documents\\PyELM\\"
     
     easy_handle = open(file_loc + FILENAME, 'r')
     data = pickle.load(easy_handle)

@@ -1,6 +1,7 @@
 import shelve
 import PyAlign
 import itertools as IT
+import HIVGenoTypeChecker as GenoTyping
 
 
 def MakeMapping(ALIGNMENT):
@@ -34,7 +35,8 @@ class ViralSeq():
                         Determines the subtype of the sequence using the
                 HIVSubtype module.
                 """
-                raise NotImplemented
+
+                self.tested_subtype = GenoTyping.GetSimple(self.my_sequence)
 
 class BkgSeq(ViralSeq):
         def __init__(self, TEST_SEQ):
