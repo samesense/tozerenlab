@@ -88,6 +88,9 @@ def testGetResult():
     nose.tools.assert_equal(seq_obj.GetResult('TEST', (0, 6)), 0,
                             'Incorrect Count (with RANGE)')
 
+    nose.tools.assert_equal(seq_obj.GetResult('TEST', (6, 20)), 1,
+                            'Incorrect Count (with RANGE)')
+
     output = seq_obj.GetResult('TEST', None, OUTPUT_TYPE = 'array')
 
 
@@ -257,10 +260,14 @@ def testIterator4():
 
 
 def testMultiELM():
+<<<<<<< .mine
+    file_list = ['EasyData.pkl']#, 'MedData.pkl', 'HardData.pkl']
+=======
     """
     Test MultiELM
     """
     file_list = ['EasyData.pkl', 'MedData.pkl', 'HardData.pkl']
+>>>>>>> .r185
     for this_file in file_list:
         yield CheckMultiELM, this_file
 
@@ -278,11 +285,14 @@ def CheckMultiELM(THIS_FILE):
     py_elm.CalculateBins('TESTCASE')
     for i in xrange(num_seqs - 1):
         this_ans = py_elm.MultiELMCall(i, 'TESTCASE')
+        #print str(this_ans) + str(imported_data.MultiAns[i])
         if len(imported_data.MultiAns[i]) <= len(this_ans):
             total_val += AlignObs(imported_data.MultiAns[i], this_ans)
         else:
             total_val += AlignObs(this_ans, imported_data.MultiAns[i])
 
     spec = total_val / num_seqs
+    print str(py_elm.precalc_elm_bin_dict['TESTCASE'])
 
+    
     nose.tools.assert_true(spec > 0.8, msg = 'SimpleELM Spec: ' + str(spec))
