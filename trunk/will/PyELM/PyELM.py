@@ -42,6 +42,16 @@ def ParseELMs(SEQ, ELM_DICT):
     
     return seq_elm_dict
 
+def pairwise(iterable):
+    "s -> (s0,s1), (s1,s2), (s2, s3), ..."
+    a, b = itertools.tee(iterable)
+    try:
+        b.next()
+    except StopIteration:
+        pass
+    return itertools.izip(a, b)
+
+
 class SeqObject:
     def __init__(self, SEQ, ELM_DICT = None):
         self.sequence = SEQ
@@ -128,6 +138,8 @@ class PyELM:
         self.max_iter = 1000
         self.calc_time_out = 300
         self.force_bins = [858, 1359, 1483, 1676, 2570, 3434, 3513]
+#funVal = (.25*total_empty + total_wrong) / (total_correct + 1)
+        self.ObjectiveFun = lambda c, w, e: (0.25*e + w)/(c + 1)
 
     def ELMParser(self, DIRECTORY = None):
         """
@@ -196,7 +208,10 @@ class PyELM:
 
         
         for this_seq in SEQUENCES:
-            self.sequences.append(SeqObject(this_seq, ELM_DICT = self.elm_re_dict))
+            if len(this_seq) > self.max_size:
+                self.max_size = len(this_seq)
+            self.sequences.append(SeqObject(this_seq,
+                                            ELM_DICT = self.elm_re_dict))
 
     def GetSequence(self, SEQ_IND, RANGE = None):
         """
@@ -426,6 +441,8 @@ class PyELM:
         """
         Evaluates the values of the single bin provided.
         """
+        if BIN_EDGES in self.__singlebin_dict:
+            return self.__singlebin_dict[BIN_EDGES]
         bin_val = [0, 0, 0]
         for current_bin in self.GetIter('COUNT', WANTED_ELM,
                                         (BIN_EDGES[0], BIN_EDGES[1])):
@@ -435,7 +452,8 @@ class PyELM:
                 bin_val[1] += 1
             else:
                 bin_val[2] += 1
-        return (bin_val[0], bin_val[1], bin_val[2] )
+        self.__singlebin_dict[BIN_EDGES] = tuple(bin_val)
+        return self.__singlebin_dict[BIN_EDGES]
 
 
     def __EvaluateAllBins(self, WANTED_ELM, THESE_BINS):
@@ -455,17 +473,15 @@ class PyELM:
             total_empty = 0
             total_correct = 0
             total_wrong = 0
-            for i in xrange(len(all_bins) - 1):
-                if (all_bins[i], all_bins[i + 1]) not in self.__singlebin_dict:
-                    self.__singlebin_dict[(all_bins[i], all_bins[i + 1])] = self.__EvaluateBin(WANTED_ELM, (all_bins[i], all_bins[i + 1]))
-                
-                total_empty += self.__singlebin_dict[(all_bins[i],
-                                                     all_bins[i + 1])][0]
-                total_correct += self.__singlebin_dict[(all_bins[i],
-                                                       all_bins[i + 1])][1]
-                total_wrong += self.__singlebin_dict[(all_bins[i],
-                                                     all_bins[i + 1])][2]
-            funVal = (.25*total_empty + total_wrong) / (total_correct + 1)
+            for this_val in itertools.imap(self.__EvaluateBin,
+                                           itertools.repeat(WANTED_ELM),
+                                           pairwise(all_bins)):
+
+                total_empty += this_val[0]
+                total_correct += this_val[1]
+                total_wrong += this_val[2]
+
+            funVal = self.ObjectiveFun(total_correct, total_wrong, total_empty)
             self.__all_bin_dict[tuple(all_bins)] = (total_empty, total_correct,
                                                     total_wrong, funVal)
             if (self.__all_bin_dict[tuple(all_bins)][2] == 0) & (self.__all_bin_dict[tuple(all_bins)][0] == 0):
@@ -552,6 +568,7 @@ class PyELM:
         currentMin = 50000
         currentMinInd = 0
         for i in self.__all_bin_dict:
+            print str(i) + str(self.__all_bin_dict[i])
             if self.__all_bin_dict[i][3] < currentMin:
                 currentMinInd = i
                 currentMin = self.__all_bin_dict[currentMinInd][3]
