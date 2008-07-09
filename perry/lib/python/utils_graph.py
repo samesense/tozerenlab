@@ -76,3 +76,17 @@ def unionLists(list_of_lists):
         for k in ls.keys():
             all[k] = True
     return all
+
+# get degree
+def degree(gene, network):
+    return len(network[gene].keys())
+
+# given a set of genes
+# return their average connectivity
+def avgConnectivity(geneLs, network):
+    [connectivity, total] = [0, 0]
+    for gene in geneLs.keys():
+        if network.has_key(gene):
+            connectivity += degree(gene, network)
+            total += 1
+    return float(connectivity) / float(total)
