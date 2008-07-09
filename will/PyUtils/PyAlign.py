@@ -11,6 +11,19 @@ import os
 import subprocess
 import re
 
+
+def AlignSeqs(INPUT_SEQS, PARAMS = None):
+    """
+    AlignSeqs
+        A shortcut to aligning using the default clustalw parameters.
+    """
+    cont = ClustalInterface(INPUT_SEQS)
+
+    return cont.AlignSeqs()
+
+
+
+
 class ClustalInterface():
     """
     ClustalInterface
@@ -199,10 +212,11 @@ class ClustalInterface():
         any parameters from self.paramdict which are not None
 
         """
-        command = 'clustalw ' + self.fastaname 
+        command = 'clustalw ' + self.fastaname
 
-        for thisPair in self.parampairs:
-            self.paramdict[thisPair[0]] = str(thisPair[1])
+        if self.parampairs != None:
+            for thisPair in self.parampairs:
+                self.paramdict[thisPair[0]] = str(thisPair[1])
 
         for thisParam in self.paramdict:
             if self.paramdict[thisParam] != None:
@@ -292,7 +306,8 @@ class ClustalInterface():
         self.DoAlignment()
         self.ReadALN()
         self.CleanUpFiles()
-        
+
+        return self.alignedseqs
         
 
 
