@@ -4,6 +4,7 @@ import PyVirus
 from testELM import SeqAns, FileSetup
 from Bio import SeqIO
 import itertools
+import os
 
 
 def testLoading():
@@ -11,7 +12,7 @@ def testLoading():
     Test Loading the Virus classes
     """
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-                        PyVirus.PatSeq, PyVirus.RefSeq]
+                        PyVirus.PatSeq]
     file_loc = "C:\\Documents and Settings\\Will\\My Documents\\PyELM\\"
     with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
@@ -29,7 +30,7 @@ def testGenotyping():
     Test Genotyping the Virus classes
     """
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-                        PyVirus.PatSeq, PyVirus.RefSeq]
+                        PyVirus.PatSeq]
     file_loc = "C:\\Documents and Settings\\Will\\My Documents\\PyELM\\"
     with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
@@ -42,3 +43,16 @@ def CheckGenotyping(INPUT_CLASS, INPUT_REC):
     genome.DetSubtype()
     nose.tools.assert_not_equal(genome, None)
 
+
+def testRefLoading():
+    """
+    Test Genbank parsing of Reference Sequences
+    """
+    base_dir = 'C:\\Documents and Settings\\Will\\My Documents\\hivsnppredsvn\\HIVRefs\\'
+    for this_file in filter(lambda x: x[-3:] == '.gb', os.listdir(base_dir)):
+        yield CheckRefLoading, base_dir+this_file
+    
+
+def CheckRefLoading(INPUT_FILE):
+    genome = PyVirus.RefSeq(INPUT_FILE)
+    nose.tools.assert_not_equal(genome.annotation, None)
