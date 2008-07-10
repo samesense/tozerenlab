@@ -3,12 +3,12 @@
 # Author     Perry Evans
 #            evansjp@mail.med.upenn.edu
 # 2008
+#
 #----------------------------------------
 """
 Functions here help with network loading,
 printing, and searching.
 """
-import string
 
 def getNodes(afile):
     """ Make a {} from a file.  Each line
@@ -19,24 +19,24 @@ def getNodes(afile):
     """
 
     nodes = dict()
-    f = open(afile)
-    for line in f:
+    f_nodes = open(afile)
+    for line in f_nodes:
         nodes[ line.strip() ] = True
-    f.close()
+    f_nodes.close()
     return nodes
 
-def dumpNodes(afile, ls):
+def dumpNodes(afile, node_dict):
     """ Output {} to file.  One item
     per line.
 
     @param afile: write to this file
-    @param ls: {} with items for writing
+    @param node_dict: {} with items for writing
     """
 
-    f = open(afile, 'w')
-    for g in ls.keys():
-        f.write(g + '\n')
-    f.close()
+    f_out = open(afile, 'w')
+    for node in node_dict.keys():
+        f_out.write(node + '\n')
+    f_out.close()
 
 def getEdges(afile):
     """ Make edge {} from file.
@@ -47,35 +47,36 @@ def getEdges(afile):
     """
 
     edges = dict()
-    f = open(afile)
-    for line in f():
-        [n1, n2] = map(string.strip, line.split('\t'))
-        if not edges.has_key(n1): edges[n1] = dict()
-        if not edges.has_key(n2): edges[n2] = dict()
-        edges[n1][n2] = True
-        edges[n2][n1] = True
-    f.close()
+    f_edges = open(afile)
+    for line in f_edges:
+        [node1, node2] = [x.strip()for x in line.split('\t')]
+        if not edges.has_key(node1): 
+            edges[node1] = dict()
+        if not edges.has_key(node2): 
+            edges[node2] = dict()
+        edges[node1][node2] = True
+        edges[node2][node1] = True
+    f_edges.close()
     return edges
 
-def dumpEdges(afile, d):
+def dumpEdges(afile, edge_dict):
     """ Write edges to file.
     
-    @param afile: output is tab-delimited.
-    bi-directional edges are not duplicated
-    @param d: {} format is d[n1][n2] = True
+    @param afile: output is tab-delimited; bi-directional edges are not duplicated
+    @param edge_dict: {} format is d[n1][n2] = True
     """
     
-    f = open(afile, 'w')
+    f_out = open(afile, 'w')
     seen = {}
-    for g1 in d.keys():
-        for g2 in d[g1].keys():
-            k1 = g1+':'+g2
-            k2 = g2+':'+g1
-            if not seen.has_key(k1) and not seen.has_key(k2):
-                seen[k1] = True
-                seen[k2] = True
-                f.write(g1 + '\t' + g2 + '\n')
-    f.close()
+    for gene1 in edge_dict.keys():
+        for gene2 in edge_dict[gene1].keys():
+            key1 = gene1+':'+gene2
+            key2 = gene2+':'+gene1
+            if not seen.has_key(key1) and not seen.has_key(key2):
+                seen[key1] = True
+                seen[key2] = True
+                f_out.write(gene1 + '\t' + gene2 + '\n')
+    f_out.close()
 
 def mkNodesFromEdges(afile):
     """ Given an edge file, make a {} of nodes.
@@ -85,12 +86,12 @@ def mkNodesFromEdges(afile):
     """
 
     nodes = {}
-    f = open(afile)
-    for line in f.xreadlines():
-        sp = line.split('\t')
-        nodes[sp[0]] = True
-        nodes[sp[1]] = True
-    f.close()
+    f_edges = open(afile)
+    for line in f_edges:
+        splitup = line.split('\t')
+        nodes[splitup[0]] = True
+        nodes[splitup[1]] = True
+    f_edges.close()
     return nodes
 
 def getConnected(ls_file, net_file):
@@ -102,14 +103,14 @@ def getConnected(ls_file, net_file):
     @return: {} of genes
     """
 
-    ls = getNodes(ls_file)
+    seed_ls = getNodes(ls_file)
     net = getEdges(net_file)
     second_level_ls = {}
-    for gene in ls.keys():
+    for gene in seed_ls.keys():
         if net.has_key(gene):
-            for g2 in net[gene].keys():
-                if gene != g2:
-                    second_level_ls[g2] = True
+            for gene2 in net[gene].keys():
+                if gene != gene2:
+                    second_level_ls[gene2] = True
     return second_level_ls
 
 def intersectLists(list_of_lists):
@@ -121,12 +122,13 @@ def intersectLists(list_of_lists):
     """
 
     same = {}
-    for s in list_of_lists[0].keys():
+    for item in list_of_lists[0].keys():
         count = 0
-        for ls in list_of_lists[1:]:
-            if ls.has_key(s): count += 1
+        for alist in list_of_lists[1:]:
+            if alist.has_key(item): 
+                count += 1
         if count == len(list_of_lists)-1:
-            same[s] = True
+            same[item] = True
     return same
 
 def unionLists(list_of_lists):
@@ -137,11 +139,11 @@ def unionLists(list_of_lists):
     @return: {} of union
     """
 
-    all = {}
-    for ls in list_of_lists:
-        for k in ls.keys():
-            all[k] = True
-    return all
+    union = {}
+    for alist in list_of_lists:
+        for k in alist.keys():
+            union[k] = True
+    return union
 
 def degree(gene, network):
     """ Find the degree of this node
@@ -154,7 +156,7 @@ def degree(gene, network):
 
     return len(network[gene].keys())
 
-def avgConnectivity(geneLs, network):
+def avgConnectivity(gene_ls, network):
     """ Given a set of genes, return
     their average connectivity in the network.
 
@@ -164,7 +166,7 @@ def avgConnectivity(geneLs, network):
     """
 
     [connectivity, total] = [0, 0]
-    for gene in geneLs.keys():
+    for gene in gene_ls.keys():
         if network.has_key(gene):
             connectivity += degree(gene, network)
             total += 1
