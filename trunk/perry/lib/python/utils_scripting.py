@@ -2,6 +2,7 @@
 #  Author:     Perry Evans
 #              evansjp@mail.med.upenn.edu
 #  2008
+#
 #-----------------------------------------
 """
 Functions in this module aid in writing
@@ -9,7 +10,7 @@ small scripts
 """
 import sys
 
-def checkstart(sys_args, req_args, examples):
+def checkStart(sys_args, req_args, examples):
     """Place this at the start of cmd line scripts to check for
        the correct # of script argumtns.  If you do not recieve
        the correct arguments, the script exits and suggests 
