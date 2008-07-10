@@ -8,8 +8,12 @@
 Functions for reading the my protein 
 annotation file, which is organized:
 
-geneid st stp annotation_name seq annotation_tool.
+geneid st stp annotation_name seq annotation_tool
+
+and making annotated multiple alignment plots.
 """
+import utils_graph
+import pylab, math
 
 def annotation2protein(afile, tool_dict):
     d = dict()
@@ -185,5 +189,40 @@ def printAnnotation01(annotationLs, fasta):
 def printAnnotation01_tofile(annotationLs, fasta, afile):
     afile.write(printAnnotation01_runner(annotationLs, fasta) + '\n')
         
-def addBackslash(s):
-    return s.replace('_', '\_')
+def extendSeq(max_len, seq):
+    """ All sequnces in the alignment must
+        be the same length.  This fills in
+        the seq with 0 until max_len is reached.
+    
+    @param max_len: desired seq len
+    @param seq as a list of 1 and 0 for motif presence/absense
+    @return: seq w/ filled in 0's
+    """
+
+    while len(seq) != max_len:
+        seq.append(0)
+    return seq
+
+def mkProteinPlot(motif_ls_file, motif_matrix_dir, output_file):
+    """ This makes the multiple alignment annotation figure.
+
+    @param motif_ls_file: file with the names of the motifs
+    @param motif_matrix_dir: directory with multiple alignments annotated w/ 0/1 for absence/presense
+    @param out_file: put the figure here
+    """
+
+    motifs = utils_graph.getNodes(motif_ls_file)
+    cols = math.ceil( float(len(motifs.keys()))/float(5) )
+    motif_index = 1
+    motif_figure = pylab.gcf()
+    default_size = motif_figure.get_size_inches()
+    motif_figure.set_size_inches( (default_size[0]*3, default_size[1]*3) )
+    for motif in motifs.keys():
+        motif_matrix = pylab.imread(motif)
+        pylab.subplot(5, cols, motif_index)
+        pylab.imshow(motif_matrix)
+        pylab.xticks([],[])
+        pylab.yticks([],[])
+        pylab.title(motif.split('.')[-1])
+        motif_index += 1
+    pylab.savefig(output_file)
