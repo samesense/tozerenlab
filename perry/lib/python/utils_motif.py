@@ -1,24 +1,15 @@
-import string
+#---------------------------------------
+#
+# Author     Perry Evans
+#            evansjp@mail.med.upenn.edu
+# 2008
+#---------------------------------------
+"""
+Functions for reading the my protein 
+annotation file, which is organized:
 
-def protein2motif(afile):
-    d = dict()
-    f = open(afile)
-    for line in f.xreadlines():
-        sp = line.split('\t')
-        if not d.has_key( sp[0] ): d[ sp[0] ] = {}
-        d[ sp[0] ][ sp[3] ] = True
-    f.close()
-    return d
-
-def motif2protein(afile):
-    d = dict()
-    f = open(afile)
-    for line in f.xreadlines():
-        sp = line.split('\t')
-        if not d.has_key( sp[3] ): d[ sp[3] ] = {}
-        d[ sp[3] ][ sp[0] ] = True
-    f.close()
-    return d
+geneid st stp annotation_name seq annotation_tool.
+"""
 
 def annotation2protein(afile, tool_dict):
     d = dict()
@@ -41,6 +32,13 @@ def annotation2protein(afile, tool_dict):
     return d
 
 def protein2annotation(afile, tool_dict):
+    """ Parse the given file and return {}
+        mapping proteins to their annotations.
+
+    @param afile: annotation file; format
+    geneid st stp annotation seq tool
+    """
+
     d = dict()
     f = open(afile)
     for line in f.xreadlines():
