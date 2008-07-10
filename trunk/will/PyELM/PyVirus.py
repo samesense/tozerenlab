@@ -1,7 +1,9 @@
+from __future__ import with_statement
 import shelve
 import PyAlign
 import itertools as IT
 import HIVGenoTypeChecker as GenoTyping
+from Bio import SeqIO
 
 
 def MakeMapping(ALIGNMENT):
@@ -20,7 +22,12 @@ def MakeMapping(ALIGNMENT):
 	print str(mapping_val) + str(len(mapping_val))
 	print str(num_val) + str(len(num_val))
 
-
+class Gene():
+	def __init__(self, NT_SEQ, AA_SEQ, START, END):
+		self.nt_seq = NT_SEQ
+		self.aa_seq = AA_SEQ
+		self.start = START
+		self.end = END
 
 
 class ViralSeq():
@@ -54,12 +61,35 @@ class PatSeq(ViralSeq):
 
 
 class RefSeq(ViralSeq):
-        def __init__(self, TEST_SEQ):
-                self.my_sequence = TEST_SEQ
+        def __init__(self, FILENAME):
+                self.my_sequence = None
                 self.known_subtype = None
                 self.seq_name = None
-                self.protein_starts = None
-                self.protein_seqs = None
+                self.annotation = None
+
+                self.ParseGenbank(FILENAME)
+
+                
+
+        def ParseGenbank(self, FILENAME):
+                with open(FILENAME, mode='r') as handle:
+                        this_record = SeqIO.parse(handle, 'genbank').next()
+
+                self.my_sequence = this_record.seq.tostring()
+                
+
+                self.annotation = {}
+                for feat in this_record.features:
+                        if feat.qualifiers.has_key('translation'):
+                                start_pos = feat.location._start.position
+                                end_pos = feat.location._end.position
+                                trans_data = feat.qualifiers['translation'][0]
+                                nt_seq = self.my_sequence[start_pos:end_pos]
+                                this_gene = Gene(nt_seq, trans_data,
+                                                 start_pos, end_pos)
+
+                                self.annotation[feat.qualifiers['gene'][0]] = this_gene
+	
 
 
 
