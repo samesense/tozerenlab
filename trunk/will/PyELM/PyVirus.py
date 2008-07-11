@@ -1,6 +1,6 @@
 from __future__ import with_statement
 import shelve
-import PyAlign
+#import PyAlign
 import itertools as IT
 import HIVGenoTypeChecker as GenoTyping
 import subprocess
@@ -34,13 +34,19 @@ def MakeMapping(ALIGNMENT):
 	print str(num_val) + str(len(num_val))
 
 class Gene():
-	def __init__(self, NAME, PRODUCT, NT_SEQ, AA_SEQ, START, END):
-		self.nt_seq = NT_SEQ
-		self.aa_seq = AA_SEQ
-		self.start = START
-		self.end = END
-		self.name = NAME
-		self.product = PRODUCT
+        def __init__(self, NAME, PRODUCT, NT_SEQ, AA_SEQ, START, END):
+                self.nt_seq = NT_SEQ
+                self.aa_seq = AA_SEQ
+                self.start = START
+                self.end = END
+                self.name = NAME
+                self.product = PRODUCT
+
+        def __str__(self):
+                temp_str = '(Gene Class '
+                temp_str += 'Name: ' + self.name
+                temp_str += ', Start: ' + str(self.start) + ')'
+                return temp_str
 
 
 class ViralSeq():
@@ -84,6 +90,12 @@ class ViralSeq():
                 self.tested_subtype = GenoTyping.GetSimple(self.my_sequence)
 
         def TranslateAll(self, REFBASE):
+                """
+                TranslateAll
+                        Uses a BLASTx query to determine the which ORFs
+                correspond to HIV-1 proteins.  It then stores the data in a
+                dictionary keyed by "genename".
+                """
                 blast_record = REFBASE.BLASTx(self.GenomeToBioPython())
                 gene_dict = {}
                 reg = re.compile('.*?:(\w{3}).*')
@@ -107,11 +119,11 @@ class BkgSeq(ViralSeq):
 
 
 class PatSeq(ViralSeq):
-        def __init__(self, TEST_SEQ):
+        def __init__(self, TEST_SEQ, SEQ_NAME):
                 self.my_sequence = TEST_SEQ
                 self.pat_data = None
                 self.tested_subtype = None
-                self.seq_name = None
+                self.seq_name = SEQ_NAME
 
 
 class RefSeq(ViralSeq):
