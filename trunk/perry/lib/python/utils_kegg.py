@@ -1,3 +1,9 @@
+#---------------------------------------
+#
+# Author     Perry Evans
+#            evansjp@mail.med.upenn.edu
+# 2008
+#---------------------------------------
 import sys, os
 from SOAPpy import WSDL
 
