@@ -1,10 +1,9 @@
 from __future__ import with_statement
-import shelve
-#import PyAlign
 import itertools as IT
 import HIVGenoTypeChecker as GenoTyping
 import subprocess
 import tempfile
+import time
 import os
 import re
 from Bio import SeqIO
@@ -12,9 +11,6 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_protein, generic_nucleotide
 from Bio.Blast import NCBIXML
-
-
-
 
 
 def MakeMapping(ALIGNMENT):
@@ -33,6 +29,7 @@ def MakeMapping(ALIGNMENT):
 	print str(mapping_val) + str(len(mapping_val))
 	print str(num_val) + str(len(num_val))
 
+
 class Gene():
         def __init__(self, NAME, PRODUCT, NT_SEQ, AA_SEQ, START, END):
                 self.nt_seq = NT_SEQ
@@ -47,6 +44,8 @@ class Gene():
                 temp_str += 'Name: ' + self.name
                 temp_str += ', Start: ' + str(self.start) + ')'
                 return temp_str
+        def __hash__(self):
+                return hash(self.aa_seq)
 
 
 class ViralSeq():
@@ -55,6 +54,9 @@ class ViralSeq():
                 self.tested_subtype = None
                 self.seq_name = SEQ_NAME
                 self.annotation = None
+
+        def __hash__(self):
+                return hash(self.my_sequence + self.seq_name)
 
         def GenomeToBioPython(self):
                 """
@@ -135,7 +137,6 @@ class RefSeq(ViralSeq):
 
                 self.ParseGenbank(FILENAME)
 
-                
 
         def ParseGenbank(self, FILENAME):
                 with open(FILENAME, mode='r') as handle:
@@ -156,7 +157,6 @@ class RefSeq(ViralSeq):
                                 trans_data = feat.qualifiers['translation'][0]
                                 nt_seq = self.my_sequence[start_pos:end_pos]
                                 
-                                
                                 prod_name = feat.qualifiers['product'][0]
                                 
                                 this_gene = Gene(gene_name, prod_name, nt_seq,
@@ -167,7 +167,7 @@ class RefSeq(ViralSeq):
 
 
 class RefBase():
-        def __init__(self, SOURCE_DIR, DEST_DIR, BUILD = True,
+        def __init__(self, SOURCE_DIR, DEST_DIR, BUILD = False,
                      BLAST_DIR = 'C:\\local_blast\\'):
 
 
@@ -181,6 +181,9 @@ class RefBase():
                 self.aa_name = DEST_DIR + 'ref_aa.fasta'
                 self.dir_name = DEST_DIR
                 self.blast_dir = BLAST_DIR
+
+                if BUILD:
+                        self.BuildDatabase()
 
         def BuildDatabase(self):
                 """
@@ -198,25 +201,19 @@ class RefBase():
                                 this_iter = this_data.AnnotToBioPython()
                                 SeqIO.write(this_iter, handle, "fasta")
 
-
+                command = self.MakeBLASTCommand('formatdb',
+                                                self.nt_name, self.nt_name,
+                                                EXTRA_FLAGS = ' -p F -o T')
                 
-
-
-                command = self.blast_dir + 'bin\\formatdb.exe'
-                command += ' -i ' +  self.nt_name
-                command += ' -p F -o T'
-
                 ProcessVar = subprocess.Popen(command, shell = True)
                 ProcessVar.wait()
 
-                command = self.blast_dir + 'bin\\formatdb.exe'
-                command += ' -i ' + self.aa_name
-                command += ' -p T -o T'
+                command = self.MakeBLASTCommand('formatdb',
+                                                self.aa_name, self.aa_name,
+                                                EXTRA_FLAGS = ' -p T -o T')
 
                 ProcessVar = subprocess.Popen(command, shell = True)
                 ProcessVar.wait()
-                
-
 
         def BLASTx(self, INPUT_GENOME):
                 """
@@ -225,31 +222,74 @@ class RefBase():
                 the possible translations of the INPUT_GENOME
                 """
                 with BLASTContext(self.dir_name, 2) as file_names:
-                        print file_names
-                                
 
                         with open(file_names[0], mode = 'w') as handle:
                                 SeqIO.write([INPUT_GENOME],
                                             handle, 'fasta')
 
-
-                        command = self.blast_dir + 'bin\\blastall.exe'
-                        command += ' -p blastx -m 7'
-                        command += ' -d ' + self.aa_name
-                        command += ' -o ' + file_names[1]
-                        command += ' -i ' + file_names[0]
-
+                        command = self.MakeBLASTCommand('blastx', file_names[0],
+                                                        file_names[1])
                         ProcessVar = subprocess.Popen(command)
                         ProcessVar.wait()
                        
-
                         with open(file_names[1], mode = 'r') as handle:
                                 this_blast = NCBIXML.parse(handle).next()
 
+                return this_blast
+
+        def BLASTn(self, INPUT_GENOME):
+                """
+                BLASTn
+                        Performs a BLASTn query to align the provided genome to
+                the reference genomes.
+                """
+                with BLASTContext(self.dir_name, 2) as file_names:
+
+                        with open(file_names[0], mode = 'w') as handle:
+                                SeqIO.write([INPUT_GENOME],
+                                            handle, 'fasta')
+
+                        command = self.MakeBLASTCommand('blastn', file_names[0],
+                                                        file_names[1])
+
+                        ProcessVar = subprocess.Popen(command, shell = True)
+                        ProcessVar.wait()
                         
+                        with open(file_names[1], mode = 'r') as handle:
+                                this_blast = NCBIXML.parse(handle).next()
 
                 return this_blast
 
+        def MakeBLASTCommand(self, BLAST_TYPE, INPUT_FILE, OUTPUT_FILE,
+                             EXTRA_FLAGS = None):
+                """
+                MakeBLASTCommand
+                        Creates a command that can be passed to Popen for
+                executing blast commands ... supports: formatdb, blastn,
+                blastx.
+                """
+                if BLAST_TYPE == 'formatdb':
+                        command = self.blast_dir + 'bin\\formatdb.exe'
+
+                if BLAST_TYPE == 'blastx':
+                        command = self.blast_dir + 'bin\\blastall.exe'
+                        command += ' -p blastx -m 7'
+                        command += ' -d ' + self.aa_name
+                        command += ' -o ' + OUTPUT_FILE
+                        
+                if BLAST_TYPE == 'blastn':
+                        command = self.blast_dir + 'bin\\blastall.exe'
+                        command += ' -p blastn -m 7'
+                        command += ' -d ' + self.nt_name
+                        command += ' -g F'
+                        command += ' -o ' + OUTPUT_FILE
+
+                command += ' -i ' + INPUT_FILE
+                
+                if EXTRA_FLAGS != None:
+                        command +=  EXTRA_FLAGS
+
+                return command
 
 class BLASTContext:
         """
