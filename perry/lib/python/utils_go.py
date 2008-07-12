@@ -1,3 +1,9 @@
+#---------------------------------------
+#
+# Author     Perry Evans
+#            evansjp@mail.med.upenn.edu
+# 2008
+#---------------------------------------
 import MySQLdb, sys, string
 import utils_graph
 
