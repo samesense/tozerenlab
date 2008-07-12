@@ -18,13 +18,25 @@ def testLoading():
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
     with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
-                                   iter(possible_classes))
+                                   iter(possible_classes),
+                                   itertools.repeat(None, 5))
         for this_test in this_iter:
-            yield CheckLoading, this_test[1], this_test[0]
+            yield CheckStringLoading, this_test[1], this_test[0]
+
+        this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+                                   iter(possible_classes),
+                                   itertools.repeat(None, 5))
+        for this_test in this_iter:
+            yield CheckSeqRecordLoading, this_test[1], this_test[0]
         
-def CheckLoading(INPUT_CLASS, INPUT_REC):
+def CheckStringLoading(INPUT_CLASS, INPUT_REC):
     genome = INPUT_CLASS(INPUT_REC.seq.tostring(), 'testFile')
-    nose.tools.assert_not_equal(genome, None)
+    nose.tools.assert_not_equal(genome, None, 'Could not load from string')
+
+def CheckSeqRecordLoading(INPUT_CLASS, INPUT_REC):
+    genome = INPUT_CLASS(INPUT_REC, None)
+    nose.tools.assert_not_equal(genome, None, 'Could not load from SeqRecord')
+
         
 
 def testGenotyping():
@@ -50,9 +62,14 @@ def testRefLoading():
     """
     Test Genbank parsing of Reference Sequences
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-    for this_file in filter(lambda x: x[-3:] == '.gb', os.listdir(base_dir)):
-        yield CheckRefLoading, base_dir+this_file
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
+    filter_fun = lambda x: x[-3:] == '.gb'
+    this_iter = itertools.izip(itertools.ifilter(filter_fun,
+                                                 iter(os.listdir(base_dir))),
+                               itertools.repeat(None,5))
+                   
+    for this_file in this_iter:
+        yield CheckRefLoading, base_dir+this_file[0]
     
 
 def CheckRefLoading(INPUT_FILE):
@@ -63,7 +80,7 @@ def testRefBaseLoading():
     """
     Test RefBase loading
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir)
     nose.tools.assert_not_equal(ref_base, None, 'Could not Load Data')
@@ -116,7 +133,7 @@ def testRefBaseBuilding():
 
     correct_suffix_list = ['hr', 'in', 'sd', 'si', 'sq']
     correct_base_list = ['ref_aa.fasta.p', 'ref_nt.fasta.n']
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir, BUILD = True)
 
@@ -133,7 +150,7 @@ def testTranslateAll():
     """
     Test the translation of whole genome sequences
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir)
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,

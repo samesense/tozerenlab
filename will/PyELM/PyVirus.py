@@ -6,6 +6,7 @@ import tempfile
 import time
 import os
 import re
+import types
 from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
@@ -50,9 +51,14 @@ class Gene():
 
 class ViralSeq():
         def __init__(self, TEST_SEQ, SEQ_NAME):
-                self.my_sequence = TEST_SEQ
+                #if SEQ_NAME is None then assume that TEST_SEQ is a SeqRecord
+                if SEQ_NAME == None:
+                        self.my_sequence = TEST_SEQ.seq.tostring()
+                        self.seq_name = TEST_SEQ.id
+                else:
+                        self.my_sequence = TEST_SEQ
+                        self.seq_name = SEQ_NAME
                 self.tested_subtype = None
-                self.seq_name = SEQ_NAME
                 self.annotation = None
 
         def __hash__(self):
@@ -114,10 +120,9 @@ class ViralSeq():
                 self.annotation = gene_dict
 
 class BkgSeq(ViralSeq):
-        def __init__(self, TEST_SEQ, SEQ_NAME):
-                self.my_sequence = TEST_SEQ
-                self.tested_subtype = None
-                self.seq_name = SEQ_NAME
+        """
+        Used for Background Sequences
+        """
 
 
 class PatSeq(ViralSeq):
@@ -243,10 +248,12 @@ class RefBase():
                         Performs a BLASTn query to align the provided genome to
                 the reference genomes.
                 """
+                if type(INPUT_GENOME) != types.ListType:
+                        INPUT_GENOME = [INPUT_GENOME]
                 with BLASTContext(self.dir_name, 2) as file_names:
 
                         with open(file_names[0], mode = 'w') as handle:
-                                SeqIO.write([INPUT_GENOME],
+                                SeqIO.write(INPUT_GENOME,
                                             handle, 'fasta')
 
                         command = self.MakeBLASTCommand('blastn', file_names[0],

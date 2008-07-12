@@ -54,7 +54,6 @@ class MappingBase():
         self.dest_dir = DEST_DIR
         self.ref_base = PyVirus.RefBase(REF_SOURCE, DEST_DIR)
         self.my_shelf_name = DEST_DIR + SHELF_NAME
-        print self.my_shelf_name
         self.my_shelf = shelve.open(self.my_shelf_name)
 
     def BuildRefBase(self):
@@ -64,7 +63,7 @@ class MappingBase():
         """
         self.ref_base.BuildDatabase()
 
-    def CreateShelf(self):
+    def CreateShelf(self, MAX_SEQS = None, MULTI_THREAD = False):
         """
         CreateShelf
             Blasts the background sequences against the RefBase and creates
@@ -72,20 +71,23 @@ class MappingBase():
         """
         with open(self.bkg_source, mode = 'r') as bkg_handle:
             bkg_iter = SeqIO.parse(bkg_handle, 'fasta')
-            
-            
-            for this_seq in bkg_iter:
-                this_blast = self.ref_base.BLASTn(this_seq)
-                maprecord_iter = itertools.imap(self.MapToRefs,
-                                                iter(this_blast.alignments),
-                                                itertools.repeat(this_seq))
-                
-                for this_mapping in maprecord_iter:
-                    volume_name = this_mapping.ref_name
-                    volume_name += this_mapping.test_viral_seq.seq_name
-                    print volume_name
+        
+            if not(MULTI_THREAD):    
+                for this_seq in bkg_iter:
+                    this_blast = self.ref_base.BLASTn(this_seq)
+                    maprecord_iter = itertools.imap(self.MapToRefs,
+                                                    iter(this_blast.alignments),
+                                                    itertools.repeat(this_seq))
+                    
+                    for this_mapping in itertools.izip(maprecord_iter,
+                                                       itertools.repeat(None,
+                                                       MAX_SEQS)):
+                        volume_name = this_mapping[0].ref_name
+                        volume_name += this_mapping[0].test_viral_seq.seq_name
+                        print volume_name
 
-                    self.my_shelf[volume_name] = this_mapping
+                        self.my_shelf[volume_name] = this_mapping[0]
+                
                 
         
     def MapToRefs(self, BLAST_RECORD, SEQ_RECORD):
