@@ -15,4 +15,4 @@ def mumble(title, message):
     @param message: sub txt
     """
 
-    os.system("mumbles-send '" + title + "' '" + message)
+    os.system("mumbles-send '" + title + "' '" + message + "'")
