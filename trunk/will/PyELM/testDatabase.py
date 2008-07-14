@@ -70,7 +70,7 @@ def testCreateShelf():
     mapping_base = HIVDatabase.MappingBase(source_dir, seq_file,
                                            dest_dir, 'test_self.slf')
 
-    mapping_base.CreateShelf(MAX_SEQS = 5)
+    mapping_base.CreateShelf()
     nose.tools.assert_not_equal(len(mapping_base.my_shelf.keys()), 0,
                                 'Shelf has no items')
 

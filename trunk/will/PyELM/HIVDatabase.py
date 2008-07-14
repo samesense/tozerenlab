@@ -7,10 +7,26 @@ import itertools
 import copy
 import re
 import os
+import threading
+import copy
 
 ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
 bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+
+
+def MakeBatch(ITERABLE, NUM_PER_BATCH):
+    """
+    MakeBatch
+        Zips an iterable into batches and then yields the batches
+    """
+    internal_list = []
+    for this_iter in ITERABLE:
+        internal_list.append(this_iter)
+        if len(internal_list) == NUM_PER_BATCH:
+            yield copy.deepcopy(internal_list)
+            internal_list = []
+    yield copy.deepcopy(internal_list)
 
 
 class MappingRecord():
@@ -63,46 +79,50 @@ class MappingBase():
         """
         self.ref_base.BuildDatabase()
 
-    def CreateShelf(self, MAX_SEQS = None, MULTI_THREAD = False):
+    def CreateShelf(self, MULTI_THREAD = False):
         """
         CreateShelf
             Blasts the background sequences against the RefBase and creates
         shelf instances of the resulting alignments.
         """
+
+        BATCH_SIZE = 1
+        
         with open(self.bkg_source, mode = 'r') as bkg_handle:
             bkg_iter = SeqIO.parse(bkg_handle, 'fasta')
         
             if not(MULTI_THREAD):    
-                for this_seq in bkg_iter:
-                    this_blast = self.ref_base.BLASTn(this_seq)
-                    maprecord_iter = itertools.imap(self.MapToRefs,
-                                                    iter(this_blast.alignments),
-                                                    itertools.repeat(this_seq))
+                for this_seq_batch in MakeBatch(bkg_iter, BATCH_SIZE):
+                    this_blast = self.ref_base.BLASTn(this_seq_batch)
+                    this_seq_batch.reverse()
                     
-                    for this_mapping in itertools.izip(maprecord_iter,
-                                                       itertools.repeat(None,
-                                                       MAX_SEQS)):
-                        volume_name = this_mapping[0].ref_name
-                        volume_name += this_mapping[0].test_viral_seq.seq_name
-                        print volume_name
+                    for this_mapping in self.MapToRefs(this_blast,
+                                                       this_seq_batch):
+                        volume_name = this_mapping.ref_name
+                        volume_name += this_mapping.test_viral_seq.seq_name
 
-                        self.my_shelf[volume_name] = this_mapping[0]
+                        self.my_shelf[volume_name] = this_mapping
+
+                
                 
                 
         
-    def MapToRefs(self, BLAST_RECORD, SEQ_RECORD):
+    def MapToRefs(self, BLAST_RECORDS, SEQ_RECORD):
         """
         MapToRefs
-            Uses a BLAST_RECORD to create a MappingRecord.
+            Use a sequence of BLAST_RECORDs to create a sequence of
+            MappingRecord.
         """
         #reg_exp gets the Genbank ID from the header
-        checker = re.match('.*?\|(\w{1,2}\d*\.\d*).*',BLAST_RECORD.title)
-        ref_name = str(checker.groups()[0])
-        this_record = PyVirus.BkgSeq(SEQ_RECORD.seq.tostring(), SEQ_RECORD.id)
-        this_mapping = MappingRecord(ref_name, this_record)
-        this_mapping.CalculateMapping(BLAST_RECORD)
 
-        return this_mapping
+        for this_rec in itertools.izip(BLAST_RECORDS, iter(SEQ_RECORD)):
+            checker = re.match('.*?\|(\w{1,2}\d*\.\d*).*', this_rec[0].title)
+            ref_name = str(checker.groups()[0])
+            this_bkgseq = PyVirus.BkgSeq(this_rec[1], None)
+            this_mapping = MappingRecord(ref_name, this_bkgseq)
+            this_mapping.CalculateMapping(this_rec[0])
+
+            yield this_mapping
 
     
         
