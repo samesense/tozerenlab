@@ -49,7 +49,7 @@ def checkStart(sys_args, req_args, examples, arg_count, use_eq_req):
             printError(sys_args, req_args, examples)        
     else:
         if not len(sys_args) >= arg_count +1:
-            printErro(sys_args, req_args, examples)
+            printError(sys_args, req_args, examples)
             
 
 

@@ -49,7 +49,7 @@ def getEdges(afile):
     edges = dict()
     f_edges = open(afile)
     for line in f_edges:
-        [node1, node2] = [x.strip()for x in line.split('\t')]
+        [node1, node2] = [x.strip() for x in line.split('\t')]
         if not edges.has_key(node1): 
             edges[node1] = dict()
         if not edges.has_key(node2): 
