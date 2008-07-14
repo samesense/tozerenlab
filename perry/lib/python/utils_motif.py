@@ -20,7 +20,7 @@ def annotation2protein(afile, tool_dict):
     f = open(afile)
     for line in f.xreadlines():
         [geneid, start, stop,
-         domain, seq_desc, tool] = map(string.strip, line.split('\t'))
+         domain, seq_desc, tool] = [x.strip() for x in line.split('\t')]
         start = int(start)
         stop = int(stop)
         if tool_dict.has_key( tool ):
@@ -47,7 +47,7 @@ def protein2annotation(afile, tool_dict):
     f = open(afile)
     for line in f.xreadlines():
         [geneid, start, stop,
-         domain, seq_desc, tool] = map(string.strip, line.split('\t'))
+         domain, seq_desc, tool] = [x.strip() for x in line.split('\t')]
         start = int(start)
         stop = int(stop)
         if tool_dict.has_key( tool ):
@@ -68,7 +68,7 @@ def protein2annotation_forMotifs(afile, motifs):
     f = open(afile)
     for line in f.xreadlines():
         [geneid, start, stop,
-         domain, seq_desc, tool] = map(string.strip, line.split('\t'))
+         domain, seq_desc, tool] = [x.strip() for x in line.split('\t')]
         start = int(start)
         stop = int(stop)
         if motifs.has_key(domain):
@@ -89,7 +89,7 @@ def annotation2protein_forMotifs(afile, motifs):
     f = open(afile)
     for line in f.xreadlines():
         [geneid, start, stop,
-         domain, seq_desc, tool] = map(string.strip, line.split('\t'))
+         domain, seq_desc, tool] = [x.strip() for x in line.split('\t')]
         start = int(start)
         stop = int(stop)
         if motifs.has_key(domain):
