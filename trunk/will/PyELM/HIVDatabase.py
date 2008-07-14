@@ -26,7 +26,8 @@ def MakeBatch(ITERABLE, NUM_PER_BATCH):
         if len(internal_list) == NUM_PER_BATCH:
             yield copy.deepcopy(internal_list)
             internal_list = []
-    yield copy.deepcopy(internal_list)
+    if len(internal_list) != 0:
+        yield copy.deepcopy(internal_list)
 
 
 class MappingRecord():
