@@ -11,24 +11,7 @@ from Bio import SeqIO
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_protein, generic_nucleotide
-from Bio.Blast import NCBIXML
-
-
-def MakeMapping(ALIGNMENT):
-	REF_ITER = iter(ALIGNMENT[1])
-	TEST_ITER = iter(ALIGNMENT[0])
-	filterFun = lambda x: x[0] != '-'
-	mapping_val = []
-	num_val = []
-	ref_num_inter = IT.chain(IT.ifilter(filterFun, IT.izip(REF_ITER, IT.count())), IT.repeat(('-',len(ALIGNMENT[1]))))
-	test_iter = IT.ifilter(filterFun, IT.izip(TEST_ITER, ref_num_inter))
-	for this_iter in test_iter:
-		mapping_val.append(this_iter[0])
-		num_val.append(this_iter[1][1])
-	print ALIGNMENT[1] + str(len(ALIGNMENT[1]))
-	print ALIGNMENT[0]
-	print str(mapping_val) + str(len(mapping_val))
-	print str(num_val) + str(len(num_val))
+from Bio.Blast import NCBIXML, NCBIStandalone
 
 
 class Gene():
@@ -262,13 +245,12 @@ class RefBase():
 
                         ProcessVar = subprocess.Popen(command, shell = True)
                         ProcessVar.wait()
+
+                        
                         
                         with open(file_names[1], mode = 'r') as handle:
-                                blast = NCBIXML.parse(handle)
-
-                                for a_blast in blast:
-                                        for this_align in a_blast.alignments:
-                                                yield this_align
+                                blast_rec = NCBIXML.parse(handle).next()
+                return blast_rec
 
         def MakeBLASTCommand(self, BLAST_TYPE, INPUT_FILE, OUTPUT_FILE,
                              EXTRA_FLAGS = None):
