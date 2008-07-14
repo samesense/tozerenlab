@@ -257,15 +257,18 @@ class RefBase():
                                             handle, 'fasta')
 
                         command = self.MakeBLASTCommand('blastn', file_names[0],
-                                                        file_names[1])
+                                                        file_names[1],
+                                                        EXTRA_FLAGS = ' -B ' + str(len(INPUT_GENOME)))
 
                         ProcessVar = subprocess.Popen(command, shell = True)
                         ProcessVar.wait()
                         
                         with open(file_names[1], mode = 'r') as handle:
-                                this_blast = NCBIXML.parse(handle).next()
+                                blast = NCBIXML.parse(handle)
 
-                return this_blast
+                                for a_blast in blast:
+                                        for this_align in a_blast.alignments:
+                                                yield this_align
 
         def MakeBLASTCommand(self, BLAST_TYPE, INPUT_FILE, OUTPUT_FILE,
                              EXTRA_FLAGS = None):
