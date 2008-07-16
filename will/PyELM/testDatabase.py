@@ -8,7 +8,7 @@ import itertools
 
 def setupModule():
     dest_dir = os.environ['PYTHONSCRATCH']
-    source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    source_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     
     PyVirus.RefBase(source_dir, dest_dir, BUILD = True)
 
@@ -19,7 +19,7 @@ def testMappingRecord():
     Test loading MappingRecord
     """
     dest_dir = os.environ['PYTHONSCRATCH']
-    source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    source_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
     with open(seq_file) as handle:
@@ -37,7 +37,7 @@ def CheckMappingRecord(INPUT_SEQ):
     
 def testMappingBase():
     dest_dir = os.environ['PYTHONSCRATCH']
-    source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    source_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
                                            'test_self.slf')
@@ -50,7 +50,7 @@ def testMappingBase():
     Test loading MappingBase
     """
     dest_dir = os.environ['PYTHONSCRATCH']
-    source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    source_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, 
@@ -63,7 +63,7 @@ def testAddtoShelf():
     Test AddtoShelf
     """
     dest_dir = os.environ['PYTHONSCRATCH']
-    source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    source_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
@@ -86,7 +86,7 @@ def testSaveShelf():
     """
 
     dest_dir = os.environ['PYTHONSCRATCH']
-    source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    source_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,

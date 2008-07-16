@@ -62,7 +62,7 @@ def testRefLoading():
     """
     Test Genbank parsing of Reference Sequences
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     filter_fun = lambda x: x[-3:] == '.gb'
     this_iter = itertools.izip(itertools.ifilter(filter_fun,
                                                  iter(os.listdir(base_dir))),
@@ -80,7 +80,7 @@ def testRefBaseLoading():
     """
     Test RefBase loading
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir)
     nose.tools.assert_not_equal(ref_base, None, 'Could not Load Data')
@@ -133,7 +133,7 @@ def testRefBaseBuilding():
 
     correct_suffix_list = ['hr', 'in', 'sd', 'si', 'sq']
     correct_base_list = ['ref_aa.fasta.p', 'ref_nt.fasta.n']
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir, BUILD = True)
 
@@ -150,7 +150,7 @@ def testTranslateAll():
     """
     Test the translation of whole genome sequences
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir)
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
@@ -176,23 +176,5 @@ def tearDownModule():
     file_list = os.listdir(os.environ['PYTHONSCRATCH'])
     for this_file in file_list:
         os.remove(os.environ['PYTHONSCRATCH'] + this_file)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
     

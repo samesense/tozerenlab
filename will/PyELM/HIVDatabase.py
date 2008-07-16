@@ -12,7 +12,7 @@ import logging
 import cPickle as pickle
 import types
 
-ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+ref_source = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
 bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
