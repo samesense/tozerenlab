@@ -13,7 +13,7 @@ geneid st stp annotation_name seq annotation_tool
 and making annotated multiple alignment plots.
 """
 import utils_graph
-import pylab, math
+import pylab, math, gc
 
 def annotation2protein(afile, tool_dict):
     d = dict()
@@ -203,26 +203,64 @@ def extendSeq(max_len, seq):
         seq.append(0)
     return seq
 
-def mkProteinPlot(motif_ls_file, motif_matrix_dir, output_file):
+def loadMatrix(afile):
+    alignment_matrix = []
+    longest_len = 0
+    matrix_file = open(afile)
+    for line in matrix_file:
+        alignment_matrix.append([])
+        for item in line.strip().split():
+            alignment_matrix[-1].append(int(item))
+        seq_len = len(alignment_matrix[-1])
+        if seq_len > longest_len:
+            longest_len = seq_len    
+    return [extendSeq(longest_len, seq) for seq in alignment_matrix]
+
+def mkProteinPlot(motif_name_file, motif_matrix_dir, output_file):
     """ This makes the multiple alignment annotation figure.
 
-    @param motif_ls_file: file with the names of the motifs
-    @param motif_matrix_dir: directory with multiple alignments annotated w/ 0/1 for absence/presense
+    @param motif_ls_file: file with the locations and names of the motifs
+                          separated by tabs, one per line
+    @param motif_matrix_dir: directory with multiple 
+                             alignments annotated w/ 0/1 for absence/presense
     @param out_file: put the figure here
     """
-
-    motifs = utils_graph.getNodes(motif_ls_file)
-    cols = math.ceil( float(len(motifs.keys()))/float(5) )
+    
+    motifs = {}
+    afile = open(motif_name_file)
+    for line in afile:
+        [location, name] = line.strip().split('\t')
+        motifs[name] = location
+    motif_count = len(motifs.keys())
+    print motifs
+    if motif_count < 4:
+        # up to 3x1
+        cols = 1
+        rows = motif_count
+    elif motif_count < 7:
+        # up to 3x2
+        cols = 2
+        rows = int(math.ceil( float(motif_count) / float(2) ))
+    elif motif_count < 10:
+        # up to 3x3
+        cols = 3
+        rows = int(math.ceil( float(motif_count) / float(3) ))
+    else:
+        cols = 4
+        rows = int(math.ceil( float(motif_count) / float(4) ))
+    #cols = math.ceil( float(len(motifs.keys()))/float(5) )
     motif_index = 1
     motif_figure = pylab.gcf()
     default_size = motif_figure.get_size_inches()
     motif_figure.set_size_inches( (default_size[0]*3, default_size[1]*3) )
-    for motif in motifs.keys():
-        motif_matrix = pylab.imread(motif)
-        pylab.subplot(5, cols, motif_index)
+    for motif in motifs.keys():        
+        motif_matrix = loadMatrix(motif_matrix_dir + motifs[motif])
+        print rows, cols, motif_index
+        pylab.subplot(rows, cols, motif_index)
         pylab.imshow(motif_matrix)
-        pylab.xticks([],[])
-        pylab.yticks([],[])
-        pylab.title(motif.split('.')[-1])
+        pylab.xticks([], [])
+        pylab.yticks([], [])
+        pylab.title(motif)
         motif_index += 1
     pylab.savefig(output_file)
+    pylab.close()

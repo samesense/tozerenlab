@@ -25,6 +25,9 @@ def printError(sys_args, req_args, examples):
     print 'ENTER'
     for arg in req_args:
         print '\t', arg
+    print 'YOU GAVE ME'
+    for arg in sys_args[1:]:
+        print '\t', arg
     print 'EXAMPLE'
     print 'python', sys_args[0], str(examples)[1:-1].replace(',', '')
     sys.exit(0)
