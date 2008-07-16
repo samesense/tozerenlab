@@ -131,6 +131,19 @@ def intersectLists(list_of_lists):
             same[item] = True
     return same
 
+def intersectFiles(list_of_files):
+    """ Given a list of files, return the intersection
+    as a {}.
+
+    @param list_of_lists: [] of files
+    @return: {} of genes
+    """
+
+    list_of_lists = []
+    for afile in list_of_files:
+        list_of_lists.append(getNodes(afile))
+    return intersectLists(list_of_lists)
+    
 def unionLists(list_of_lists):
     """ Given a list of {}, return the union
     as a {}.
@@ -171,3 +184,21 @@ def avgConnectivity(gene_ls, network):
             connectivity += degree(gene, network)
             total += 1
     return float(connectivity) / float(total)
+
+def getDegreeDistribution(gene_dict, network_edges):
+    """ For these genes, return the degree distribution
+        according to this network.
+
+    @param gene_dict: {} w/ gene names
+    @param network_edges {} of edges d[n1][n2] = True
+    @return {} of degrees d[degree] = count
+    """
+
+    degreeDict = []
+    for gene in gene_dict.keys():
+        if network_edges.has_key(gene):
+            degreeDict.append(degree(gene, network_edges))
+            #if not degreeDict.has_key(deg):
+            #    degreeDict[str(deg)] = 0
+            #degreeDict[str(deg)] += 1
+    return degreeDict

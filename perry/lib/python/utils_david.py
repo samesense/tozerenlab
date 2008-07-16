@@ -36,7 +36,7 @@ def cat2term2protein_sig(iterable):
 
     cat2term2protein = {}
     for line in iterable:
-        splitup = [x.strip for x in  line.split('\t')]
+        splitup = [x.strip() for x in line.split('\t')]
         category = splitup[0]
         term = splitup[1]
         count = splitup[2]
@@ -76,14 +76,15 @@ def cat2term2protein_all(iterable):
     """
 
     cat2term2protein = {}
-    categories = [x.strip for x in iterable[0].split('\t')[3:7]]
+    categories = [x.strip() for x in iterable[0].split('\t')[3:7]]
+    print categories
     for cat in categories:
         cat2term2protein[cat] = {}
     for line in iterable[1:]:
-        splitup = [x.strip for x in line.split('\t')]
+        splitup = [x.strip() for x in line.split('\t')]
         for i in xrange(len(categories)):
             cat = categories[i]
-            terms = [x.strip for x in splitup[i+3].strip(',').split(':')]
+            terms = [x.strip() for x in splitup[i+3].strip(',').split(':')]
             for index in xrange(len(terms)-1):
                 if terms[index] != '':
                     term = terms[index].split()[-1] + ':'\
@@ -104,7 +105,7 @@ def cat2term2protein_allFile(afile):
     """
 
     f_david = open(afile)
-    cat2term2protein = cat2term2protein_all(f_david)
+    cat2term2protein = cat2term2protein_all(f_david.readlines())
     f_david.close()
     return cat2term2protein
 
@@ -126,26 +127,6 @@ def getSigKEGGgenes_sigFile(afile, cutoff):
                 genes[gene] = True
     return genes
 
-def getSigKEGGgenes(motif_search_results, background, cutoff):
-    """ Given a foreground and background {}, find
-        significant KEGG pathways with DAVID and return
-        {} of foreground genes that are in these pathways
-        for the given p-value cutoff.
-        
-    @param motif_search_results: foreground {}
-    @param backgground: background gene {}
-    @param cuttoff: float p-value cutoff
-    @return: {} of foreground genes in sig KEGG pathways
-    """
-
-    genes = {}
-    cat2term2protein = getSigTerms(motif_search_results, background)
-    for path in cat2term2protein['KEGG_PATHWAY'].keys():
-        if cat2term2protein['KEGG_PATHWAY'][path]['pvalue'] < cutoff:
-            for gene in cat2term2protein['KEGG_PATHWAY'][path]['genes'].keys():
-                genes[gene] = True
-    return genes
-
 #def getGenesForEnrichedKEGG(afile, cutOff):
 #    genes = {}
 #    cat2term2protein = cat2term2protein_sigFile(afile)
@@ -158,15 +139,14 @@ def getSigKEGGgenes(motif_search_results, background, cutoff):
 #            genes[gene] = True
 #    return genes
 
-def getAllTerms(gene_file):
+def getAllTerms_web(gene_file):
     """ Given a file with one gene per line, return
         the parsed DAVID annotation for the genes in
         the form [Category][Term]['count' | 'genes'={} ].
     
     @param gene_file: one gene per line in this file
-    @return [Category][Term]['count' | 'genes'={} ]
+    @return string representation of downloaded webpage
     """
-
     david_prefix = 'http://david.abcc.ncifcrf.gov/'
     moz_emu = PyMozilla.MozillaEmulator(cacher=None, trycount=0)
     files = [['fileBrowser', 'testData', '']]
@@ -192,19 +172,28 @@ def getAllTerms(gene_file):
                                           + david_cats + '&currentList=0')
     index = user_download_page.find('UserDownload')
     addr = user_download_page[index+13:].split('.')[0]
-    return cat2term2protein_all(moz_emu.download(david_prefix
-                                                 + 'UserDownload/'
-                                                 + addr 
-                                                 + '.txt').split('\n')[1:-1])
+    return moz_emu.download(david_prefix + 'UserDownload/' + addr + '.txt')
 
-def getSigTerms(fg_file, bg_file):
+def getAllTerms(gene_file):
+    """ Given a file with one gene per line, return
+        the parsed DAVID annotation for the genes in
+        the form [Category][Term]['count' | 'genes'={} ].
+    
+    @param gene_file: one gene per line in this file
+    @return [Category][Term]['count' | 'genes'={} ]
+    """
+    web_page = getAllTerms_web(gene_file)
+    # page ends in a newline
+    return cat2term2protein_all(web_page.split('\n')[:-1])
+
+def getSigTerms_web(fg_file, bg_file):
     """ Given a file with one gene per line, return
         the parsed DAVID significance chart for the genes in
         the form [Category][Term]['count' | 'genes'={} ].
     
     @param fg_file: one gene per line in this file
     @param bg_file: one gene per line; backround gene set
-    @return [Category][Term]['count' | 'p-value' | 'genes'={} ]
+    @return string representing DAVID webpage
     """
 
     david_prefix = 'http://david.abcc.ncifcrf.gov/'
@@ -244,13 +233,46 @@ def getSigTerms(fg_file, bg_file):
     
     moz_emu.download(david_prefix + 'template.css')
     moz_emu.download(david_prefix + 'scripts/sidebar.js')
-    moz_emu.download(david_prefix + 'summary.js')
+    moz_emu.download(david_prefix + 'summary.jsp')
 
     user_download_page = moz_emu.download(david_prefix
                                           + 'chartReport.jsp?annot=,'
                                           + david_cats + '&currentList=0')
     index = user_download_page.find('UserDownload')
     addr = user_download_page[index+13:].split('.')[0]
-    res = moz_emu.download('http://david.abcc.ncifcrf.gov/UserDownload/'
-                           + addr  + '.txt')
-    return cat2term2protein_sig(res.split('\n')[1:-1])
+    return moz_emu.download('http://david.abcc.ncifcrf.gov/UserDownload/'
+                            + addr  + '.txt')
+
+def getSigTerms(fg_file, bg_file):
+    """ Given a file with one gene per line, return
+        the parsed DAVID significance chart for the genes in
+        the form [Category][Term]['count' | 'genes'={} ].
+    
+    @param fg_file: one gene per line in this file
+    @param bg_file: one gene per line; backround gene set
+    @return [Category][Term]['count' | 'p-value' | 'genes'={} ]
+    """
+
+    web_page = getSigTerms_web(fg_file, bg_file)
+    # page ends in a newline
+    return cat2term2protein_sig(web_page.split('\n')[1:-1])
+
+def getSigKEGGgenes(motif_search_results, background, cutoff):
+    """ Given a foreground and background {}, find
+        significant KEGG pathways with DAVID and return
+        {} of foreground genes that are in these pathways
+        for the given p-value cutoff.
+        
+    @param motif_search_results: foreground {}
+    @param backgground: background gene {}
+    @param cuttoff: float p-value cutoff
+    @return: {} of foreground genes in sig KEGG pathways
+    """
+
+    genes = {}
+    cat2term2protein = getSigTerms(motif_search_results, background)
+    for path in cat2term2protein['KEGG_PATHWAY'].keys():
+        if cat2term2protein['KEGG_PATHWAY'][path]['pvalue'] < cutoff:
+            for gene in cat2term2protein['KEGG_PATHWAY'][path]['genes'].keys():
+                genes[gene] = True
+    return genes
