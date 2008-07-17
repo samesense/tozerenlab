@@ -11,8 +11,11 @@ import copy
 import logging
 import cPickle as pickle
 import types
+import time
 
-ref_source = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
+
+
+ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
 bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
@@ -20,6 +23,7 @@ class MappingRecord():
     def __init__(self, REF_NAME, TEST_VIRAL):
         self.ref_name = REF_NAME
 
+        self.test_viral_seq = TEST_VIRAL
         self.test_viral_seq = TEST_VIRAL
 
         self.mapping = None
@@ -80,17 +84,16 @@ class MappingBase():
         ITER or GENERATOR
         """
         
-           
-        for this_seq in INPUT_SEQRECORD_ITER:
-            this_blast = self.ref_base.BLASTn(this_seq)
+        blast_seq_iter, map_seq_iter = itertools.tee(INPUT_SEQRECORD_ITER, 2)
+        for this_blast in self.ref_base.BLASTn(blast_seq_iter, 
+												NUM_THREADS = 4):
+			
+			for this_mapping in self.MapToRefs(this_blast, map_seq_iter.next()):
+				volume_name = this_mapping.ref_name
+				volume_name += this_mapping.test_viral_seq.seq_name
+				print volume_name
 
-            for this_mapping in self.MapToRefs(this_blast,
-                                           this_seq):
-                volume_name = this_mapping.ref_name
-                volume_name += this_mapping.test_viral_seq.seq_name
-                print volume_name
-
-                self.my_shelf[volume_name] = this_mapping
+				self.my_shelf[volume_name] = this_mapping
 
     def SaveShelf(self):
         """

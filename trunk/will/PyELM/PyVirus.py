@@ -14,6 +14,17 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_protein, generic_nucleotide
 from Bio.Blast import NCBIXML, NCBIStandalone
+import ctypes
+
+
+def fLock(FILENAME):
+	print 'in fLock'
+	h = ctypes.cdll.msvcrt._sopen(FILENAME, 0, 0x10, 0)
+	while h == -1:
+		time.sleep(0.5)
+		h = ctypes.cdll.msvcrt._sopen(FILENAME, 0, 0x10, 0)
+	ctypes.cdll.msvcrt._close(h)
+	print 'leaving fLock'
 
 
 class Gene():
@@ -192,98 +203,58 @@ class RefBase():
 				SeqIO.write(this_iter, handle, "fasta")
 
 		command = self.MakeBLASTCommand('formatdb',
-										self.nt_name, self.nt_name,
+										self.nt_name,
 										EXTRA_FLAGS = ' -p F -o T')
 		
 		ProcessVar = subprocess.Popen(command, shell = True)
 		ProcessVar.wait()
 
 		command = self.MakeBLASTCommand('formatdb',
-										self.aa_name, self.aa_name,
+										self.aa_name,
 										EXTRA_FLAGS = ' -p T -o T')
 
 		ProcessVar = subprocess.Popen(command, shell = True)
 		ProcessVar.wait()
 
-	def BLASTx(self, INPUT_GENOME):
+	def BLASTx(self, INPUT_SEQ_RECORD, NUM_THREADS = None):
 		"""
 		BLASTx
 				Performs a BLASTx query on the database to determine
 		the possible translations of the INPUT_GENOME
 		"""
-		with BLASTContext(self.dir_name, 2) as file_names:
+		if NUM_THREADS == None:
+			b_controler = BLASTController(INPUT_SEQ_RECORD, 'BLASTx', NUM_SEQS = 1, 
+										BLAST_DIR = self.blast_dir,
+										SCRATCH_DIR = self.dir_name)
+			return b_controler.GetSingleResult()
+		else:
+			b_controler = BLASTController(INPUT_SEQ_RECORD, 'BLASTx', 
+										BLAST_DIR = self.blast_dir,
+										SCRATCH_DIR = self.dir_name, 
+										NUM_THREADS = NUM_THREADS)
+			b_controler.start()
+			return b_controler.ResultGen()
 
-			with open(file_names[0], mode = 'w') as handle:
-				SeqIO.write([INPUT_GENOME],
-							handle, 'fasta')
-
-			command = self.MakeBLASTCommand('blastx', file_names[0],
-											file_names[1])
-			ProcessVar = subprocess.Popen(command)
-			ProcessVar.wait()
-		   
-			with open(file_names[1], mode = 'r') as handle:
-				this_blast = NCBIXML.parse(handle).next()
-
-		return this_blast
-
-	def BLASTn(self, INPUT_GENOME, DUMP_LOCATION = None):
+	def BLASTn(self, INPUT_SEQ_RECORD, NUM_THREADS = None):
 		"""
 		BLASTn
 				Performs a BLASTn query to align the provided genome to
 		the reference genomes.
 		"""
-		if type(INPUT_GENOME) != types.ListType:
-			INPUT_GENOME = [INPUT_GENOME]
-
-		with BLASTContext(self.dir_name, 2) as file_names:
-
-			with open(file_names[0], mode = 'w') as handle:
-				SeqIO.write(INPUT_GENOME,
-							handle, 'fasta')
-
-			command = self.MakeBLASTCommand('blastn', file_names[0],
-											file_names[1],
-											EXTRA_FLAGS = ' -B ' + str(len(INPUT_GENOME)))
-
-			ProcessVar = subprocess.Popen(command, shell = True)
-			ProcessVar.wait()
-
-			with open(file_names[1], mode = 'r') as handle:
-				blast_rec = NCBIXML.parse(handle).next()
-		if DUMP_LOCATION == None:
-			return blast_rec
+		if NUM_THREADS == None:
+			b_controler = BLASTController(INPUT_SEQ_RECORD, 'BLASTn', NUM_SEQS = 1, 
+										BLAST_DIR = self.blast_dir,
+										SCRATCH_DIR = self.dir_name)
+			return b_controler.GetSingleResult()
 		else:
-			DUMP_LOCATION.put()
-					
-
-	def MultiThreadedBLAST(INPUT_SEQ_ITER, BLAST_TYPE = 'BLASTn',
-						   NUM_THREADS = 4):
-		"""
-		MultiThreadedBLAST
-				A controller for multithreading the BLAST calls.  This
-		will leave each BLAST result in a temp_file and then remove them
-		upon yield'ing the result.
-		"""
-		
-		if BLAST_TYPE == 'BLASTn':
-			worker_fun = lambda x: self.BLASTn(x)
-		elif BLAST_TYPE == 'BLASTx':
-			worker_fun = lambda x: self.BLASTx(x)
-		else:
-			raise KeyError, 'Unrecognized BLAST type'
-		this_seph = threading.Semaphore(NUM_THREADS)
-		this_ans = Queue.Queue(0)
-
-		for this_seq in INPUT_SEQ_ITER:
-			with this_seph:
-				this_thread = threading.Thread(target = worker_fun,
-											   args = (this_seq))
-				this_thread.start()
-	
-
-	def MakeBLASTCommand(self, BLAST_TYPE, INPUT_FILE, OUTPUT_FILE,
-						 EXTRA_FLAGS = None):
+			b_controler = BLASTController(INPUT_SEQ_RECORD, 'BLASTn', 
+										BLAST_DIR = self.blast_dir,
+										SCRATCH_DIR = self.dir_name, 
+										NUM_THREADS = NUM_THREADS)
+			b_controler.start()
+			return b_controler.ResultGen()
+			
+	def MakeBLASTCommand(self, BLAST_TYPE, INPUT_FILE, EXTRA_FLAGS = None):
 		"""
 		MakeBLASTCommand
 				Creates a command that can be passed to Popen for
@@ -293,25 +264,14 @@ class RefBase():
 		if BLAST_TYPE == 'formatdb':
 			command = self.blast_dir + 'bin\\formatdb.exe'
 
-		if BLAST_TYPE == 'blastx':
-			command = self.blast_dir + 'bin\\blastall.exe'
-			command += ' -p blastx -m 7'
-			command += ' -d ' + self.aa_name
-			command += ' -o ' + OUTPUT_FILE
-			
-		if BLAST_TYPE == 'blastn':
-			command = self.blast_dir + 'bin\\blastall.exe'
-			command += ' -p blastn -m 7'
-			command += ' -d ' + self.nt_name
-			command += ' -g F'
-			command += ' -o ' + OUTPUT_FILE
-
 		command += ' -i ' + INPUT_FILE
 		
 		if EXTRA_FLAGS != None:
 			command +=  EXTRA_FLAGS
 
 		return command
+
+
 
 class BLASTContext:
         """
@@ -339,9 +299,10 @@ class BLASTContext:
 class BLASTController:
 
 	def __init__(self, SEQ_ITER, BLAST_TYPE, NUM_SEQS = None,
-				 BLAST_DIR = "C:\\local_blast\\bin\\",
-				 SCRATCH_DIR = "C:\\pythonscrath\\",
-				 NUM_THREADS = 4):
+				 BLAST_DIR = "C:\\local_blast\\",
+				 SCRATCH_DIR = "C:\\pyscratch\\",
+				 NUM_THREADS = 4, AA_BASE = 'ref_aa.fasta',
+				 NT_BASE = 'ref_nt.fasta'):
 		if BLAST_TYPE == 'BLASTn':
 			self.blast_type = 'blastn'
 		elif BLAST_TYPE == 'BLASTx':
@@ -353,54 +314,89 @@ class BLASTController:
 		else:
 			self.seqs = SEQ_ITER
 			
-		self.thread_seph = threading.Sephamore(NUM_THREADS)
-		self.file_seph = threading.Sephamore(min(50, NUM_SEQS))
+		self.thread_seph = threading.Semaphore(NUM_THREADS)
+		self.file_seph = threading.Semaphore(20)
 		self.seq_file_names = Queue.Queue()
 		self.res_file_names = Queue.Queue()
-		self.scrath_dir = SCRATCH_DIR
+		self.scratch_dir = SCRATCH_DIR
+		self.blast_dir = BLAST_DIR
+		self.aa_name = SCRATCH_DIR + AA_BASE
+		self.nt_name = SCRATCH_DIR + NT_BASE
 
 	def start(self):
 		"""
 		start
 			Starts the multithreaded BLASTing
 		"""
+		cont_thread = threading.Thread(name = 'BLAST-CONT',
+						target = self.runBLASTs)
+		cont_thread.start()
+					
+	def runBLASTs(self):
+		"""
+		runBLASTs
+			Controls the starting and stopping of the workers
+		"""
+		this_seq = self.seqs.next()
+		these_files = self.MakeFiles()
+		with open(these_files[0], mode = 'w') as seq_handle:
+			SeqIO.write([this_seq],
+						seq_handle, 'fasta')
+		#wait until there is an availble thread
+		self.thread_seph.acquire()
+		this_thread = self.BLASTWorker(self.blast_type, these_files[0],
+						these_files[1], self.blast_dir, self.nt_name,
+						self.aa_name, self.thread_seph)
+		this_thread.start()
+		this_thread.join()
+		self.seq_file_names.put(these_files[0])
+		self.res_file_names.put(these_files[1])
+	
+		
 		
 		for this_seq in self.seqs:
 			#autimatically limits the number of files possible
 			these_files = self.MakeFiles()
+			with open(these_files[0], mode = 'w') as seq_handle:
+				SeqIO.write([this_seq],
+							seq_handle, 'fasta')
+			#wait until there is an availble thread
+			self.thread_seph.acquire()
+			this_thread = self.BLASTWorker(self.blast_type, these_files[0],
+							these_files[1], self.blast_dir, self.nt_name,
+							self.aa_name, self.thread_seph)
+			this_thread.start()
 			self.seq_file_names.put(these_files[0])
 			self.res_file_names.put(these_files[1])
-			#wait until there is an availble thread
-			with self.thread_seph:
-				self.BLASTWorker(self.blast_type, these_files[0],
-								these_files[1], self.blast_dir)
+				
 		self.seq_file_names.put(StopIteration)
 		self.res_file_names.put(StopIteration)
-					
-			
+		
 	def ResultGen(self):
 		"""
 		ResultGen
 			A generator function which returns the blast results in the 
 			order in which they were provided.
 		"""
-		
 		while True:
 			this_seq_file = self.seq_file_names.get()
 			this_res_file = self.res_file_names.get()
 			if this_seq_file == StopIteration:
 				break
-			file_size = os.path.getsize(this_res_file)
-			while file_size < 10:
-				time.sleep(5)
-				file_size = os.path.getsize(this_res_file)
-			with open(file_names[1], mode = 'r') as handle:
-				blast_rec = NCBIXML.parse(handle).next()
 			
-			self.file_seph.release()				
+			fLock(this_res_file)
+			
+			with open(this_res_file, mode = 'r') as handle:
+				blast_rec = NCBIXML.parse(handle).next()
+				
+			fLock(this_res_file)
+			os.remove(this_res_file)
+			self.file_seph.release()
+			
+			fLock(this_seq_file)
 			os.remove(this_seq_file)
 			self.file_seph.release()
-			os.remove(this_res_file)
+			
 			
 			yield blast_rec
 				
@@ -415,25 +411,61 @@ class BLASTController:
 		"""
 		file_names = []
 		for i in xrange(2):
-			self.file_seph.aquire()
-			newNamedFile = tempfile.NamedTemporaryFile(prefix = PREFIX,
-									   dir = self.scrath_dir)
+			self.file_seph.acquire()
+			newNamedFile = tempfile.NamedTemporaryFile(prefix = 'temp_', 
+														dir = self.scratch_dir)
 			file_names.append(newNamedFile.name)
 			newNamedFile.close()
+		return file_names
 
 
+	def GetSingleResult(self):
+		"""
+		GetSingleResult
+			A shortcut for getting a single BLAST result without any threading
+			nonsense.
+		"""
+		
+		these_files = self.MakeFiles()
+		with open(these_files[0], mode = 'w') as seq_handle:
+				SeqIO.write([self.seqs.next()],
+							seq_handle, 'fasta')
+		
+		this_worker = self.BLASTWorker(self.blast_type, these_files[0],
+							these_files[1], self.blast_dir, self.nt_name,
+							self.aa_name, self.thread_seph)
+		
+		command = this_worker.MakeBLASTCommand()
+		ProcessVar = subprocess.Popen(command, shell = True)
+		ProcessVar.wait()
+		
+		with open(these_files[1], mode = 'r') as handle:
+			blast_rec = NCBIXML.parse(handle).next()
+		
+		
+		os.remove(these_files[0])
+		os.remove(these_files[1])
+		
+		return blast_rec
+					
+		
 	class BLASTWorker(threading.Thread):
 		def __init__(self, BLAST_TYPE, SEQ_FILE, OUTPUT_FILE,
-					 BLAST_DIR):
-			if BLAST_TYPE == 'BLASTn':
+					 BLAST_DIR, NT_NAME, AA_NAME, THREAD_SEPH):
+			if BLAST_TYPE == 'blastn':
 				self.blast_type = 'blastn'
-			elif BLAST_TYPE == 'BLASTx':
+			elif BLAST_TYPE == 'blastx':
 				self.blast_type = 'blastx'
 			else:
 				raise KeyError, 'Unrecognized BLAST type'
+				
+			threading.Thread.__init__(self)
 			self.seq_file = SEQ_FILE
 			self.output_file = OUTPUT_FILE
 			self.blast_dir = BLAST_DIR
+			self.aa_name = AA_NAME
+			self.nt_name = NT_NAME
+			self.thread_seph = THREAD_SEPH
 
 
 		def run(self):
@@ -442,47 +474,37 @@ class BLASTController:
 				Performs the BLAST query and waits for
 				completion.
 			"""
-			if BLAST_TYPE == 'BLASTn':
-				blast_type = 'blastn'
-			elif BLAST_TYPE == 'BLASTx':
-				blast_type = 'blastx'
-			else:
-				raise KeyError, 'Unrecognized BLAST type'
-
-			command = self.MakeBLASTCommand(selfl.blast_type,
-											self.seq_file,
-											self.output_file)
+			
+			command = self.MakeBLASTCommand()
 			ProcessVar = subprocess.Popen(command, shell = True)
 			ProcessVar.wait()
+			self.thread_seph.release()
 			
 				   
 						   
-		def MakeBLASTCommand(self, BLAST_TYPE, INPUT_FILE, OUTPUT_FILE,
-							 EXTRA_FLAGS = None):
-				"""
-				MakeBLASTCommand
-						Creates a command that can be passed to Popen for
-				executing blast commands ... supports: formatdb, blastn,
-				blastx.
-				"""
+		def MakeBLASTCommand(self):
+			"""
+			MakeBLASTCommand
+					Creates a command that can be passed to Popen for
+			executing blast commands ... supports: formatdb, blastn,
+			blastx.
+			"""
 
-			if BLAST_TYPE == 'blastx':
+			if self.blast_type == 'blastx':
 				command = self.blast_dir + 'bin\\blastall.exe'
 				command += ' -p blastx -m 7'
 				command += ' -d ' + self.aa_name
-				command += ' -o ' + OUTPUT_FILE
+				command += ' -o ' + self.output_file
 					
-			if BLAST_TYPE == 'blastn':
+			if self.blast_type == 'blastn':
 				command = self.blast_dir + 'bin\\blastall.exe'
 				command += ' -p blastn -m 7'
 				command += ' -d ' + self.nt_name
 				command += ' -g F'
-				command += ' -o ' + OUTPUT_FILE
+				command += ' -o ' + self.output_file
 
-			command += ' -i ' + INPUT_FILE
+			command += ' -i ' + self.seq_file
 			
-			if EXTRA_FLAGS != None:
-				command +=  EXTRA_FLAGS
 
 			return command
 
