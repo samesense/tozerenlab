@@ -46,6 +46,7 @@ def testGenotyping():
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+    file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
     with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes))
@@ -62,7 +63,7 @@ def testRefLoading():
     """
     Test Genbank parsing of Reference Sequences
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
     filter_fun = lambda x: x[-3:] == '.gb'
     this_iter = itertools.izip(itertools.ifilter(filter_fun,
                                                  iter(os.listdir(base_dir))),
@@ -80,7 +81,7 @@ def testRefBaseLoading():
     """
     Test RefBase loading
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir)
     nose.tools.assert_not_equal(ref_base, None, 'Could not Load Data')
@@ -133,7 +134,7 @@ def testRefBaseBuilding():
 
     correct_suffix_list = ['hr', 'in', 'sd', 'si', 'sq']
     correct_base_list = ['ref_aa.fasta.p', 'ref_nt.fasta.n']
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir, BUILD = True)
 
@@ -150,7 +151,7 @@ def testTranslateAll():
     """
     Test the translation of whole genome sequences
     """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppred\\HIVRefs\\'
+    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
     dest_dir = os.environ['PYTHONSCRATCH']
     ref_base = PyVirus.RefBase(base_dir, dest_dir)
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
@@ -167,14 +168,50 @@ def CheckTranslateAll(REF_BASE, INPUT_CLASS, INPUT_RECORD):
     genome = INPUT_CLASS(INPUT_RECORD.seq.tostring(), 'testseq')
     genome.TranslateAll(REF_BASE)
 
-    nose.tools.assert_true(genome.annotation.has_key('env'))
+    nose.tools.assert_true(genome.annotation.has_key('env'))   
 
-    
+	
+def testGetSingleResult():
+	"""
+	Test the GetSingleResult of BLASTController
+	"""
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	with open(file_loc) as seq_handle:
+		seq_iter = SeqIO.parse(seq_handle, 'fasta').next()
+	
+	b_control = PyVirus.BLASTController(seq_iter, 'BLASTn', NUM_SEQS = 1)
+	this_res = b_control.GetSingleResult()
+	nose.tools.assert_true(this_res != None)
+	
+def testBLASTController():
+	"""
+	Test the MultiThreaded BLAST controller
+	"""
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	with open(file_loc) as seq_handle:
+		seq_iter = SeqIO.parse(seq_handle, 'fasta')
+		
+		b_control = PyVirus.BLASTController(seq_iter, 'BLASTn')
+		before = time.time()
+		b_control.start()
+		t_diff = time.time() - before
+		nose.tools.assert_true(t_diff < 20, 'Did not start in a new thread')
+		
+		counter = 0
+		time.sleep(5)
+		for this_rec in b_control.ResultGen():
+			counter += 1
+			nose.tools.assert_true(this_rec != None,
+									'Returned bad value')
+		nose.tools.assert_true(counter == 50, 
+			'Did not return the proper number of sequences')
+
 
 
 def tearDownModule():
-    file_list = os.listdir(os.environ['PYTHONSCRATCH'])
-    for this_file in file_list:
-        os.remove(os.environ['PYTHONSCRATCH'] + this_file)
+	time.sleep(1)
+	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
+	for this_file in file_list:
+		os.remove(os.environ['PYTHONSCRATCH'] + this_file)
 
     
