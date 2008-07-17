@@ -7,6 +7,7 @@ import os
 import PyVirus
 import tempfile
 import time
+import PyBLAST
 
 
 def testLoading():
@@ -39,7 +40,7 @@ def CheckSeqRecordLoading(INPUT_CLASS, INPUT_REC):
 
         
 
-def testGenotyping():
+def testGenotyping_SLOW():
     """
     Test Genotyping the Virus classes
     """
@@ -179,11 +180,11 @@ def testGetSingleResult():
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta').next()
 	
-	b_control = PyVirus.BLASTController(seq_iter, 'BLASTn', NUM_SEQS = 1)
+	b_control = PyBLAST.BLASTController(seq_iter, 'BLASTn', NUM_SEQS = 1)
 	this_res = b_control.GetSingleResult()
 	nose.tools.assert_true(this_res != None)
 	
-def testBLASTController():
+def testBLASTController_SLOW():
 	"""
 	Test the MultiThreaded BLAST controller
 	"""
@@ -191,7 +192,7 @@ def testBLASTController():
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta')
 		
-		b_control = PyVirus.BLASTController(seq_iter, 'BLASTn')
+		b_control = PyBLAST.BLASTController(seq_iter, 'BLASTn')
 		before = time.time()
 		b_control.start()
 		t_diff = time.time() - before

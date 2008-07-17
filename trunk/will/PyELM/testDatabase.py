@@ -4,6 +4,7 @@ import HIVDatabase
 import PyVirus
 import os
 import time
+import numpy
 from Bio import SeqIO
 import itertools
 
@@ -60,7 +61,7 @@ def testMappingBase():
     
     nose.tools.assert_not_equal(mapping_base, None)
     
-def testAddtoShelf():
+def testAddtoShelf_SLOW():
 	"""
 	Test AddtoShelf
 	"""
@@ -75,7 +76,7 @@ def testAddtoShelf():
 	mapping_base.AddtoShelf(seq_iter)
 	handle.close()
 
-	nose.tools.assert_true(mapping_base.my_shelf.has_key(POSSIBLE_KEY), 'Shelf is missing an Item')
+	nose.tools.assert_true(mapping_base.my_map_shelf.has_key(POSSIBLE_KEY), 'Shelf is missing an Item')
 
 def testSaveShelf():
     """
@@ -94,17 +95,65 @@ def testSaveShelf():
 	test_key = POSSIBLE_KEY + seq_val.id
 
 	mapping_base.AddtoShelf([seq_val])
-	mapping_base.SaveShelf()
 
     del(mapping_base)
 
     mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
                                            'test_self.slf')
     
-    nose.tools.assert_true(mapping_base.my_shelf.has_key(test_key),
+    nose.tools.assert_true(mapping_base.my_map_shelf.has_key(test_key),
                                 'Shelf is missing an Item')
 
+def testMappingSlicing():
+	"""
+	Test various slicing operations
+	"""
+	dest_dir = os.environ['PYTHONSCRATCH']
+	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
+	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+									   'test_self.slf')
+	POSSIBLE_KEY = 'AJ302647.1'
+	with open(seq_file) as handle:
+		seq_val = SeqIO.parse(handle, 'fasta').next()
+	test_key = POSSIBLE_KEY + seq_val.id
+
+	mapping_base.AddtoShelf([seq_val])
+	
+	nose.tools.assert_true(mapping_base[test_key] != None,
+							'Could not [] into MappingBase')
+	test_mapping = mapping_base[test_key][0:5]
+	nose.tools.assert_true(test_mapping != None,
+							'Could not [:] into .is_match')
+
+def testMappingBaseIter():
+	"""
+	Test the Iteration over MappingRecords
+	"""
+	
+	dest_dir = os.environ['PYTHONSCRATCH']
+	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+
+	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+									   'test_self.slf')
+	POSSIBLE_KEY = 'AJ302647.1'
+	with open(seq_file) as handle:
+		seq_val = SeqIO.parse(handle, 'fasta').next()
+	test_key = POSSIBLE_KEY + seq_val.id
+
+	mapping_base.AddtoShelf([seq_val])
+
+	for this_map in mapping_base.GetIter():
+		nose.tools.assert_true(this_map != None, 
+				'Could not generate individual mappings')
+	
+	for this_map in mapping_base.GetIter(WANTED_SUBTYPE = 'B'):
+		nose.tools.assert_true(this_map != None, 
+				'Could not generate individual mappings from a single subtype')
+	
+							
 def tearDownModule():
 	time.sleep(5)
 	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
