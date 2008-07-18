@@ -62,3 +62,4 @@ return(list(gap=gapStat,sk=stError,khat=khat))
 
 
 	
+
