@@ -82,8 +82,10 @@ for(i in 1:length(classLabels)){
 #heatmap
 col=colorRampPalette(c('blue','yellow'),space='Lab')
 col=col(10)
+
+pdf(file='modelbasedMap.pdf')
 ATHM(PD,TrueCI=unique(trueCI),Rowv=F,Colv=F,dendrogram='none',scale='none',trace='none',colsep=sepvec,rowsep=sepvec,ColSideColors=colbar,RowSideColors=colbar,key=T,col=col,labRow="",labCol="",density.info='none')
-dev.print(device=pdf, file='modelbasedMap.pdf')) 
+dev.off()
 }	
 
 ATHM<-function (x,TrueCI=NULL,SCIDX=NULL,SCIDX2=NULL,Rowv = TRUE, Colv = if (symm) "Rowv" else TRUE, 
