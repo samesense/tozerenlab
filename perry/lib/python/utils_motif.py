@@ -256,7 +256,7 @@ def mkProteinPlot(motif_name_file, motif_matrix_dir, output_file):
     elif motif_count < 21:
         # up to 5x4
         cols = 4
-        rows = int(math.ceil( float(motif_count) / float(4) )
+        rows = int(math.ceil( float(motif_count) / float(4) ))
     #cols = math.ceil( float(len(motifs.keys()))/float(5) )
     motif_index = 1
     motif_figure = pylab.gcf()
