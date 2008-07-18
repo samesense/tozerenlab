@@ -39,7 +39,7 @@ class ViralSeq():
 	def __init__(self, TEST_SEQ, SEQ_NAME):
 		#if SEQ_NAME is None then assume that TEST_SEQ is a SeqRecord
 		if SEQ_NAME == None:
-			self.my_sequence = TEST_SEQ.seq.tostring()
+			self.my_sequence = TEST_SEQ.seq.tostring().upper()
 			self.seq_name = TEST_SEQ.id
 		else:
 			self.my_sequence = TEST_SEQ
@@ -49,6 +49,13 @@ class ViralSeq():
 	def __hash__(self):
 		return hash(self.my_sequence + self.seq_name)
 
+	def __getattr__(self, NAME):
+		if NAME == 'tested_subtype':
+			self.DetSubtype()
+			return self.tested_subtype
+		else:
+			raise AttributeError
+		
 	def GenomeToBioPython(self):
 		"""
 		GenomeToBioPython
@@ -72,12 +79,7 @@ class ViralSeq():
 			final_list.append(this_record)
 		return final_list
 
-	def __getattr__(self, NAME):
-		if NAME == 'tested_subtype':
-			self.DetSubtype()
-			return self.tested_subtype
-		else:
-			raise AttributeError
+
 	def DetSubtype(self):
 		"""
 		DetSubtype
@@ -107,7 +109,17 @@ class ViralSeq():
 							nt_seq, aa_seq, start_pos, end_pos)
 				gene_dict[this_gene] = gene
 		self.annotation = gene_dict
+	def CheckSeq(self, INPUT_SEQ):
+		"""
+		CheckSeq
+			Returns True if the sequence is present within the sequence and False
+			otherwise.
+		"""
 
+		return self.my_sequence.find(INPUT_SEQ) != -1
+		
+		
+		
 class BkgSeq(ViralSeq):
 	"""
 	Used for Background Sequences
@@ -181,8 +193,7 @@ class RefBase():
 
 	def __iter__(self):
 		return iter(self.ref_seqs)
-			
-			
+		
 	def BuildDatabase(self):
 		"""
 		BuildDatabase

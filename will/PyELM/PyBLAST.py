@@ -217,15 +217,14 @@ class BLASTController:
 				command = self.blast_dir + 'bin\\blastall.exe'
 				command += ' -p blastx -m 7'
 				command += ' -d ' + self.aa_name
-				command += ' -o ' + self.output_file
 					
 			if self.blast_type == 'blastn':
 				command = self.blast_dir + 'bin\\blastall.exe'
 				command += ' -p blastn -m 7'
 				command += ' -d ' + self.nt_name
 				command += ' -g F'
-				command += ' -o ' + self.output_file
-
+			
+			command += ' -o ' + self.output_file
 			command += ' -i ' + self.seq_file
 			
 

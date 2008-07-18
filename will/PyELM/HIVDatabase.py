@@ -13,12 +13,15 @@ import cPickle as pickle
 import types
 import time
 import shelve
-
+import operator
 
 
 ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
 bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+
+def enumerate(iterable):
+    return itertools.izip(itertools.count(), iterable)
 
 class MappingRecord():
 	def __init__(self, REF_NAME, TEST_VIRAL):
@@ -28,10 +31,21 @@ class MappingRecord():
 		self.test_seq_len = len(TEST_VIRAL.my_sequence)
 		self.mapping = None
 		self.is_match = None
+		
 
 	def __getitem__(self, KEY):
 		return self.is_match[KEY]
-
+	
+	def __getattr__(self, NAME):
+		if NAME == 'f_look':
+			self.CalculateRuns()
+			return self.f_look
+		elif NAME == 'r_look':
+			self.CalculateRuns()
+			return self.r_look
+		else:
+			raise AttributeError
+	
 	def __hash__(self):
 		return hash(self.ref_name + self.test_name)
 
@@ -52,7 +66,22 @@ class MappingRecord():
 			matched_inds = filter(filter_fun, zip(this_align.match, query_inds))
 			matched_inds = map(unzip, matched_inds)
 			self.is_match[0,matched_inds] = 1
-
+	
+	def CalculateRuns(self):
+		"""
+		CalculateRuns
+			Find the number of consecutive MATCHES are present in the sequence
+		"""
+		p = test_array.nonzero()[0].tolist()
+		self.r_look = nump.zeros((1,self.test_seq_len))
+		self.f_look = nump.zeros((1,self.test_seq_len))
+		
+		for k,g in itertools.groupby(enumerate(p), lambda (i,x): i-x):
+			inds = map(operator.itemgetter(1), g)
+			self.f_look[inds] = range(len(inds),0,-1)
+			self.r_look[inds] = range(0, len(inds))
+		
+		
 
 
 
@@ -105,18 +134,22 @@ class MappingBase():
 				
 				self.my_map_shelf[volume_name] = this_mapping
 
-	def GetIter(self, WANTED_SUBTYPE = None):
+	def GetIter(self, WANTED_REF = None, WANTED_SUBTYPE = None):
 		"""
 		GetIter
 			Returns an iterator over the mapping records in the database.  Can
 			specifiy specific subtypes if desired.
 		"""
 		
-		for this_ref in self.ref_base:
-			if (WANTED_SUBTYPE == None) | (this_ref.tested_subtype == WANTED_SUBTYPE):
-				for this_test in self.test_names:
-					yield self.my_map_shelf[this_ref.seq_name+this_test]
+		if WANTED_REF == None
+			for this_ref in self.ref_base:
+				if (WANTED_SUBTYPE == None) | (this_ref.tested_subtype == WANTED_SUBTYPE):
+					for this_test in self.test_names:
+						yield self.my_map_shelf[this_ref.seq_name+this_test]
 	
+		else:
+			for this_test in self.test_names:
+				yield self.my_map_shelf[WANTED_REF+this_test]
 
 	def MapToRefs(self, BLAST_RECORDS, SEQ_RECORD):
 		"""
@@ -141,3 +174,52 @@ class MappingBase():
 			
 			yield this_mapping
 
+	def CheckSeqs(self, INPUT_SEQ):
+		"""
+		CheckSeqs
+			Checks all test sequences in the database and returns a homology 
+			percentage between 0.0 and 1.0
+		"""
+		counter = 0
+		
+		for this_seq in self.my_test_shelf:
+			if self.my_test_shelf[this_seq].CheckSeq(INPUT_SEQ):
+				counter += 1
+		return float(counter) / float(len(self.test_names))
+			
+			
+			
+	def FindWindows(self, MIN_SIZE, MIN_HOM):
+		
+		
+		initial_window = 1
+		f_look_fun = opertator.attrgetter('f_look')
+		pos_fun = lambda (x,y): x[y]
+		for this_ref in self.ref_base:
+			this_window_size = initial_window
+			start_pos = 0
+			poss_win = []
+			while (start_pos + window_size) < len(this_ref.my_sequence):
+				f_look_iter = itertools.imap(f_look_fun, 
+								self.GetIter(WANTED_REF = this_ref.name))
+				win_size_iter = itertools.imap(pos_fun, f_look_iter, start_pos)
+				
+				win_size_array = numpy.array(list(win_size_iter))
+				
+				win_size_count = numpy.bincount(win_size_array)
+				
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
