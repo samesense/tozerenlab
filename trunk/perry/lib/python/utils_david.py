@@ -127,18 +127,6 @@ def getSigKEGGgenes_sigFile(afile, cutoff):
                 genes[gene] = True
     return genes
 
-#def getGenesForEnrichedKEGG(afile, cutOff):
-#    genes = {}
-#    cat2term2protein = cat2term2protein_sigFile(afile)
-#    paths = {}
-#    for kegg in cat2term2protein['KEGG_PATHWAY'].keys():
-#        paths['path:' + kegg.split(':')[0]] = True
-#    for kegg in paths.keys():
-#        path_genes = utils_kegg.getPathwayGenes(kegg)
-#        for gene in path_genes.keys():
-#            genes[gene] = True
-#    return genes
-
 def getAllTerms_web(gene_file):
     """ Given a file with one gene per line, return
         the parsed DAVID annotation for the genes in
@@ -276,3 +264,45 @@ def getSigKEGGgenes(motif_search_results, background, cutoff):
             for gene in cat2term2protein['KEGG_PATHWAY'][path]['genes'].keys():
                 genes[gene] = True
     return genes
+
+def getSigKEGGpathways(motif_search_results, background, cutOff):
+    """ Given a foreground and background {}, find
+        significant KEGG pathways with DAVID 
+        for the given p-value cutoff.
+        
+    @param motif_search_results: foreground {}
+    @param backgground: background gene {}
+    @param cuttoff: float p-value cutoff
+    @return: {} of sig KEGG pathways
+    """
+
+    pathways = {}
+    cat2term2protein = cat2term2protein_sigFile(afile)
+    paths = {}
+    for kegg in cat2term2protein['KEGG_PATHWAY'].keys():
+        paths['path:' + kegg.split(':')[0]] = True
+    for kegg in paths.keys():
+        pathways[kegg] = True
+    return pathways
+
+def getSigKEGGpathwayGenes(motif_search_results, background, cutOff):
+    """ Given a foreground and background {}, find genes in
+        significant KEGG pathways with DAVID 
+        for the given p-value cutoff.
+        
+    @param motif_search_results: foreground {}
+    @param backgground: background gene {}
+    @param cuttoff: float p-value cutoff
+    @return: {} genes in sig KEGG pathways
+    """
+
+    sig_genes = {}
+    cat2term2protein = getSigTerms(motif_search_results, background)
+    paths = {}
+    for kegg in cat2term2protein['KEGG_PATHWAY'].keys():
+        paths['path:' + kegg.split(':')[0]] = True
+    for kegg in paths.keys():
+        path_genes = utils_kegg.getPathwayGenes(kegg)
+        for gene in path_genes.keys():
+            sig_genes[gene] = True
+    return sig_genes

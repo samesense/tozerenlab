@@ -4,7 +4,7 @@
 #            evansjp@mail.med.upenn.edu
 # 2008
 #---------------------------------------
-import sys, os
+import sys, os, utils_graph
 from SOAPpy import WSDL
 
 def parseKO_name(description_st):
@@ -386,25 +386,60 @@ def mkGene2GI(gene_dict):
     #for item in ls:
     #    print item
 
-def color(pathway, genes, fg, bg):
+def prepAndColor(pathway, gene_file, html_color):
+    """ Color these genes for this pathway.
+
+    @param pathway: KEGG pathway, format path:hsa04010
+    @param gene_file_1: one gene per line
+    @param html_color_1: color, html format
+    """
+    gene_dict = utils_graph.getNodes(gene_file)
+    obj_ls = []
+    fore_gnd = []
+    back_gnd = []
+    for gene in gene_dict.keys():
+        obj_ls.append(gene)
+        fore_gnd.append('black')
+        back_gnd.append(html_color)
+
     wsdl = 'http://soap.genome.jp/KEGG.wsdl'
     serv = WSDL.Proxy(wsdl)
-    #genes = serv.get_genes_by_pathway(pathway)
-    #fg_list = []
-    #bg_list = []
-    #for gene in genes:
-    #    fg_list.append('#ff0000')
-    #    bg_list.append('yellow')
+    url = serv.color_pathway_by_objects(pathway, obj_ls, fore_gnd, back_gnd)
+    name = pathway.split(':')[-1] + '_' + html_color
+    os.system('wget --output-document=' + name + ' ' + url)
+    return name
+
+def colorPathwayWith2GeneSets(pathway, 
+                              gene_file_1, gene_file_2, 
+                              html_color_1, html_color_2,
+                              blending_percent):
+    """ Color these genes, and make the overlap a mix of the colors.
+
+    @param pathway: KEGG pathway, format path:hsa04010
+    @param gene_file_1: one gene per line
+    @param gene_file_2: one gene per line
+    @param html_color_1: color for first set
+    @parma html_color_2: color for second
+    @param blending_percent: int 0..100 for composite --dissolve input
+    """
+
+    name1 = prepAndColor(pathway, gene_file_1, html_color_1)
+    name2 = prepAndColor(pathway, gene_file_2, html_color_2)
+    name1_alpha = name1 + '_alpha'
+    name2_alpha = name2 + '_alpha'
+    gimp_prefix = "gimp --no-interface --batch '(python-fu-color-kegg "
+    os.system(gimp_prefix
+              + "RUN-NONINTERACTIVE \""
+              + name2 + "\" \"" + name1 + "\" \""
+              + name1_alpha + "\" (list 191 255 191))' --batch '(gimp-quit 1)'")
+    os.system(gimp_prefix
+              + "RUN-NONINTERACTIVE \""
+              + name1 + "\" \"" + name2 + "\" \""
+              + name2_alpha + "\" (list 191 255 191))' --batch '(gimp-quit 1)'")
+    os.system("composite "
+              + name1_alpha + ' '
+              + name2_alpha + " -dissolve \""
+              + str(blending_percent) + "%\" "
+              + pathway.split(':')[1] + '.png')
     
-    #fg_list  = ['#ff0000', '#00ff00']
-    #bg_list  = ['#ffff00', 'yellow']
-    #print genes.has_key('b3559')
-    #print genes.has_key('b3560')
-    #elements = serv.get_elements_by_pathway(path)
-    #for element in elements:
-    #    if element['type'] == 'gene':            
-    #        names = element['names']            
-    #        for n in names:
-    #            genes[n.split(':')[1]] = True
-    url = serv.color_pathway_by_objects(pathway, genes, fg, bg)
-    os.system('wget ' + url)
+
