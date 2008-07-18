@@ -153,7 +153,27 @@ def testMappingBaseIter():
 		nose.tools.assert_true(this_map != None, 
 				'Could not generate individual mappings from a single subtype')
 	
-							
+def testCheckSeqs():
+	"""
+	Test the Sequence Homology
+	"""
+	dest_dir = os.environ['PYTHONSCRATCH']
+	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+
+	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+									   'test_self.slf')
+	
+	correct_seq = 'A'
+	wrong_seq = 'QQQQQQ'
+	
+	nose.tools.assert_true(mapping_base.CheckSeqs(correct_seq) == 1,
+							'Could not find "A" in all sequences.')
+	nose.tools.assert_true(mapping_base.CheckSeqs(wrong_seq) == 0,
+							'Found wrong_seq in a sequence')
+	
+	
+	
 def tearDownModule():
 	time.sleep(5)
 	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
