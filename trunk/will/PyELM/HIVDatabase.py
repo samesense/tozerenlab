@@ -37,7 +37,7 @@ class MappingRecord():
 
 	def CalculateMapping(self, BLAST_ALIGNMENT):
 		self.mapping = numpy.zeros((1,self.test_seq_len))
-		self.is_match = numpy.zeros((1,self.test_seq_len))
+		self.is_match = numpy.zeros((1,self.test_seq_len), bool)
 		filter_fun = lambda x: x[0] == '|'
 		unzip = lambda x: x[1]
 		for this_align in BLAST_ALIGNMENT.hsps:
