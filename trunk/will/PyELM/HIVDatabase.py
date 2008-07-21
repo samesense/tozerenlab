@@ -92,8 +92,8 @@ class MappingBase():
 		self.dest_dir = DEST_DIR
 		self.ref_base = PyVirus.RefBase(REF_SOURCE, DEST_DIR)
 		self.test_names = []
-		self.my_test_shelf_name = DEST_DIR + SHELF_NAME + '.slf'
-		self.my_map_shelf_name = DEST_DIR + SHELF_NAME + '.seq'
+		self.my_test_shelf_name = DEST_DIR + SHELF_NAME + '_seqs.slf'
+		self.my_map_shelf_name = DEST_DIR + SHELF_NAME + '_map.slf'
 		
 		self.my_map_shelf = shelve.DbfilenameShelf(self.my_map_shelf_name, 
 													protocol = 2)
@@ -141,7 +141,7 @@ class MappingBase():
 			specifiy specific subtypes if desired.
 		"""
 		
-		if WANTED_REF == None
+		if WANTED_REF == None:
 			for this_ref in self.ref_base:
 				if (WANTED_SUBTYPE == None) | (this_ref.tested_subtype == WANTED_SUBTYPE):
 					for this_test in self.test_names:
@@ -191,7 +191,7 @@ class MappingBase():
 			
 	def FindWindows(self, MIN_SIZE, MIN_HOM):
 		
-		
+		num_seqs = float(self.test_names)
 		initial_window = 1
 		f_look_fun = opertator.attrgetter('f_look')
 		pos_fun = lambda (x,y): x[y]
@@ -203,10 +203,18 @@ class MappingBase():
 				f_look_iter = itertools.imap(f_look_fun, 
 								self.GetIter(WANTED_REF = this_ref.name))
 				win_size_iter = itertools.imap(pos_fun, f_look_iter, start_pos)
-				
 				win_size_array = numpy.array(list(win_size_iter))
+				win_size_norm = numpy.bincount(win_size_array) / num_seqs
 				
-				win_size_count = numpy.bincount(win_size_array)
+				#win_size_prob[i] is the percentage of seqs with AT_LEAST i homology
+				win_size_prob = numpy.flipud(numpy.cumsum(numpy.flipud(win_size_norm)))
+				
+				if win_size_prob[MIN_SIZE] < MIN_HOM:
+					start_pos += 1
+					continue
+				else:
+					best_pos = numpy.argmax(numpy.nonzero(win_size_prob >= MIN_HOM)[0])
+					
 				
 	
 	

@@ -43,7 +43,7 @@ def testMappingBase():
     source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
-                                           'test_self.slf')
+                                           'test_self')
 
     nose.tools.assert_not_equal(mapping_base, None)
     
@@ -57,7 +57,7 @@ def testMappingBase():
     seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, 
-                                           dest_dir, 'test_self.slf')
+                                           dest_dir, 'test_self')
     
     nose.tools.assert_not_equal(mapping_base, None)
     
@@ -69,7 +69,7 @@ def testAddtoShelf_SLOW():
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir, 'test_self.slf')
+	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir, 'test_self')
 	POSSIBLE_KEY = 'AJ302647.12_bkg_data_1'
 	handle = open(seq_file)
 	seq_iter = SeqIO.parse(handle, 'fasta')
@@ -88,7 +88,7 @@ def testSaveShelf():
     seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
-                                           'test_self.slf')
+                                           'test_self')
     POSSIBLE_KEY = 'AJ302647.1'
     with open(seq_file) as handle:
         seq_val = SeqIO.parse(handle, 'fasta').next()
@@ -99,7 +99,7 @@ def testSaveShelf():
     del(mapping_base)
 
     mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
-                                           'test_self.slf')
+                                           'test_self')
     
     nose.tools.assert_true(mapping_base.my_map_shelf.has_key(test_key),
                                 'Shelf is missing an Item')
@@ -113,7 +113,7 @@ def testMappingSlicing():
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
-									   'test_self.slf')
+									   'test_self')
 	POSSIBLE_KEY = 'AJ302647.1'
 	with open(seq_file) as handle:
 		seq_val = SeqIO.parse(handle, 'fasta').next()
@@ -137,7 +137,7 @@ def testMappingBaseIter():
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
-									   'test_self.slf')
+									   'test_self')
 	POSSIBLE_KEY = 'AJ302647.1'
 	with open(seq_file) as handle:
 		seq_val = SeqIO.parse(handle, 'fasta').next()
@@ -162,7 +162,7 @@ def testCheckSeqs():
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
-									   'test_self.slf')
+									   'test_self')
 	
 	correct_seq = 'A'
 	wrong_seq = 'QQQQQQ'
@@ -172,11 +172,17 @@ def testCheckSeqs():
 	nose.tools.assert_true(mapping_base.CheckSeqs(wrong_seq) == 0,
 							'Found wrong_seq in a sequence')
 	
+def testCheckWindows():
+	"""
+	Test the FindWindows
+	"""
+	
 	
 	
 def tearDownModule():
 	time.sleep(5)
 	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
 	for this_file in file_list:
-		os.remove(os.environ['PYTHONSCRATCH'] + this_file)
+		if this_file[-3:] != 'slf':
+			os.remove(os.environ['PYTHONSCRATCH'] + this_file)
 
