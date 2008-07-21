@@ -213,6 +213,7 @@ def tearDownModule():
 	time.sleep(1)
 	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
 	for this_file in file_list:
-		os.remove(os.environ['PYTHONSCRATCH'] + this_file)
+		if this_file[-3:] != 'slf:'
+			os.remove(os.environ['PYTHONSCRATCH'] + this_file)
 
     
