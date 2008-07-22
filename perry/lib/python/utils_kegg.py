@@ -388,9 +388,10 @@ def mkGene2GI(gene_dict):
 
 def prepAndColor(pathway, gene_file, html_color):
     """ Color these genes for this pathway.
+        Does not color Cell Communication (path:hsa01430).
 
     @param pathway: KEGG pathway, format path:hsa04010
-    @param gene_file_1: one gene per line
+    @param gene_file: one gene per line
     @param html_color_1: color, html format
     """
     gene_dict = utils_graph.getNodes(gene_file)
@@ -409,11 +410,36 @@ def prepAndColor(pathway, gene_file, html_color):
     os.system('wget --output-document=' + name + ' ' + url)
     return name
 
+def prepAndColor_gene_dict(pathway, gene_dict, html_color):
+    """ Color these genes for this pathway.
+        Does not color Cell Communication (path:hsa01430).
+
+    @param pathway: KEGG pathway, format path:hsa04010
+    @param gene_dict: {} of genes
+    @param html_color_1: color, html format
+    """
+    obj_ls = []
+    fore_gnd = []
+    back_gnd = []
+    for gene in gene_dict.keys():
+        obj_ls.append(gene)
+        fore_gnd.append('black')
+        back_gnd.append(html_color)
+
+    wsdl = 'http://soap.genome.jp/KEGG.wsdl'
+    serv = WSDL.Proxy(wsdl)
+    url = serv.color_pathway_by_objects(pathway, obj_ls, fore_gnd, back_gnd)
+    name = pathway.split(':')[-1] + '_' + html_color + '.gif'
+    os.system('wget --output-document=' + name + ' ' + url)
+    return name
+
 def colorPathwayWith2GeneSets(pathway, 
                               gene_file_1, gene_file_2, 
                               html_color_1, html_color_2,
-                              blending_percent):
+                              blending_percent,
+                              output_dir):
     """ Color these genes, and make the overlap a mix of the colors.
+        Does not color Cell Communication (path:hsa01430).
 
     @param pathway: KEGG pathway, format path:hsa04010
     @param gene_file_1: one gene per line
@@ -421,6 +447,7 @@ def colorPathwayWith2GeneSets(pathway,
     @param html_color_1: color for first set
     @parma html_color_2: color for second
     @param blending_percent: int 0..100 for composite --dissolve input
+    @param output_dir: directory to put figure
     """
 
     name1 = prepAndColor(pathway, gene_file_1, html_color_1)
@@ -440,6 +467,6 @@ def colorPathwayWith2GeneSets(pathway,
               + name1_alpha + ' '
               + name2_alpha + " -dissolve \""
               + str(blending_percent) + "%\" "
-              + pathway.split(':')[1] + '.png')
+              + output_dir + pathway.split(':')[1] + '.png')
     
 

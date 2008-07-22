@@ -7,7 +7,7 @@
 """
 Functions for automating calls to DAVID.
 """
-import PyMozilla
+import PyMozilla, utils_kegg
 
 def fullMonty(astring):
     """ Remove hsa, commas, and whitespace from
@@ -227,7 +227,10 @@ def getSigTerms_web(fg_file, bg_file):
                                           + 'chartReport.jsp?annot=,'
                                           + david_cats + '&currentList=0')
     index = user_download_page.find('UserDownload')
+    #print user_download_page
+    #print user_download_page[index+13:][0:50]
     addr = user_download_page[index+13:].split('.')[0]
+    #print 'http://david.abcc.ncifcrf.gov/UserDownload/' + addr + '.txt'
     return moz_emu.download('http://david.abcc.ncifcrf.gov/UserDownload/'
                             + addr  + '.txt')
 
@@ -280,7 +283,8 @@ def getSigKEGGpathways(motif_search_results, background, cutOff):
     cat2term2protein = cat2term2protein_sigFile(afile)
     paths = {}
     for kegg in cat2term2protein['KEGG_PATHWAY'].keys():
-        paths['path:' + kegg.split(':')[0]] = True
+        if cat2term2protein['KEGG_PATHWAY'][kegg]['pvalue'] < cutOff:
+            paths['path:' + kegg.split(':')[0]] = True
     for kegg in paths.keys():
         pathways[kegg] = True
     return pathways
@@ -300,7 +304,8 @@ def getSigKEGGpathwayGenes(motif_search_results, background, cutOff):
     cat2term2protein = getSigTerms(motif_search_results, background)
     paths = {}
     for kegg in cat2term2protein['KEGG_PATHWAY'].keys():
-        paths['path:' + kegg.split(':')[0]] = True
+        if cat2term2protein['KEGG_PATHWAY'][kegg]['pvalue'] < cutOff:
+            paths['path:' + kegg.split(':')[0]] = True
     for kegg in paths.keys():
         path_genes = utils_kegg.getPathwayGenes(kegg)
         for gene in path_genes.keys():

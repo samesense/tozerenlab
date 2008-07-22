@@ -185,7 +185,7 @@ def avgConnectivity(gene_ls, network):
             total += 1
     return float(connectivity) / float(total)
 
-def getDegreeDistribution(gene_dict, network_edges):
+def getDegreeDistributionLs(gene_dict, network_edges):
     """ For these genes, return the degree distribution
         according to this network.
 
@@ -201,4 +201,22 @@ def getDegreeDistribution(gene_dict, network_edges):
             #if not degreeDict.has_key(deg):
             #    degreeDict[str(deg)] = 0
             #degreeDict[str(deg)] += 1
+    return degreeDict
+
+def getDegreeDistributionDict(gene_dict, network_edges):
+    """ For these genes, return the degree distribution
+        according to this network.
+
+    @param gene_dict: {} w/ gene names
+    @param network_edges {} of edges d[n1][n2] = True
+    @return {} of degrees d[degree] = count
+    """
+
+    degreeDict = {}
+    for gene in gene_dict.keys():
+        if network_edges.has_key(gene):
+            deg = degree(gene, network_edges)
+            if not degreeDict.has_key(str(deg)):
+                degreeDict[str(deg)] = 0
+            degreeDict[str(deg)] += 1
     return degreeDict
