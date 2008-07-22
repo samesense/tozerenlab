@@ -4,6 +4,7 @@ from testELM import SeqAns, FileSetup
 from Bio import SeqIO
 import itertools
 import os
+import re
 import PyVirus
 import tempfile
 import time
@@ -170,8 +171,62 @@ def CheckTranslateAll(REF_BASE, INPUT_CLASS, INPUT_RECORD):
     genome.TranslateAll(REF_BASE)
 
     nose.tools.assert_true(genome.annotation.has_key('env'))   
-
 	
+def testGetSeqFeatures():
+	"""
+	Test the SeqFeature Output
+	"""
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
+						PyVirus.PatSeq]
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+									iter(possible_classes))
+		for this_test in this_iter:
+			yield CheckSeqFeatures, ref_base, this_test[1], this_test[0]
+
+def CheckSeqFeatures(REF_BASE, INPUT_CLASS, INPUT_RECORD):
+	genome = INPUT_CLASS(INPUT_RECORD.seq.tostring(), 'testseq')
+	genome.TranslateAll(REF_BASE)
+	
+	feature_list = genome.GetSeqFeatures()
+	found_env = False
+	for this_feat in feature_list:
+		if this_feat.id == 'env':
+			found_env = True
+	
+	nose.tools.assert_true(found_env, 'Could not find ENV in the feature list')   
+
+def testGenomeDiagram():
+	"""
+	Test the GenomeDiagram
+	"""
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
+						PyVirus.PatSeq]
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+									iter(possible_classes))
+		for this_test in this_iter:
+			yield CheckGenomeDiagram, ref_base, this_test[1], this_test[0]
+			
+
+def CheckGenomeDiagram(REF_BASE, INPUT_CLASS, INPUT_RECORD):
+	genome = INPUT_CLASS(INPUT_RECORD.seq.tostring(), 'testseq')
+	genome.TranslateAll(REF_BASE)
+	
+	dest_file = os.environ['PYTHONSCRATCH'] + INPUT_RECORD.id + 'KEEP.pdf'
+	
+	genome.WriteGenesToDiagram()
+	genome.this_genome.write(dest_file, 'PDF')
+
+
 def testGetSingleResult():
 	"""
 	Test the GetSingleResult of BLASTController
@@ -210,10 +265,11 @@ def testBLASTController_SLOW():
 
 
 def tearDownModule():
+	checker = re.compile('.*KEEP.*')
 	time.sleep(1)
 	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
 	for this_file in file_list:
-		if this_file[-3:] != 'slf:'
+		if checker.match(this_file) == None:
 			os.remove(os.environ['PYTHONSCRATCH'] + this_file)
 
     

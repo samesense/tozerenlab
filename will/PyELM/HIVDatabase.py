@@ -14,7 +14,7 @@ import types
 import time
 import shelve
 import operator
-
+import string
 
 ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
@@ -24,8 +24,9 @@ def enumerate(iterable):
     return itertools.izip(itertools.count(), iterable)
 
 class MappingRecord():
-	def __init__(self, REF_NAME, TEST_VIRAL):
+	def __init__(self, REF_NAME, TEST_VIRAL, REF_LEN):
 		self.ref_name = REF_NAME
+		self.ref_len = REF_LEN
 
 		self.test_name = TEST_VIRAL.seq_name
 		self.test_seq_len = len(TEST_VIRAL.my_sequence)
@@ -36,22 +37,12 @@ class MappingRecord():
 	def __getitem__(self, KEY):
 		return self.is_match[KEY]
 	
-	def __getattr__(self, NAME):
-		if NAME == 'f_look':
-			self.CalculateRuns()
-			return self.f_look
-		elif NAME == 'r_look':
-			self.CalculateRuns()
-			return self.r_look
-		else:
-			raise AttributeError
-	
 	def __hash__(self):
 		return hash(self.ref_name + self.test_name)
 
 	def CalculateMapping(self, BLAST_ALIGNMENT):
-		self.mapping = numpy.zeros((1,self.test_seq_len))
-		self.is_match = numpy.zeros((1,self.test_seq_len), bool)
+		self.mapping = numpy.zeros((1,self.ref_len))
+		self.is_match = numpy.zeros((1,self.ref_len), bool)
 		filter_fun = lambda x: x[0] == '|'
 		unzip = lambda x: x[1]
 		for this_align in BLAST_ALIGNMENT.hsps:
@@ -59,8 +50,12 @@ class MappingRecord():
 				continue
 			if this_align.sbjct_start > this_align.query_end:
 				continue	
-			query_inds = range(this_align.query_start, this_align.query_end)
-			subjct_inds = range(this_align.sbjct_start, this_align.sbjct_end)
+			# query_inds = range(this_align.query_start, this_align.query_end)
+			# subjct_inds = range(this_align.sbjct_start, this_align.sbjct_end)
+			
+			query_inds = range(this_align.sbjct_start, this_align.sbjct_end)
+			subjct_inds = range(this_align.query_start, this_align.query_end)
+			
 			self.mapping[0,query_inds] = numpy.array(subjct_inds)
 
 			matched_inds = filter(filter_fun, zip(this_align.match, query_inds))
@@ -72,16 +67,14 @@ class MappingRecord():
 		CalculateRuns
 			Find the number of consecutive MATCHES are present in the sequence
 		"""
-		p = test_array.nonzero()[0].tolist()
-		self.r_look = nump.zeros((1,self.test_seq_len))
-		self.f_look = nump.zeros((1,self.test_seq_len))
-		
+		p = numpy.nonzero(self.is_match)[1].tolist()
+		self.r_look = numpy.zeros((1,self.ref_len))
+		self.f_look = numpy.zeros((1,self.ref_len))
 		for k,g in itertools.groupby(enumerate(p), lambda (i,x): i-x):
 			inds = map(operator.itemgetter(1), g)
-			self.f_look[inds] = range(len(inds),0,-1)
-			self.r_look[inds] = range(0, len(inds))
-		
-		
+			#handle.write('inds \t' + str(inds))
+			self.f_look[0,inds] = range(len(inds),0,-1)
+			self.r_look[0,inds] = range(0, len(inds))
 
 
 
@@ -150,6 +143,31 @@ class MappingBase():
 		else:
 			for this_test in self.test_names:
 				yield self.my_map_shelf[WANTED_REF+this_test]
+				
+
+
+	def WindowedHomology(self, WANTED_REF):
+		"""
+		WindowedHomology
+			Annotates a reference sequence with the windowed homology across 
+			all sequences in the MAPPING_BASE based in the BLAST alignments.
+		"""
+		
+		hom_vector = numpy.zeros((1, len(self.ref_base.GetRefSeq(WANTED_REF).my_sequence)), 
+									'float')
+		count = 0
+		
+		for this_mapping in self.GetIter(WANTED_REF = WANTED_REF):
+			count += 1
+			hom_vector += this_mapping.is_match
+			
+		hom_vector = hom_vector / float(count)
+		
+		self.ref_base.GetRefSeq(WANTED_REF).global_hom = zip(range(len(hom_vector)),
+															hom_vector.tolist())
+		
+		
+			
 
 	def MapToRefs(self, BLAST_RECORDS, SEQ_RECORD):
 		"""
@@ -169,8 +187,10 @@ class MappingBase():
 			temp_name = checker.match(this_align.title)
 			ref_name = str(temp_name.groups()[0])
 			
-			this_mapping = MappingRecord(ref_name, this_bkgseq)
+			this_mapping = MappingRecord(ref_name, this_bkgseq, 
+							len(self.ref_base.GetRefSeq(ref_name).my_sequence))
 			this_mapping.CalculateMapping(this_align)
+			this_mapping.CalculateRuns()
 			
 			yield this_mapping
 
@@ -189,33 +209,49 @@ class MappingBase():
 			
 			
 			
-	def FindWindows(self, MIN_SIZE, MIN_HOM):
+	def FindWindows(self, MIN_SIZE, MIN_HOM, FILE_HANDLE):
 		
-		num_seqs = float(self.test_names)
+		num_seqs = float(len(self.test_names))
 		initial_window = 1
-		f_look_fun = opertator.attrgetter('f_look')
-		pos_fun = lambda (x,y): x[y]
-		for this_ref in self.ref_base:
-			this_window_size = initial_window
-			start_pos = 0
-			poss_win = []
-			while (start_pos + window_size) < len(this_ref.my_sequence):
-				f_look_iter = itertools.imap(f_look_fun, 
-								self.GetIter(WANTED_REF = this_ref.name))
-				win_size_iter = itertools.imap(pos_fun, f_look_iter, start_pos)
-				win_size_array = numpy.array(list(win_size_iter))
-				win_size_norm = numpy.bincount(win_size_array) / num_seqs
-				
-				#win_size_prob[i] is the percentage of seqs with AT_LEAST i homology
-				win_size_prob = numpy.flipud(numpy.cumsum(numpy.flipud(win_size_norm)))
-				
-				if win_size_prob[MIN_SIZE] < MIN_HOM:
-					start_pos += 1
-					continue
+		f_look_fun = operator.attrgetter('f_look')
+		pos_fun = lambda x,y: x[y]
+		this_ref = self.ref_base.ref_seqs[0]
+		#for this_ref in self.ref_base:
+		this_window_size = initial_window
+		start_pos = 0
+		poss_win = []
+		while (start_pos + MIN_SIZE) < len(this_ref.my_sequence):
+			temp = []
+			for this_map in self.GetIter(WANTED_REF = this_ref.seq_name):
+				if len(this_map.f_look) <= start_pos-1:
+					temp.append(this_map.f_look[0,start_pos])
 				else:
-					best_pos = numpy.argmax(numpy.nonzero(win_size_prob >= MIN_HOM)[0])
-					
-				
+					temp.append(0)
+			
+			#print temp
+			win_size_array = numpy.array(temp, dtype = 'int32')
+			#print win_size_array
+			#print win_size_array.dtype
+			vals = numpy.bincount(win_size_array)
+			#print vals
+			
+			win_size_norm = vals / num_seqs
+			
+			#win_size_prob[i] is the percentage of seqs with AT_LEAST i homology
+			win_size_prob = numpy.flipud(numpy.cumsum(numpy.flipud(win_size_norm)))
+			if len(win_size_prob) <= MIN_SIZE:
+				start_pos += 1
+				continue
+			if win_size_prob[MIN_SIZE] < MIN_HOM:
+				start_pos += 1
+				continue
+			else:
+				best_pos = numpy.argmax(win_size_prob)
+				this_seq = this_ref.my_sequence[start_pos:start_pos+best_pos]
+				known_hom = self.CheckSeqs(this_seq)
+				FILE_HANDLE.write(string.join([this_seq, str(win_size_prob[best_pos].tolist()), 
+											str(known_hom) ],'\t') + '\n')
+				start_pos += best_pos
 	
 	
 	

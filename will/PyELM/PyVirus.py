@@ -11,10 +11,15 @@ import types
 import Queue
 import PyBLAST
 from Bio import SeqIO
+from Bio import SeqFeature as SeqFeatClass
+#a hack but the only way I can get everything to work right
+from Bio.SeqFeature import SeqFeature
 from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_protein, generic_nucleotide
 from Bio.Blast import NCBIXML, NCBIStandalone
+from GenomeDiagram import *
+from reportlab.lib import colors
 
 
 class Gene():
@@ -31,8 +36,18 @@ class Gene():
 		temp_str += 'Name: ' + self.name
 		temp_str += ', Start: ' + str(self.start) + ')'
 		return temp_str
+		
 	def __hash__(self):
 		return hash(self.aa_seq)
+		
+	def GetSeqFeature(self):
+		"""
+		Returns a BioPython SeqFeature describing the gene represented
+		"""
+		seq_loc = SeqFeatClass.FeatureLocation(self.start, self.end)
+		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
+								id = self.name)
+		return seq_feat
 
 
 class ViralSeq():
@@ -45,6 +60,7 @@ class ViralSeq():
 			self.my_sequence = TEST_SEQ
 			self.seq_name = SEQ_NAME
 		self.annotation = None
+		self.this_genome = None
 
 	def __hash__(self):
 		return hash(self.my_sequence + self.seq_name)
@@ -78,7 +94,18 @@ class ViralSeq():
 										id = self.seq_name + ':' + this_gene)
 			final_list.append(this_record)
 		return final_list
-
+	
+	def GetSeqFeatures(self):
+		"""
+		GetSeqFeatures
+			Returns a list of SeqFeatures describing each protein in 
+			self.annotation suitalbe for using with GenomeDiagram
+		"""
+		feat_list = []
+		for this_gene in self.annotation:
+			feat_list.append(self.annotation[this_gene].GetSeqFeature())
+		
+		return feat_list
 
 	def DetSubtype(self):
 		"""
@@ -109,16 +136,39 @@ class ViralSeq():
 							nt_seq, aa_seq, start_pos, end_pos)
 				gene_dict[this_gene] = gene
 		self.annotation = gene_dict
+	
 	def CheckSeq(self, INPUT_SEQ):
 		"""
 		CheckSeq
 			Returns True if the sequence is present within the sequence and False
 			otherwise.
 		"""
-
 		return self.my_sequence.find(INPUT_SEQ) != -1
+	
+	def WriteGenesToDiagram(self):
+		"""
+		WriteGenomeDiagram
+			Use the GenomeDiagram module to write a publication quality figure
+			of the genes and features in self.annotation
+		"""
+		if self.this_genome == None:
+			self.this_genome = GDDiagram(self.seq_name)
 		
+		gene_track = self.this_genome.new_track(5, greytrack = 1, name = 'Genes')
+		gene_set = gene_track.new_set('feature')
 		
+		gene_feat_list = self.GetSeqFeatures()
+		color_list = [colors.blue, colors.chocolate,  colors.crimson, 
+					colors.darkorchid, colors.green, colors.indianred, 
+					colors.magenta, colors.orange, colors.pink]
+		strand = [1,-1]
+		feat_iter = IT.izip(iter(gene_feat_list), IT.cycle(iter(color_list)), 
+						IT.cycle(iter(strand)))
+		for feat in feat_iter:
+			feat[0].strand = feat[2]
+			gene_set.add_feature(feat[0], colour = feat[1])
+			
+		self.this_genome.draw()
 		
 class BkgSeq(ViralSeq):
 	"""
@@ -132,7 +182,7 @@ class PatSeq(ViralSeq):
 		self.pat_data = None
 		self.tested_subtype = None
 		self.seq_name = SEQ_NAME
-
+		self.this_genome = None
 
 class RefSeq(ViralSeq):
 	def __init__(self, FILENAME):
@@ -140,6 +190,13 @@ class RefSeq(ViralSeq):
 		self.tested_subtype = None
 		self.seq_name = None
 		self.annotation = None
+		#a windowed homology over the entire genome
+		self.global_hom = None
+		#identification of specific homology islands
+		self.hom_data = []
+		self.hom_seqs = []
+		
+		self.this_genome = None
 
 		self.ParseGenbank(FILENAME)
 		#self.DetSubtype()
@@ -170,7 +227,37 @@ class RefSeq(ViralSeq):
 								 trans_data, start_pos, end_pos)
 
 				self.annotation[feat.qualifiers['gene'][0]] = this_gene
-
+				
+				
+	def AnnotHomIsland(self, INPUT_SEQ, START_POS, HOMOLOGY):
+		"""
+		AnnotHomIsland
+			Adda a homology island which can be annotated into GenomeDiagram
+			
+		AnnotHomIsland(INPUT_SEQ, START_POS, HOMOLOGY)
+		"""
+		
+		hom_it = IT.izip(IT.count(START_POS), 
+							IT.repeat(HOMOLOGY, len(INPUT_SEQ)))
+		self.hom_data += list(hom_it)
+		
+		self.hom_seqs.append(START_POS, INPUT_SEQ)
+		
+	def AnnotGlobalHom(self):
+		"""
+		AnnotGlobalHom
+			Uses the data in self.global_hom to create a continious value of 
+			homology
+		"""
+		if self.this_genome == None:
+			self.this_genome = GDDiagram(self.seq_name)
+		
+		hom_track = self.this_genome.new_track(1, greytrack = 1, name = 'Homology')
+		hom_set = hom_track.new_set('graph')
+		
+		hom_set.new_graph(self.global_hom, 'Homology', style = 'line')
+		
+		self.this_genome.draw()
 
 class RefBase():
 	def __init__(self, SOURCE_DIR, DEST_DIR, BUILD = False,
@@ -193,7 +280,14 @@ class RefBase():
 
 	def __iter__(self):
 		return iter(self.ref_seqs)
-		
+	
+	def GetRefSeq(self, WANTED_REF):
+		for this_ref in self.ref_seqs:
+			if this_ref.seq_name == WANTED_REF:
+				return this_ref
+		raise KeyError
+	
+	
 	def BuildDatabase(self):
 		"""
 		BuildDatabase
