@@ -77,7 +77,7 @@ def cat2term2protein_all(iterable):
 
     cat2term2protein = {}
     categories = [x.strip() for x in iterable[0].split('\t')[3:7]]
-    print categories
+
     for cat in categories:
         cat2term2protein[cat] = {}
     for line in iterable[1:]:

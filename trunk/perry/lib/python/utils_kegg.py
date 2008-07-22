@@ -468,5 +468,10 @@ def colorPathwayWith2GeneSets(pathway,
               + name2_alpha + " -dissolve \""
               + str(blending_percent) + "%\" "
               + output_dir + pathway.split(':')[1] + '.png')
+    os.system('rm ' + name1)
+    os.system('rm ' + name2)
+    os.system('rm ' + name1_alpha)
+    os.system('rm ' + name2_alpha)
+    
     
 
