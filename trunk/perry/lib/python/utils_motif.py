@@ -216,6 +216,62 @@ def loadMatrix(afile):
             longest_len = seq_len    
     return [extendSeq(longest_len, seq) for seq in alignment_matrix]
 
+def mkProteinPlot_2proteins(motif_name_file1, motif_name_file2,
+                            motif_matrix_dir,
+                            output_file):
+    """ This makes the multiple alignment annotation figure for two proteins,
+        one per column.
+
+    @param motif_ls_file1: file with the locations and names of the motifs
+                           separated by tabs, one per line
+    @param motif_matrix_dir: directory with multiple 
+                              alignments annotated w/ 0/1 for absence/presense
+    @param motif_ls_file2: file with the locations and names of the motifs
+                            separated by tabs, one per line   
+    @param out_file: put the figure here
+    """
+
+    motifs1 = {}
+    afile = open(motif_name_file1)
+    for line in afile:
+        [location, name] = line.strip().split('\t')
+        motifs1[name] = location
+        
+    motifs2 = {}
+    afile = open(motif_name_file2)
+    for line in afile:
+        [location, name] = line.strip().split('\t')
+        motifs2[name] = location
+
+    cols = 2
+    rows = max([len(motifs1.keys()), len(motifs2.keys())])
+    
+    motif_index = 1
+    #motif_figure = pylab.gcf()
+    #default_size = motif_figure.get_size_inches()
+    #motif_figure.set_size_inches( (default_size[0]*3, default_size[1]*3) )
+    for motif in motifs1.keys():        
+        motif_matrix = loadMatrix(motif_matrix_dir + motifs1[motif])
+        #print rows, cols, motif_index
+        pylab.subplot(rows, cols, motif_index)
+        pylab.imshow(motif_matrix)
+        pylab.xticks([], [])
+        pylab.yticks([], [])
+        pylab.title(motif)
+        motif_index += 2
+    motif_index = 2
+    for motif in motifs2.keys():        
+        motif_matrix = loadMatrix(motif_matrix_dir + motifs2[motif])
+        #print rows, cols, motif_index
+        pylab.subplot(rows, cols, motif_index)
+        pylab.imshow(motif_matrix)
+        pylab.xticks([], [])
+        pylab.yticks([], [])
+        pylab.title(motif)
+        motif_index += 2
+    pylab.savefig(output_file, dpi=(300))
+    pylab.close()            
+
 def mkProteinPlot(motif_name_file, motif_matrix_dir, output_file):
     """ This makes the multiple alignment annotation figure.
 
@@ -232,7 +288,7 @@ def mkProteinPlot(motif_name_file, motif_matrix_dir, output_file):
         [location, name] = line.strip().split('\t')
         motifs[name] = location
     motif_count = len(motifs.keys())
-    print motifs
+    #print motifs
     if motif_count < 4:
         # up to 3x1
         cols = 1
@@ -259,17 +315,17 @@ def mkProteinPlot(motif_name_file, motif_matrix_dir, output_file):
         rows = int(math.ceil( float(motif_count) / float(4) ))
     #cols = math.ceil( float(len(motifs.keys()))/float(5) )
     motif_index = 1
-    motif_figure = pylab.gcf()
-    default_size = motif_figure.get_size_inches()
-    motif_figure.set_size_inches( (default_size[0]*3, default_size[1]*3) )
+    #motif_figure = pylab.gcf()
+    #default_size = motif_figure.get_size_inches()
+    #motif_figure.set_size_inches( (default_size[0]*3, default_size[1]*3) )
     for motif in motifs.keys():        
         motif_matrix = loadMatrix(motif_matrix_dir + motifs[motif])
-        print rows, cols, motif_index
+        #print rows, cols, motif_index
         pylab.subplot(rows, cols, motif_index)
         pylab.imshow(motif_matrix)
         pylab.xticks([], [])
         pylab.yticks([], [])
         pylab.title(motif)
         motif_index += 1
-    pylab.savefig(output_file)
+    pylab.savefig(output_file, dpi=(300))
     pylab.close()

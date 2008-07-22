@@ -54,6 +54,13 @@ def checkStart(sys_args, req_args, examples, arg_count, use_eq_req):
         if not len(sys_args) >= arg_count +1:
             printError(sys_args, req_args, examples)
             
+def sortedIntDictAsLs(adict):
+    keys = [int(k) for k in adict.keys()]    
+    keys.sort()
+    ls = []
+    for k in keys:
+        ls.append( [k, adict[str(k)]] )
+    return ls
 
 
         
