@@ -50,6 +50,21 @@ class Gene():
 		return seq_feat
 
 
+class HomIsland():
+	def __init__(self, SEQ, START_POS, HOM):
+		self.seq = SEQ
+		self.start = START_POS
+		self.hom = HOM
+		
+	def GetSeqFeatures(self):
+		"""
+		Returns a BioPython SeqFeature describing the homology Island
+		"""
+		seq_loc = SeqFeatClass.FeatureLocation(self.start, 
+									self.start + len(self.seq))
+		seq_feat = SeqFeature(location = seq_loc, strand = 1)
+		return seq_feat
+		
 class ViralSeq():
 	def __init__(self, TEST_SEQ, SEQ_NAME):
 		#if SEQ_NAME is None then assume that TEST_SEQ is a SeqRecord
@@ -153,20 +168,27 @@ class ViralSeq():
 		"""
 		if self.this_genome == None:
 			self.this_genome = GDDiagram(self.seq_name)
-		
+		gene_feat_list = self.GetSeqFeatures()
+		if len(gene_feat_list) == 0:
+			return
+			
 		gene_track = self.this_genome.new_track(5, greytrack = 1, name = 'Genes')
 		gene_set = gene_track.new_set('feature')
 		
-		gene_feat_list = self.GetSeqFeatures()
-		color_list = [colors.blue, colors.chocolate,  colors.crimson, 
-					colors.darkorchid, colors.green, colors.indianred, 
-					colors.magenta, colors.orange, colors.pink]
-		strand = [1,-1]
-		feat_iter = IT.izip(iter(gene_feat_list), IT.cycle(iter(color_list)), 
-						IT.cycle(iter(strand)))
-		for feat in feat_iter:
-			feat[0].strand = feat[2]
-			gene_set.add_feature(feat[0], colour = feat[1])
+		feat_dict = {}
+		feat_dict['gag'] = (colors.blue, 1)
+		feat_dict['pol'] = (colors.red, -1)
+		feat_dict['vif'] = (colors.green, 1)
+		feat_dict['vpr'] = (colors.chocolate, -1)
+		feat_dict['tat'] = (colors.orange, 1)
+		feat_dict['rev'] = (colors.magenta, -1)
+		feat_dict['env'] = (colors.darkorchid, 1)
+		feat_dict['nef'] = (colors.pink, -1)
+		feat_dict['vpu'] = (colors.purple, 1)
+		
+		for feat in gene_feat_list:
+			feat.strand = feat_dict[feat.id][1]
+			gene_set.add_feature(feat, colour = feat_dict[feat.id][0])
 			
 		self.this_genome.draw()
 		
@@ -193,7 +215,6 @@ class RefSeq(ViralSeq):
 		#a windowed homology over the entire genome
 		self.global_hom = None
 		#identification of specific homology islands
-		self.hom_data = []
 		self.hom_seqs = []
 		
 		self.this_genome = None
@@ -209,7 +230,6 @@ class RefSeq(ViralSeq):
 		self.my_sequence = this_record.seq.tostring()
 		self.seq_name = this_record.id
 		
-
 		self.annotation = {}
 		for feat in this_record.features:
 			if feat.qualifiers.has_key('gene') & feat.qualifiers.has_key('translation'):
@@ -229,19 +249,34 @@ class RefSeq(ViralSeq):
 				self.annotation[feat.qualifiers['gene'][0]] = this_gene
 				
 				
-	def AnnotHomIsland(self, INPUT_SEQ, START_POS, HOMOLOGY):
+	def LogHomIsland(self, INPUT_SEQ, START_POS, HOMOLOGY):
 		"""
 		AnnotHomIsland
 			Adda a homology island which can be annotated into GenomeDiagram
 			
 		AnnotHomIsland(INPUT_SEQ, START_POS, HOMOLOGY)
 		"""
+		self.hom_seqs.append(HomIsland(INPUT_SEQ, START_POS, HOMOLOGY))
 		
-		hom_it = IT.izip(IT.count(START_POS), 
-							IT.repeat(HOMOLOGY, len(INPUT_SEQ)))
-		self.hom_data += list(hom_it)
+	def AnnotHomIsland(self):
+		"""
+		AnnotHomIsland
+			Uses the data in self.hom_seqs to create a homology windows tack
+		"""
+		if self.this_genome == None:
+			self.this_genome = GDDiagram(self.seq_name)
 		
-		self.hom_seqs.append(START_POS, INPUT_SEQ)
+		if len(self.hom_seqs) == 0:
+			return
+		
+		hom_track = self.this_genome.new_track(3, greytrack = 1, 
+												name = 'Homology Islands')
+		hom_set = hom_track.new_set('feature')
+		
+		for this_island in self.hom_seqs:
+			hom_set.add_feature(this_island.GetSeqFeatures())
+		
+		self.this_genome.draw()
 		
 	def AnnotGlobalHom(self):
 		"""
@@ -252,9 +287,8 @@ class RefSeq(ViralSeq):
 		if self.this_genome == None:
 			self.this_genome = GDDiagram(self.seq_name)
 		
-		hom_track = self.this_genome.new_track(1, greytrack = 1, name = 'Homology')
+		hom_track = self.this_genome.new_track(4, greytrack = 1, name = 'Homology')
 		hom_set = hom_track.new_set('graph')
-		
 		hom_set.new_graph(self.global_hom, 'Homology', style = 'line')
 		
 		self.this_genome.draw()
@@ -287,6 +321,19 @@ class RefBase():
 				return this_ref
 		raise KeyError
 	
+	def FinalizeAnnotations(self):
+		"""
+		FinalizeAnnotations
+			Occasionally the genbank parser is not able to read all of the gene
+			sections of the genome.  FinalizeAnnotations uses the known
+			annotations to infer the missing annotations and re-build the BLAST
+			databases.
+		"""
+		
+		for this_ref in self.ref_seqs:
+			this_ref.TranslateAll(self)
+			
+		self.BuildDatabase()
 	
 	def BuildDatabase(self):
 		"""

@@ -143,7 +143,7 @@ class MappingBase():
 		else:
 			for this_test in self.test_names:
 				yield self.my_map_shelf[WANTED_REF+this_test]
-				
+
 
 
 	def WindowedHomology(self, WANTED_REF):
@@ -153,7 +153,8 @@ class MappingBase():
 			all sequences in the MAPPING_BASE based in the BLAST alignments.
 		"""
 		
-		hom_vector = numpy.zeros((1, len(self.ref_base.GetRefSeq(WANTED_REF).my_sequence)), 
+		this_ref = self.ref_base.GetRefSeq(WANTED_REF)
+		hom_vector = numpy.zeros((1, len(this_ref.my_sequence)), 
 									'float')
 		count = 0
 		
@@ -163,11 +164,16 @@ class MappingBase():
 			
 		hom_vector = hom_vector / float(count)
 		
-		self.ref_base.GetRefSeq(WANTED_REF).global_hom = zip(range(len(hom_vector)),
-															hom_vector.tolist())
+		val_iter = itertools.izip(range(len(hom_vector)),
+									hom_vector.tolist())
+		
+		this_ref.global_hom = []
+		for i in xrange(2,len(this_ref.my_sequence),2):
+			this_ref.global_hom.append((i, hom_vector[0,i]))
 		
 		
-			
+		
+
 
 	def MapToRefs(self, BLAST_RECORDS, SEQ_RECORD):
 		"""
@@ -209,30 +215,27 @@ class MappingBase():
 			
 			
 			
-	def FindWindows(self, MIN_SIZE, MIN_HOM, FILE_HANDLE):
+	def FindWindows(self, WANTED_REF, MIN_SIZE, MIN_HOM):
 		
 		num_seqs = float(len(self.test_names))
-		initial_window = 1
-		f_look_fun = operator.attrgetter('f_look')
-		pos_fun = lambda x,y: x[y]
-		this_ref = self.ref_base.ref_seqs[0]
-		#for this_ref in self.ref_base:
-		this_window_size = initial_window
+		
+		this_ref = self.ref_base.GetRefSeq(WANTED_REF)
 		start_pos = 0
-		poss_win = []
+		
+		#pull all of the f_look arrays because getting each from the file 
+		#is a time-intensive task
+		multi_flook = numpy.zeros((len(self.test_names), 
+									len(this_ref.my_sequence)),'int')
+		
+		mapping_iter = self.GetIter(WANTED_REF)
+		for i in xrange(len(self.test_names)):
+			multi_flook[i,:] = mapping_iter.next().f_look
+		
 		while (start_pos + MIN_SIZE) < len(this_ref.my_sequence):
-			temp = []
-			for this_map in self.GetIter(WANTED_REF = this_ref.seq_name):
-				if len(this_map.f_look) <= start_pos-1:
-					temp.append(this_map.f_look[0,start_pos])
-				else:
-					temp.append(0)
 			
-			#print temp
-			win_size_array = numpy.array(temp, dtype = 'int32')
 			#print win_size_array
 			#print win_size_array.dtype
-			vals = numpy.bincount(win_size_array)
+			vals = numpy.bincount(multi_flook[:,start_pos])
 			#print vals
 			
 			win_size_norm = vals / num_seqs
@@ -246,24 +249,35 @@ class MappingBase():
 				start_pos += 1
 				continue
 			else:
-				best_pos = numpy.argmax(win_size_prob)
+				
+				for best_pos in xrange(MIN_SIZE, len(win_size_prob)):
+					if win_size_prob[best_pos] < MIN_HOM:
+						break
+				if best_pos == 0:
+					print 'found zero'
+					raise KeyError
 				this_seq = this_ref.my_sequence[start_pos:start_pos+best_pos]
 				known_hom = self.CheckSeqs(this_seq)
-				FILE_HANDLE.write(string.join([this_seq, str(win_size_prob[best_pos].tolist()), 
-											str(known_hom) ],'\t') + '\n')
+				
+				this_ref.LogHomIsland(this_seq, start_pos, 
+										known_hom)
+				
 				start_pos += best_pos
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
-	
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
+				
