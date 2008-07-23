@@ -16,6 +16,7 @@ import shelve
 import operator
 import string
 
+
 ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
 bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
@@ -23,6 +24,45 @@ bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 def enumerate(iterable):
     return itertools.izip(itertools.count(), iterable)
 
+	
+def CalibrateRNAi(INPUT_FILE, OUTPUT_FILE):
+	mi_rna_dict = {}
+	splitter = re.compile('\t')
+	with open(INPUT_FILE) as handle:
+		#get rid of comment line
+		this_line = file_handle.next()
+		for this_line in file_handle:
+			data = splitter.split(this_line)
+			mi_rna_dict[data[3]] = string.upper(string.replace(data[5], '-', ''))
+	
+	RNAHybridPath = 'C:\\RNAHybrid\\'
+	CODING_FILE = 'C:\\RNAHybrid\\coding_HIV.txt'
+	NUM_SAMPLES = 5000
+	
+	calib_dict = {}
+	
+	for this_mirna in mi_rna_dict:
+		
+		this_seq = mi_rna_dict[this_mirna]
+		command = RNAHybridPath + 'RNAcalibrate'
+		
+		command = RNAHybridPath + 'RNAcalibrate'
+
+		command += ' -d ' + CODING_FILE
+		command += ' -k ' + str(NUM_SAMPLES)
+
+		command += ' ' + this_seq
+
+		sys_call = subprocess.Popen(command, shell = True,
+										stdout = subprocess.PIPE)
+
+		sys_call.wait()
+		output = sys_call.communicate()[0]
+		outputList = re.split(' |\n', output)
+		
+		
+	
+	
 class MappingRecord():
 	def __init__(self, REF_NAME, TEST_VIRAL, REF_LEN):
 		self.ref_name = REF_NAME
@@ -259,8 +299,8 @@ class MappingBase():
 				this_seq = this_ref.my_sequence[start_pos:start_pos+best_pos]
 				known_hom = self.CheckSeqs(this_seq)
 				
-				this_ref.LogHomIsland(this_seq, start_pos, 
-										known_hom)
+				this_ref.LogAnnotation('HomIsland', (this_seq, start_pos, 
+										known_hom))
 				
 				start_pos += best_pos
 				

@@ -66,15 +66,14 @@ def CheckFindWindows(MAPPING_BASE, THIS_REF):
 	Test the FindWindows
 	"""
 	MAPPING_BASE.FindWindows(THIS_REF.seq_name, 15, .6)
-	num_win = len(THIS_REF.hom_seqs)
+	num_win = len(THIS_REF.feature_annot)
 	
 	nose.tools.assert_true(num_win > 0, 
 			'No homology windows were found in: ' + THIS_REF.seq_name)
 
 def CheckMakeDiagram(THIS_REF):
 	
-	THIS_REF.WriteGenesToDiagram()
-	THIS_REF.AnnotHomIsland()
+	THIS_REF.RenderDiagram()
 	THIS_REF.AnnotGlobalHom()
 	
 	dest_dir = os.environ['PYTHONSCRATCH']

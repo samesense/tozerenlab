@@ -21,8 +21,23 @@ from Bio.Blast import NCBIXML, NCBIStandalone
 from GenomeDiagram import *
 from reportlab.lib import colors
 
+class Annot():
+	def __init__(self, NAME, START_POS, END_POS):
+		self.name = NAME
+		self.start = START_POS
+		self.end = END_POS
+		self.type = 'default'
+	
+	def GetSeqFeature(self):
+		"""
+		Returns a BioPython SeqFeature describing the gene represented
+		"""
+		seq_loc = SeqFeatClass.FeatureLocation(self.start, self.end)
+		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
+								id = self.name)
+		return seq_feat
 
-class Gene():
+class Gene(Annot):
 	def __init__(self, NAME, PRODUCT, NT_SEQ, AA_SEQ, START, END):
 		self.nt_seq = NT_SEQ
 		self.aa_seq = AA_SEQ
@@ -30,6 +45,7 @@ class Gene():
 		self.end = END
 		self.name = NAME
 		self.product = PRODUCT
+		self.type = 'GENE'
 
 	def __str__(self):
 		temp_str = '(Gene Class '
@@ -40,31 +56,20 @@ class Gene():
 	def __hash__(self):
 		return hash(self.aa_seq)
 		
-	def GetSeqFeature(self):
-		"""
-		Returns a BioPython SeqFeature describing the gene represented
-		"""
-		seq_loc = SeqFeatClass.FeatureLocation(self.start, self.end)
-		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
-								id = self.name)
-		return seq_feat
+	
 
-
-class HomIsland():
+class HomIsland(Annot):
 	def __init__(self, SEQ, START_POS, HOM):
 		self.seq = SEQ
 		self.start = START_POS
 		self.hom = HOM
-		
-	def GetSeqFeatures(self):
-		"""
-		Returns a BioPython SeqFeature describing the homology Island
-		"""
-		seq_loc = SeqFeatClass.FeatureLocation(self.start, 
-									self.start + len(self.seq))
-		seq_feat = SeqFeature(location = seq_loc, strand = 1)
-		return seq_feat
-		
+		self.name = SEQ
+		self.end = START_POS + len(SEQ)
+		self.type = 'HomIsland'
+	def __hash__(self):
+		return hash(self.seq)
+
+
 class ViralSeq():
 	def __init__(self, TEST_SEQ, SEQ_NAME):
 		#if SEQ_NAME is None then assume that TEST_SEQ is a SeqRecord
@@ -75,6 +80,7 @@ class ViralSeq():
 			self.my_sequence = TEST_SEQ
 			self.seq_name = SEQ_NAME
 		self.annotation = None
+		self.feature_annot = []
 		self.this_genome = None
 
 	def __hash__(self):
@@ -160,20 +166,16 @@ class ViralSeq():
 		"""
 		return self.my_sequence.find(INPUT_SEQ) != -1
 	
-	def WriteGenesToDiagram(self):
+	def WriteGenesToDiagram(self, INPUT_TRACK):
 		"""
 		WriteGenomeDiagram
 			Use the GenomeDiagram module to write a publication quality figure
 			of the genes and features in self.annotation
 		"""
-		if self.this_genome == None:
-			self.this_genome = GDDiagram(self.seq_name)
+		
 		gene_feat_list = self.GetSeqFeatures()
 		if len(gene_feat_list) == 0:
 			return
-			
-		gene_track = self.this_genome.new_track(5, greytrack = 1, name = 'Genes')
-		gene_set = gene_track.new_set('feature')
 		
 		feat_dict = {}
 		feat_dict['gag'] = (colors.blue, 1)
@@ -188,9 +190,49 @@ class ViralSeq():
 		
 		for feat in gene_feat_list:
 			feat.strand = feat_dict[feat.id][1]
-			gene_set.add_feature(feat, colour = feat_dict[feat.id][0])
+			INPUT_TRACK.add_feature(feat, colour = feat_dict[feat.id][0])
+			
+	
+	def RenderDiagram(self):
+		"""
+		RederDiagram
+			A set of functions for annotating all of the features that have
+			been annotated to the genome.  Overwrites any previous rendering.
+		"""
+		self.this_genome = GDDiagram(self.seq_name)
+		
+		wanted_tracks = ['Genes', 'HomIsland']
+		track_dict = {}
+		
+		for i in range(len(wanted_tracks)):
+			print str(i) + wanted_tracks[i]
+			a_new = self.this_genome.new_track(i + 1, name = wanted_tracks[i],  
+						greytrack = 1).new_set('feature')
+			track_dict[wanted_tracks[i]] = a_new
+		
+		self.WriteGenesToDiagram(track_dict['Genes'])
+		
+		for this_annot in self.feature_annot:
+			this_type = this_annot.type
+			track_dict[this_type].add_feature(this_annot.GetSeqFeature())
 			
 		self.this_genome.draw()
+	
+	def LogAnnotation(self, TYPE, DATA):
+		"""
+		LogAnnotation
+			Logs various types of annotations about the sequence for various
+			features such as Genes, homology, and ELMs
+		"""
+		
+		if TYPE == 'Annot':
+			self.feature_annot.append(Annot(DATA[0], DATA[1], DATA[2], DATA[4]))
+		elif TYPE == 'HomIsland':
+			self.feature_annot.append(HomIsland(DATA[0], DATA[1], DATA[2]))
+		else:
+			raise KeyError
+		
+		
 		
 class BkgSeq(ViralSeq):
 	"""
@@ -215,7 +257,7 @@ class RefSeq(ViralSeq):
 		#a windowed homology over the entire genome
 		self.global_hom = None
 		#identification of specific homology islands
-		self.hom_seqs = []
+		self.feature_annot = []
 		
 		self.this_genome = None
 
@@ -248,35 +290,6 @@ class RefSeq(ViralSeq):
 
 				self.annotation[feat.qualifiers['gene'][0]] = this_gene
 				
-				
-	def LogHomIsland(self, INPUT_SEQ, START_POS, HOMOLOGY):
-		"""
-		AnnotHomIsland
-			Adda a homology island which can be annotated into GenomeDiagram
-			
-		AnnotHomIsland(INPUT_SEQ, START_POS, HOMOLOGY)
-		"""
-		self.hom_seqs.append(HomIsland(INPUT_SEQ, START_POS, HOMOLOGY))
-		
-	def AnnotHomIsland(self):
-		"""
-		AnnotHomIsland
-			Uses the data in self.hom_seqs to create a homology windows tack
-		"""
-		if self.this_genome == None:
-			self.this_genome = GDDiagram(self.seq_name)
-		
-		if len(self.hom_seqs) == 0:
-			return
-		
-		hom_track = self.this_genome.new_track(3, greytrack = 1, 
-												name = 'Homology Islands')
-		hom_set = hom_track.new_set('feature')
-		
-		for this_island in self.hom_seqs:
-			hom_set.add_feature(this_island.GetSeqFeatures())
-		
-		self.this_genome.draw()
 		
 	def AnnotGlobalHom(self):
 		"""
