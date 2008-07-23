@@ -13,7 +13,7 @@ geneid st stp annotation_name seq annotation_tool
 and making annotated multiple alignment plots.
 """
 import utils_graph
-import pylab, math, gc
+import pylab, math
 
 def annotation2protein(afile, tool_dict):
     d = dict()
