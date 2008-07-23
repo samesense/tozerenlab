@@ -43,6 +43,6 @@ def drivingDistance(here, there):
                                 + here + '&daddr=' + there 
                                 + '&btnG=Get+Directions&output=js')
     timedist_sp = web_page.split('timedist')[1]
-    distance_num = timedist_sp.split(';')[0].split('\\')[-2].split('e')[1].replace(',', '')
+    distance_num = timedist_sp.split(';')[0].split('\\')[-2].split('e')[1]
     distance_unit = timedist_sp.split(';')[1].split('\\')[0].strip()
-    return [distance_num, distance_unit]
+    return [distance_num.replace(',', ''), distance_unit]
