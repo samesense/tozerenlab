@@ -187,53 +187,7 @@ def testCheckSeqs():
 	nose.tools.assert_true(mapping_base.CheckSeqs(wrong_seq) == 0,
 							'Found wrong_seq in a sequence')
 
-							
-def testAnnotGlobalHom():
-	"""
-	Test Global Homology, Homology Windows and Diagrams
-	"""
-	dest_dir = os.environ['PYTHONSCRATCH']
-	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
-									   'test_self_KEEP')
-	mapping_base.ref_base.FinalizeAnnotations()
-	this_iter = itertools.izip(iter(mapping_base.ref_base),
-					itertools.repeat(None,5))
-	for this_ref in this_iter:
-		yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
-		yield CheckFindWindows, mapping_base, this_ref[0]
-		yield CheckMakeDiagram, this_ref[0]
-		
-def CheckAnnotGlobalHom(MAPPING_BASE, THIS_REF):
-	
-	dest_dir = os.environ['PYTHONSCRATCH'] + THIS_REF.seq_name + '_KEEP.pdf'
-	MAPPING_BASE.WindowedHomology(THIS_REF.seq_name)
-	
-	nose.tools.assert_true(len(THIS_REF.global_hom) != 0,
-							'Did not make Homology properly')
-
-def CheckFindWindows(MAPPING_BASE, THIS_REF):
-	"""
-	Test the FindWindows
-	"""
-	MAPPING_BASE.FindWindows(THIS_REF.seq_name, 20, .6)
-	num_win = len(THIS_REF.hom_seqs)
-	
-	nose.tools.assert_true(num_win > 0, 'No homology windows were found')
-
-def CheckMakeDiagram(THIS_REF):
-	
-	THIS_REF.WriteGenesToDiagram()
-	THIS_REF.AnnotHomIsland()
-	THIS_REF.AnnotGlobalHom()
-	
-	dest_dir = os.environ['PYTHONSCRATCH']
-	dest_file = dest_dir + THIS_REF.seq_name + '_KEEP.pdf'
-	
-	THIS_REF.this_genome.write(dest_file, 'PDF')
-	
 def tearDownModule():
 	checker = re.compile('.*KEEP.*')
 	time.sleep(1)
