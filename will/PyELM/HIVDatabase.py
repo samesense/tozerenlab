@@ -15,7 +15,8 @@ import time
 import shelve
 import operator
 import string
-
+import subprocess
+import re
 
 ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
@@ -28,7 +29,7 @@ def enumerate(iterable):
 def CalibrateRNAi(INPUT_FILE, OUTPUT_FILE):
 	mi_rna_dict = {}
 	splitter = re.compile('\t')
-	with open(INPUT_FILE) as handle:
+	with open(INPUT_FILE) as file_handle:
 		#get rid of comment line
 		this_line = file_handle.next()
 		for this_line in file_handle:
@@ -37,11 +38,14 @@ def CalibrateRNAi(INPUT_FILE, OUTPUT_FILE):
 	
 	RNAHybridPath = 'C:\\RNAHybrid\\'
 	CODING_FILE = 'C:\\RNAHybrid\\coding_HIV.txt'
-	NUM_SAMPLES = 5000
+	NUM_SAMPLES = 50
 	
 	calib_dict = {}
 	
-	for this_mirna in mi_rna_dict:
+	mi_keys = mi_rna_dict.keys()[0:10]
+	
+	
+	for this_mirna in mi_keys:
 		
 		this_seq = mi_rna_dict[this_mirna]
 		command = RNAHybridPath + 'RNAcalibrate'
@@ -60,8 +64,89 @@ def CalibrateRNAi(INPUT_FILE, OUTPUT_FILE):
 		output = sys_call.communicate()[0]
 		outputList = re.split(' |\n', output)
 		
-		
+		calib_dict[this_mirna] = (this_seq, outputList[2], outputList[3])
 	
+	with open(OUTPUT_FILE, mode = 'w') as handle:
+		pickle.dump(calib_dict, handle)
+
+def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
+              RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'):
+    """
+    HybridSeq
+        Makes a call to the RNAhybrid.exe to determine the likilyhood of the
+        miRNA sequence binding to the Chomrosome Sequence.  It uses the data
+        from Calibrate to determine the statistical significance.
+
+        HybridSeq(RNA_SEQ,DELTA_THETA,CHROM_SEQ, 
+              RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'):
+
+        RNA_SEQ         The sequence of the short miRNA.
+
+        DELTA_THETA      The output of Calibrate ... the shape of the extreme
+                         value distribution.
+
+        RNA_HYBRID_PATH   The path to the folder that contains RNAhybrid
+
+
+    RETURNS
+
+        the list of tuples:
+            (position, energy, p-value)
+
+
+    """
+	
+	if len(CHROM_SEQ) > 700:
+		#sequence is too long so it must be split up so recursivel call the 
+		#function with smaller OVERLAPPING segments and append them together
+		step_fun = lambda x:(max(0,(x)*500-100), (x+1)*500)
+		off_set_fun = lambda x,y: [x[0]+y,x[1]+y,x[2]+y]
+		output_list = []
+		for this_win in itertools.imap(step_fun, itertools.count()):
+			try:
+				this_win_seq = CHROM_SEQ[this_win[0]:this_win[1]]
+				break_val = False
+			except:
+				this_win_seq = CHROM_SEQ[this_win[0]]
+				break_val = True
+			
+			this_output = HybridSeq(RNA_SEQ, DELTA_THETA, this_win_seq)
+			if len(this_output) > 0:
+				this_output = list(itertools.imap(off_set_fun, 
+												iter(this_output),
+												itertools.repeat(this_win[0])))
+				output_list += this_output
+				
+				
+	
+	command = RNA_HYBRID_PATH + 'RNAhybrid'
+
+	command += ' -c'
+	command += ' -d ' + DELTA_THETA[0] + ',' + DELTA_THETA[1]
+
+	command += ' -p 0.1' 
+	command += ' ' + CHROM_SEQ
+	command += ' ' + RNA_SEQ
+
+	sys_call = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE)
+	sys_call.wait()
+
+	output = sys_call.communicate()[0]
+
+	output_reg_exp = '(.*?):.*?command_line:[\-\.\d]*:([\.\-\d]*):'
+	output_reg_exp += '([\.\-\d]*):([\.\-\d]*).*'
+
+	final_output = []
+	if len(output) > 1:
+		all_lines = re.split('\n', output)
+
+		for this_line in all_lines[0:-1]:
+			final_output.append(re.match(output_reg_exp,
+											this_line).groups()[1:])
+		convert_fun = lambda x: [int(x[0]), float(x[1]), float(x[2])]
+		final_output = map(convert_fun, final_output)
+		
+	return final_output
 	
 class MappingRecord():
 	def __init__(self, REF_NAME, TEST_VIRAL, REF_LEN):
@@ -305,19 +390,33 @@ class MappingBase():
 				start_pos += best_pos
 				
 				
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
-				
+	def HumanMiRNAsite(self, CALIB_FILE, WANTED_REF):
+		"""
+		HumanMiRNAsite
+			Annotates the sites where human miRNA could potentially bind.  Adds
+			a track annotation for each mapping record.
+		"""
+		
+		RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'
+		
+		with open(CALIB_FILE) as handle:
+			CALIB_DICT = pickle.load(handle)
+			
+		
+		this_ref = self.ref_base.GetRefSeq(WANTED_REF)
+		if this_ref.multi_genome == None:
+			
+		for this_test_name in self.test_names:
+			this_mapping = self.my_map_shelf[this_ref.seq_name + this_test_name]
+			this_test_seq = self.my_test_shelf[this_test_name]
+			for this_mi_rna in CALIB_DICT:
+				this_calib = CALIB_DICT[this_mi_rna]
+				output_list = HybridSeq(this_calib[0], this_calib[1:2], 
+										this_test_seq.my_sequence)
+				if len(output_list) > 0:
+					
+		
+		
+		
+		
+		
