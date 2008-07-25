@@ -34,6 +34,14 @@ def setupModule():
 				seq_iter = SeqIO.parse(handle, 'fasta')
 				mapping_base.AddtoShelf(seq_iter)
 			break
+	
+	mirna_dict_file = 'RNAiCalibrations_KEEP.pkl'
+	
+	if not(mirna_dict_file in present_files):
+		DIREC = os.environ['MYDOCPATH'] + 'HIVRNAi\\'
+		DATABASENAME = 'human_predictions_4dwnload.txt'
+		HIVDatabase.CalibrateRNAi(DIREC + DATABASENAME, 
+									dest_dir + mirna_dict_file)
 
 def testAnnotation():
 	"""

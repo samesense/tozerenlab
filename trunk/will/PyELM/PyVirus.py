@@ -260,7 +260,9 @@ class RefSeq(ViralSeq):
 		self.feature_annot = []
 		
 		self.this_genome = None
-
+		self.multi_genome = None
+		self.multi_genome_dict = {}
+		
 		self.ParseGenbank(FILENAME)
 		#self.DetSubtype()
 
@@ -305,6 +307,31 @@ class RefSeq(ViralSeq):
 		hom_set.new_graph(self.global_hom, 'Homology', style = 'line')
 		
 		self.this_genome.draw()
+	
+	def AnnotMultiGenome(self, TEST_NAME, FEATURE_POS, FEATURE_TYPE):
+		"""
+		AnnotMultiGenome
+			Annotates a figure where each TEST mapping has a different cirlce
+			and each feature type has a different color.  Helpful for seeing 
+			patterns across multiple mappings in the positioning of features
+		"""
+		
+		color_dict = {}
+		color_dict['MIRNA'] = Colors.blue
+		
+		
+		if self.multi_genome == None:
+			self.multi_genome = GDDiagram(self.seq_name)
+			
+		if not(TEST_NAME in self.multi_genome_dict):
+			this_track = self.multi_genome.new_track(1)
+			this_set = this_track.new_set('feature')
+			self.multi_genome_dict[TEST_NAME] = this_set
+			
+		this_seq = self.multi_genome_dict[TEST_NAME]
+		
+		this_annot = Annot('NAME', FEATURE_POS[0], 
+									FEATURE_POS[1]).GetSeqFeature()
 
 class RefBase():
 	def __init__(self, SOURCE_DIR, DEST_DIR, BUILD = False,
