@@ -56,8 +56,14 @@ class Gene(Annot):
 	def __hash__(self):
 		return hash(self.aa_seq)
 		
-	
-
+class HumanMiRNA(Annot):
+	def __init__(self, NAME, START_POS, END_POS):
+		self.name = NAME
+		self.start = START_POS
+		self.end = END_POS
+		self.type = 'HumanMiRNA'
+		self.color = colors.blue
+		
 class HomIsland(Annot):
 	def __init__(self, SEQ, START_POS, HOM):
 		self.seq = SEQ
@@ -66,6 +72,8 @@ class HomIsland(Annot):
 		self.name = SEQ
 		self.end = START_POS + len(SEQ)
 		self.type = 'HomIsland'
+		self.color = colors.green
+		
 	def __hash__(self):
 		return hash(self.seq)
 
@@ -258,10 +266,10 @@ class RefSeq(ViralSeq):
 		self.global_hom = None
 		#identification of specific homology islands
 		self.feature_annot = []
+		self.multi_feature_annot = {}
 		
 		self.this_genome = None
 		self.multi_genome = None
-		self.multi_genome_dict = {}
 		
 		self.ParseGenbank(FILENAME)
 		#self.DetSubtype()
@@ -308,7 +316,8 @@ class RefSeq(ViralSeq):
 		
 		self.this_genome.draw()
 	
-	def AnnotMultiGenome(self, TEST_NAME, FEATURE_POS, FEATURE_TYPE):
+	def AnnotMultiGenome(self, TEST_NAME, FEATURE_NAME, 
+							FEATURE_POS, FEATURE_TYPE):
 		"""
 		AnnotMultiGenome
 			Annotates a figure where each TEST mapping has a different cirlce
@@ -316,22 +325,26 @@ class RefSeq(ViralSeq):
 			patterns across multiple mappings in the positioning of features
 		"""
 		
-		color_dict = {}
-		color_dict['MIRNA'] = Colors.blue
+		annot_list = self.multi_feature_annot.setdefault(TEST_NAME, [])
+		
+		if FEATURE_TYPE == 'MIRNA':
+			this_annot = HumanMiRNA(FEATURE_NAME, FEATURE_POS[0], FEATURE_POS[1])
+			annot_list.append(this_annot)
+			self.multi_feature_annot[TEST_NAME] = annot_list
+		else:
+			raise KeyError
 		
 		
-		if self.multi_genome == None:
-			self.multi_genome = GDDiagram(self.seq_name)
-			
-		if not(TEST_NAME in self.multi_genome_dict):
+	def DrawMultiGenome(self):
+		
+		self.multi_genome = GenomeDiagram(self.seq_name)
+		
+		for this_annot_list in self.multi_feature_annot.values():
 			this_track = self.multi_genome.new_track(1)
 			this_set = this_track.new_set('feature')
-			self.multi_genome_dict[TEST_NAME] = this_set
-			
-		this_seq = self.multi_genome_dict[TEST_NAME]
+			for this_annot in this_annot_list:
+				this_set.add_feature(this_annot.GetSeqFeature(), color = this_annot.color)
 		
-		this_annot = Annot('NAME', FEATURE_POS[0], 
-									FEATURE_POS[1]).GetSeqFeature()
 
 class RefBase():
 	def __init__(self, SOURCE_DIR, DEST_DIR, BUILD = False,

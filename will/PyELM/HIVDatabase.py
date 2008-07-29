@@ -38,11 +38,11 @@ def CalibrateRNAi(INPUT_FILE, OUTPUT_FILE):
 	
 	RNAHybridPath = 'C:\\RNAHybrid\\'
 	CODING_FILE = 'C:\\RNAHybrid\\coding_HIV.txt'
-	NUM_SAMPLES = 50
+	NUM_SAMPLES = 5000
 	
 	calib_dict = {}
 	
-	mi_keys = mi_rna_dict.keys()[0:10]
+	mi_keys = mi_rna_dict.keys()
 	
 	
 	for this_mirna in mi_keys:
@@ -71,30 +71,30 @@ def CalibrateRNAi(INPUT_FILE, OUTPUT_FILE):
 
 def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
               RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'):
-    """
-    HybridSeq
-        Makes a call to the RNAhybrid.exe to determine the likilyhood of the
-        miRNA sequence binding to the Chomrosome Sequence.  It uses the data
-        from Calibrate to determine the statistical significance.
+	"""
+	HybridSeq
+		Makes a call to the RNAhybrid.exe to determine the likilyhood of the
+		miRNA sequence binding to the Chomrosome Sequence.  It uses the data
+		from Calibrate to determine the statistical significance.
 
-        HybridSeq(RNA_SEQ,DELTA_THETA,CHROM_SEQ, 
-              RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'):
+			HybridSeq(RNA_SEQ,DELTA_THETA,CHROM_SEQ, 
+				RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'):
 
-        RNA_SEQ         The sequence of the short miRNA.
+			RNA_SEQ         The sequence of the short miRNA.
 
-        DELTA_THETA      The output of Calibrate ... the shape of the extreme
-                         value distribution.
+			DELTA_THETA      The output of Calibrate ... the shape of the extreme
+							value distribution.
 
-        RNA_HYBRID_PATH   The path to the folder that contains RNAhybrid
-
-
-    RETURNS
-
-        the list of tuples:
-            (position, energy, p-value)
+	        RNA_HYBRID_PATH   The path to the folder that contains RNAhybrid
 
 
-    """
+	    RETURNS
+
+	        the list of tuples:
+	            (position, energy, p-value)
+
+
+	"""
 	
 	if len(CHROM_SEQ) > 700:
 		#sequence is too long so it must be split up so recursivel call the 
@@ -143,7 +143,8 @@ def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
 		for this_line in all_lines[0:-1]:
 			final_output.append(re.match(output_reg_exp,
 											this_line).groups()[1:])
-		convert_fun = lambda x: [int(x[0]), float(x[1]), float(x[2])]
+		print final_output
+		convert_fun = lambda x: [int(x[2]), float(x[0]), float(x[1])]
 		final_output = map(convert_fun, final_output)
 		
 	return final_output
@@ -393,28 +394,94 @@ class MappingBase():
 	def HumanMiRNAsite(self, CALIB_FILE, WANTED_REF):
 		"""
 		HumanMiRNAsite
-			Annotates the sites where human miRNA could potentially bind.  Adds
-			a track annotation for each mapping record.
+			Annotates the sites where human miRNA could potentially bind.  
+			Makes calls to AnnotMultiGenome with binding sites for latter
+			descriptions.
 		"""
 		
+		def HybridWorker(MI_RNA_NAME, THIS_CALIB, THIS_TEST_NAME, SEQ):
+			"""
+			HybridWorker
+				A worker function which calls the HybridSeq function in a 
+				threaded manner. Aquires lock a before making calls to 
+				AnnotMultiGenome to make sure there is no difficulty with
+				the dictionary in this_ref.
+			"""
+			output_list = HybridSeq(THIS_CALIB[0], THIS_CALIB[1:], SEQ)
+			if len(output_list) == 0:
+				worker_seph.release()
+				return
+			with annot_lock:
+				#need a lock because we are modifying lists and dictionaries 
+				#in weird ways on the other side of the function call
+				for this_spot in output_list:
+					this_val = (this_spot[0], 
+									this_spot[0] + len(THIS_CALIB[0]))
+					this_ref.AnnotMultiGenome(THIS_TEST_NAME, MI_RNA_NAME, 
+												this_val, 'MIRNA')
+			worker_seph.release()
+			return
+			
+		
+		
 		RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'
+		WANTED_THREADS = 10
+		
+		annot_lock = threading.Lock()
+		worker_seph = threading.Semaphore(WANTED_THREADS)
+		all_threads = []
+		
 		
 		with open(CALIB_FILE) as handle:
 			CALIB_DICT = pickle.load(handle)
 			
-		
 		this_ref = self.ref_base.GetRefSeq(WANTED_REF)
-		if this_ref.multi_genome == None:
-			
-		for this_test_name in self.test_names:
+		
+		m_rna_frac = CALIB_DICT.keys()[0:2]
+		
+		counter = 0
+		for this_test_name in self.test_names[0:5]:
 			this_mapping = self.my_map_shelf[this_ref.seq_name + this_test_name]
 			this_test_seq = self.my_test_shelf[this_test_name]
-			for this_mi_rna in CALIB_DICT:
-				this_calib = CALIB_DICT[this_mi_rna]
-				output_list = HybridSeq(this_calib[0], this_calib[1:2], 
-										this_test_seq.my_sequence)
-				if len(output_list) > 0:
-					
+			for this_mi_rna in m_rna_frac:
+				counter += 1
+				print (this_test_name, this_mi_rna)
+				worker_seph.acquire()
+				this_thread = threading.Thread(target = HybridWorker, 
+										args = (this_mi_rna, 
+												CALIB_DICT[this_mi_rna],
+												this_test_name, 
+												this_test_seq.my_sequence))
+				this_thread.start()
+				all_threads.append(this_thread)
+				if counter > 6*3+1:
+					raise KeyError
+		
+		#make sure all threads have finished before exiting
+		for this_thread in all_threads:
+			this_thread.join()
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		
 		
