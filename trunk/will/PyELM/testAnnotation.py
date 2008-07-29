@@ -57,9 +57,11 @@ def testAnnotation():
 	this_iter = itertools.izip(iter(mapping_base.ref_base),
 					itertools.repeat(None,5))
 	for this_ref in this_iter:
-		yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
-		yield CheckFindWindows, mapping_base, this_ref[0]
-		yield CheckMakeDiagram, this_ref[0]
+		#yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
+		#yield CheckFindWindows, mapping_base, this_ref[0]
+		#yield CheckMakeDiagram, this_ref[0]
+		yield CheckHumanMiRNA, mapping_base, this_ref[0]
+		yield CheckDrawMulti, this_ref[0]
 	
 def CheckAnnotGlobalHom(MAPPING_BASE, THIS_REF):
 	
@@ -94,6 +96,25 @@ def CheckMakeDiagram(THIS_REF):
 	nose.tools.assert_true(simple_name in os.listdir(dest_dir), 
 			'Did not make ' + THIS_REF.seq_name + '_KEEP.pdf') 
 
+def CheckHumanMiRNA(MAPPING_BASE, THIS_REF):
+	
+	dest_dir = os.environ['PYTHONSCRATCH']
+	mirna_dict_file = 'RNAiCalibrations_KEEP.pkl'
+	
+	MAPPING_BASE.HumanMiRNAsite(dest_dir + mirna_dict_file, THIS_REF.seq_name)
+	
+	num_feat = len(THIS_REF.multi_feature_annot)
+	
+	nose.tools.assert_true(num_feat > 0, 'Did not create any features.')
+
+def CheckDrawMulti(THIS_REF):
+	
+	dest_dir = os.environ['PYTHONSCRATCH']
+	file_name = THIS_REF.seq_name + '_multi_KEEP.pdf'
+	THIS_REF.DrawMultiGenome()
+	THIS_REF.multi_genome.write(dest_dir + file_name, 'PDF')
+	
+	
 def tearDownModule():
 	checker = re.compile('.*KEEP.*')
 	time.sleep(1)
