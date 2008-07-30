@@ -20,62 +20,7 @@ from Bio.Alphabet import generic_protein, generic_nucleotide
 from Bio.Blast import NCBIXML, NCBIStandalone
 from GenomeDiagram import *
 from reportlab.lib import colors
-
-class Annot():
-	def __init__(self, NAME, START_POS, END_POS):
-		self.name = NAME
-		self.start = START_POS
-		self.end = END_POS
-		self.type = 'default'
-	
-	def GetSeqFeature(self):
-		"""
-		Returns a BioPython SeqFeature describing the gene represented
-		"""
-		seq_loc = SeqFeatClass.FeatureLocation(self.start, self.end)
-		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
-								id = self.name)
-		return seq_feat
-
-class Gene(Annot):
-	def __init__(self, NAME, PRODUCT, NT_SEQ, AA_SEQ, START, END):
-		self.nt_seq = NT_SEQ
-		self.aa_seq = AA_SEQ
-		self.start = START
-		self.end = END
-		self.name = NAME
-		self.product = PRODUCT
-		self.type = 'GENE'
-
-	def __str__(self):
-		temp_str = '(Gene Class '
-		temp_str += 'Name: ' + self.name
-		temp_str += ', Start: ' + str(self.start) + ')'
-		return temp_str
-		
-	def __hash__(self):
-		return hash(self.aa_seq)
-		
-class HumanMiRNA(Annot):
-	def __init__(self, NAME, START_POS, END_POS):
-		self.name = NAME
-		self.start = START_POS
-		self.end = END_POS
-		self.type = 'HumanMiRNA'
-		self.color = colors.blue
-		
-class HomIsland(Annot):
-	def __init__(self, SEQ, START_POS, HOM):
-		self.seq = SEQ
-		self.start = START_POS
-		self.hom = HOM
-		self.name = SEQ
-		self.end = START_POS + len(SEQ)
-		self.type = 'HomIsland'
-		self.color = colors.green
-		
-	def __hash__(self):
-		return hash(self.seq)
+from AnnotUtils import *
 
 
 class ViralSeq():
@@ -226,21 +171,81 @@ class ViralSeq():
 			
 		self.this_genome.draw()
 	
-	def LogAnnotation(self, TYPE, DATA):
+	def LogAnnotation(self, TYPE, POS, SEQ, HOM, NAME):
 		"""
 		LogAnnotation
 			Logs various types of annotations about the sequence for various
-			features such as Genes, homology, and ELMs
+			features such as Genes, homology, and ELMs ... use none if the data
+			does not apply
 		"""
 		
 		if TYPE == 'Annot':
-			self.feature_annot.append(Annot(DATA[0], DATA[1], DATA[2], DATA[4]))
+			self.feature_annot.append(Annot(NAME, POS[0], POS[1], None))
 		elif TYPE == 'HomIsland':
-			self.feature_annot.append(HomIsland(DATA[0], DATA[1], DATA[2]))
+			self.feature_annot.append(HomIsland(SEQ, POS[0], POS[1], HOM))
+		elif TYPE == 'MIRNA':
+			self.feature_annot.append(HumanMiRNA(NAME, POS[0], POS[1], None))
 		else:
 			raise KeyError
 		
+	def HumanMiRNAsite(self, CALIB_FILE):
+		"""
+		HumanMiRNAsite
+			Annotates the sites where human miRNA could potentially bind.  
+			Makes calls to LogAnnotation with binding sites for latter
+			descriptions.
+		"""
 		
+		def HybridWorker(MI_RNA_NAME, THIS_CALIB, THIS_TEST_NAME, SEQ):
+			"""
+			HybridWorker
+				A worker function which calls the HybridSeq function in a 
+				threaded manner. Aquires lock a before making calls to 
+				LogAnnotation to make sure there is no difficulty with
+				the dictionary in this_ref.
+			"""
+			output_list = HybridSeq(THIS_CALIB[0], THIS_CALIB[1:], SEQ)
+			if len(output_list) == 0:
+				worker_seph.release()
+				return
+			with annot_lock:
+				#need a lock because we are modifying lists and dictionaries 
+				#in weird ways on the other side of the function call
+				for this_spot in output_list:
+					this_val = (this_spot[0], 
+									this_spot[0] + len(THIS_CALIB[0]))
+					self.LogAnnotation('MIRNA', this_val, None, None, 
+										MI_RNA_NAME)
+			worker_seph.release()
+			return
+			
+		RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'
+		WANTED_THREADS = 10
+		
+		annot_lock = threading.Lock()
+		worker_seph = threading.Semaphore(WANTED_THREADS)
+		all_threads = []
+		
+		with open(CALIB_FILE) as handle:
+			CALIB_DICT = pickle.load(handle)
+		
+		m_rna_frac = CALIB_DICT.keys()[0:2]
+		
+		counter = 0
+		for this_mi_rna in m_rna_frac:
+			counter += 1
+			print (this_test_name, this_mi_rna)
+			worker_seph.acquire()
+			this_thread = threading.Thread(target = HybridWorker, 
+									args = (this_mi_rna, 
+											CALIB_DICT[this_mi_rna],
+											this_test_name, 
+											self.my_sequence))
+			this_thread.start()
+			all_threads.append(this_thread)
+		#make sure all threads have finished before exiting
+		for this_thread in all_threads:
+			this_thread.join()
 		
 class BkgSeq(ViralSeq):
 	"""
@@ -315,25 +320,6 @@ class RefSeq(ViralSeq):
 		hom_set.new_graph(self.global_hom, 'Homology', style = 'line')
 		
 		self.this_genome.draw()
-	
-	def AnnotMultiGenome(self, TEST_NAME, FEATURE_NAME, 
-							FEATURE_POS, FEATURE_TYPE):
-		"""
-		AnnotMultiGenome
-			Annotates a figure where each TEST mapping has a different cirlce
-			and each feature type has a different color.  Helpful for seeing 
-			patterns across multiple mappings in the positioning of features
-		"""
-		
-		annot_list = self.multi_feature_annot.setdefault(TEST_NAME, [])
-		
-		if FEATURE_TYPE == 'MIRNA':
-			this_annot = HumanMiRNA(FEATURE_NAME, FEATURE_POS[0], FEATURE_POS[1])
-			annot_list.append(this_annot)
-			self.multi_feature_annot[TEST_NAME] = annot_list
-		else:
-			raise KeyError
-		
 		
 	def DrawMultiGenome(self):
 		

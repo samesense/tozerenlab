@@ -9,6 +9,7 @@ import PyVirus
 import tempfile
 import time
 import PyBLAST
+import AnnotUtils
 
 
 def testLoading():
@@ -199,6 +200,60 @@ def CheckSeqFeatures(REF_BASE, INPUT_CLASS, INPUT_RECORD):
 			found_env = True
 	
 	nose.tools.assert_true(found_env, 'Could not find ENV in the feature list')   
+
+def testAnnotClass():
+	"""
+	Test Annotation Classes
+	"""
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	pos_classes = [AnnotUtils.Annot, AnnotUtils.HumanMiRNA, 
+					AnnotUtils.HomIsland]
+	
+	
+	for this_test in pos_classes:
+		yield CheckAnnotClass, this_test
+	
+def CheckAnnotClass(TEST_CLASS):
+	this_class = TEST_CLASS('test_name', 5, 10, 0.9)
+	
+	nose.tools.assert_true(this_class != None, 'Did not create class')
+	
+	this_feat = this_class.GetSeqFeature()
+	print this_feat
+	nose.tools.assert_true(this_feat != None, 'Did not convert properly')
+	nose.tools.assert_true(this_feat.id == 'test_name', 
+							'Did not convert values properly')
+							
+
+def testLogAnnotation():
+	"""
+	Test LogAnnotation
+	"""
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	pos_classes = ['Annot', 'MIRNA', 'HomIsland']
+	
+	test_cases = itertools.izip(iter(ref_base.ref_seqs), 
+								iter(pos_classes))
+	for this_case in test_cases:
+		yield CheckLogClass, this_case[0], this_case[1]
+
+def CheckLogClass(THIS_SEQ, THIS_CLASS):
+	THIS_SEQ.LogAnnotation(THIS_CLASS, (5, 10), 'aaaaa', 0.9, 'test_name')
+	
+	nose.tools.assert_true(len(THIS_SEQ.feature_annot) > 0, 
+							'Did not annotate properly')
+							
+	this_feat = THIS_SEQ.feature_annot[0].GetSeqFeature()
+	nose.tools.assert_true(this_feat.id != None, 
+							'Did not convert values properly')
+	
+
 
 def testGenomeDiagram():
 	"""
