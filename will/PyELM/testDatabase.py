@@ -72,14 +72,16 @@ def testAddtoShelf_SLOW():
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir, 
 											'test_self_KEEP')
-	POSSIBLE_KEY = 'AJ302647.12_bkg_data_1'
 	handle = open(seq_file)
 	seq_iter = SeqIO.parse(handle, 'fasta')
 	mapping_base.AddtoShelf(seq_iter)
 	handle.close()
-
-	nose.tools.assert_true(mapping_base.my_map_shelf.has_key(POSSIBLE_KEY),
-							'Shelf is missing an Item')
+	
+	for this_ref in mapping_base.ref_base:
+		for this_test in mapping_base.test_names:
+			this_key = this_ref.seq_name + this_test
+			nose.tools.assert_true(mapping_base.my_map_shelf.has_key(this_key),
+							'Shelf is missing an Item: ' + this_key)
 	for this_key in mapping_base.my_map_shelf:
 		match_sum = numpy.sum(mapping_base.my_map_shelf[this_key].is_match)
 		f_look_sum = numpy.sum(mapping_base.my_map_shelf[this_key].f_look)

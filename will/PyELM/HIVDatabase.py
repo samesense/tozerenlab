@@ -44,8 +44,8 @@ class MappingRecord():
 		return hash(self.ref_name + self.test_name)
 
 	def CalculateMapping(self, BLAST_ALIGNMENT):
-		self.mapping = numpy.zeros((1,self.ref_len))
-		self.is_match = numpy.zeros((1,self.ref_len), bool)
+		self.mapping = numpy.zeros((1,self.ref_len), dtype = numpy.uint16)
+		self.is_match = numpy.zeros((1,self.ref_len), dtype = numpy.bool)
 		filter_fun = lambda x: x[0] == '|'
 		unzip = lambda x: x[1]
 		for this_align in BLAST_ALIGNMENT.hsps:
@@ -71,8 +71,8 @@ class MappingRecord():
 			Find the number of consecutive MATCHES are present in the sequence
 		"""
 		p = numpy.nonzero(self.is_match)[1].tolist()
-		self.r_look = numpy.zeros((1,self.ref_len))
-		self.f_look = numpy.zeros((1,self.ref_len))
+		self.r_look = numpy.zeros((1,self.ref_len), dtype = numpy.uint16)
+		self.f_look = numpy.zeros((1,self.ref_len), dtype = numpy.uint16)
 		for k,g in itertools.groupby(enumerate(p), lambda (i,x): i-x):
 			inds = map(operator.itemgetter(1), g)
 			#handle.write('inds \t' + str(inds))
