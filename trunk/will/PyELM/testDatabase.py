@@ -23,8 +23,8 @@ def testMappingRecord():
     """
     dest_dir = os.environ['PYTHONSCRATCH']
     source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-    seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
-    seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+    seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
+    seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
     with open(seq_file) as handle:
         seq_iter = itertools.imap(PyVirus.BkgSeq,
@@ -55,7 +55,7 @@ def testMappingBase():
     """
     dest_dir = os.environ['PYTHONSCRATCH']
     source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-    seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+    seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
     mapping_base = HIVDatabase.MappingBase(source_dir, 
                                            dest_dir, 'test_self')
@@ -68,7 +68,7 @@ def testAddtoShelf_SLOW():
 	"""
 	dest_dir = os.environ['PYTHONSCRATCH']
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir, 
 											'test_self_KEEP')
@@ -96,7 +96,7 @@ def testSaveShelf():
 
 	dest_dir = os.environ['PYTHONSCRATCH']
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 							   'test_self')
@@ -127,7 +127,7 @@ def testMappingSlicing():
 	"""
 	dest_dir = os.environ['PYTHONSCRATCH']
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self')
@@ -151,7 +151,7 @@ def testMappingBaseIter():
 	
 	dest_dir = os.environ['PYTHONSCRATCH']
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self')
@@ -176,7 +176,7 @@ def testCheckSeqs():
 	"""
 	dest_dir = os.environ['PYTHONSCRATCH']
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self')
