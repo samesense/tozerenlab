@@ -19,8 +19,8 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_protein, generic_nucleotide
 from Bio.Blast import NCBIXML, NCBIStandalone
-#from GenomeDiagram import *
-#from reportlab.lib import colors
+from GenomeDiagram import *
+from reportlab.lib import colors
 from AnnotUtils import *
 from collections import defaultdict
 
@@ -194,6 +194,9 @@ class ViralSeq():
 		elif TYPE == 'ELM':
 			self.feature_annot.append(ELM(NAME, POS[0], POS[1], None))
 			self.feature_annot_type['ELM'] = True
+		elif TYPE == 'TF':
+			self.feature_annot.append(TFSite(NAME, POS[0], POS[1], HOM))
+			self.feature_annot_type['TF'] = True
 		else:
 			raise KeyError
 		
@@ -248,6 +251,9 @@ class ViralSeq():
 		#make sure all threads have finished before exiting
 		for this_thread in all_threads:
 			this_thread.join()
+		#make sure is set to true otherwise when checking anything that has 
+		#NO miRNAs will be re-checked because it was never logged
+		self.feature_annot_type['MIRNA'] = True
 	def FindELMs(self, ELM_DICT):
 		"""
 		Finds the ELMs in the PROTIEN sequence and then using LogAnnotation 
@@ -280,7 +286,19 @@ class ViralSeq():
 									this_annot.seq, this_annot.hom, None)
 				spot = string.find(self.my_sequence, this_annot.seq, spot+1)
 	
-	
+	def FindTFSites(self):
+		"""
+		Makes a call to AnnotUtils.TFChecker to annotate the transcription 
+		factor binding sites.  It will then call LogAnnotation to add the data
+		to the object.
+		"""
+		
+		output = TFChecker(self.my_sequence)
+		if len(output) > 0:
+			for this_annot in output:
+				spot = (this_annot[0], this_annot[0] + len(this_annot[4]))
+				self.LogAnnotation('TF', spot, this_annot[4], 
+									this_annot[3], this_annot[6])
 	
 	
 	

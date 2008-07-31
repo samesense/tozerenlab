@@ -43,30 +43,6 @@ def setupModule():
 		HIVDatabase.CalibrateRNAi(DIREC + DATABASENAME, 
 									dest_dir + mirna_dict_file)
 
-def testMiRNA_SLOW():
-	"""
-	Test finding human miRNAs
-	"""
-	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	dest_dir = os.environ['PYTHONSCRATCH']
-	ref_base = PyVirus.RefBase(base_dir, dest_dir)
-	
-	with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
-			CALIB_DICT = pickle.load(handle)
-	
-	for this_calib in CALIB_DICT.keys()[10:]:
-		junk = CALIB_DICT.pop(this_calib)
-	
-	this_seq = ref_base.ref_seqs[0]
-	
-	this_seq.HumanMiRNAsite(CALIB_DICT)
-	
-	num_feats = len(this_seq.feature_annot)
-	
-	nose.tools.assert_true(this_seq.feature_annot_type['MIRNA'], 
-							'Did not set dictionary properly')
-	nose.tools.assert_true(num_feats > 0, 'No Features annotated')
-			
 def testAnnotation():
 	"""
 	Test Annotations
@@ -77,13 +53,13 @@ def testAnnotation():
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self_KEEP')
-	mapping_base.ref_base.FinalizeAnnotations()
+	#mapping_base.ref_base.FinalizeAnnotations()
 	this_iter = itertools.izip(iter(mapping_base.ref_base),
 					itertools.repeat(None,5))
 	for this_ref in this_iter:
-		yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
+		#yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
 		#yield CheckFindWindows, mapping_base, this_ref[0]
-		yield CheckMakeDiagram, this_ref[0]
+		#yield CheckMakeDiagram, this_ref[0]
 		yield CheckDrawMulti, mapping_base, this_ref[0]
 	
 def CheckAnnotGlobalHom(MAPPING_BASE, THIS_REF):
@@ -98,7 +74,7 @@ def CheckFindWindows(MAPPING_BASE, THIS_REF):
 	"""
 	Test the FindWindows
 	"""
-	MAPPING_BASE.FindWindows(THIS_REF.seq_name, 25, .6)
+	MAPPING_BASE.FindWindows(THIS_REF.seq_name, 15, .4)
 	num_win = len(THIS_REF.feature_annot)
 	
 	nose.tools.assert_true(num_win > 0, 
