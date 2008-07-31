@@ -17,7 +17,7 @@ def setupModule():
 	
 	dest_dir = os.environ['PYTHONSCRATCH']
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 	
 	PyVirus.RefBase(source_dir, dest_dir, BUILD = True)
 	
@@ -43,13 +43,37 @@ def setupModule():
 		HIVDatabase.CalibrateRNAi(DIREC + DATABASENAME, 
 									dest_dir + mirna_dict_file)
 
+def testMiRNA_SLOW():
+	"""
+	Test finding human miRNAs
+	"""
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
+			CALIB_DICT = pickle.load(handle)
+	
+	for this_calib in CALIB_DICT.keys()[10:]:
+		junk = CALIB_DICT.pop(this_calib)
+	
+	this_seq = ref_base.ref_seqs[0]
+	
+	this_seq.HumanMiRNAsite(CALIB_DICT)
+	
+	num_feats = len(this_seq.feature_annot)
+	
+	nose.tools.assert_true(this_seq.feature_annot_type['MIRNA'], 
+							'Did not set dictionary properly')
+	nose.tools.assert_true(num_feats > 0, 'No Features annotated')
+			
 def testAnnotation():
 	"""
 	Test Annotations
 	"""
 	dest_dir = os.environ['PYTHONSCRATCH']
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self_KEEP')
@@ -57,11 +81,10 @@ def testAnnotation():
 	this_iter = itertools.izip(iter(mapping_base.ref_base),
 					itertools.repeat(None,5))
 	for this_ref in this_iter:
-		#yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
+		yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
 		#yield CheckFindWindows, mapping_base, this_ref[0]
-		#yield CheckMakeDiagram, this_ref[0]
-		yield CheckHumanMiRNA, mapping_base, this_ref[0]
-		yield CheckDrawMulti, this_ref[0]
+		yield CheckMakeDiagram, this_ref[0]
+		yield CheckDrawMulti, mapping_base, this_ref[0]
 	
 def CheckAnnotGlobalHom(MAPPING_BASE, THIS_REF):
 	
@@ -75,7 +98,7 @@ def CheckFindWindows(MAPPING_BASE, THIS_REF):
 	"""
 	Test the FindWindows
 	"""
-	MAPPING_BASE.FindWindows(THIS_REF.seq_name, 15, .6)
+	MAPPING_BASE.FindWindows(THIS_REF.seq_name, 25, .6)
 	num_win = len(THIS_REF.feature_annot)
 	
 	nose.tools.assert_true(num_win > 0, 
@@ -96,24 +119,25 @@ def CheckMakeDiagram(THIS_REF):
 	nose.tools.assert_true(simple_name in os.listdir(dest_dir), 
 			'Did not make ' + THIS_REF.seq_name + '_KEEP.pdf') 
 
-def CheckHumanMiRNA(MAPPING_BASE, THIS_REF):
-	
-	dest_dir = os.environ['PYTHONSCRATCH']
-	mirna_dict_file = 'RNAiCalibrations_KEEP.pkl'
-	
-	MAPPING_BASE.HumanMiRNAsite(dest_dir + mirna_dict_file, THIS_REF.seq_name)
-	
-	num_feat = len(THIS_REF.multi_feature_annot)
-	
-	nose.tools.assert_true(num_feat > 0, 'Did not create any features.')
 
-def CheckDrawMulti(THIS_REF):
+def CheckDrawMulti(MAPPING_BASE, THIS_REF):
 	
 	dest_dir = os.environ['PYTHONSCRATCH']
-	file_name = THIS_REF.seq_name + '_multi_KEEP.pdf'
-	THIS_REF.DrawMultiGenome()
-	THIS_REF.multi_genome.write(dest_dir + file_name, 'PDF')
+	lin_file_name = THIS_REF.seq_name + '_lin_multi_KEEP.pdf'
+	cir_file_name = THIS_REF.seq_name + '_cir_multi_KEEP.pdf'
 	
+	if THIS_REF.seq_name == 'AF033819.3':
+		#this_fig = MAPPING_BASE.MakeMultiDiagram(THIS_REF.seq_name, FORCE = True)
+		this_fig = MAPPING_BASE.MakeMultiDiagram(THIS_REF.seq_name)
+	else:
+		this_fig = MAPPING_BASE.MakeMultiDiagram(THIS_REF.seq_name)
+	
+	
+	this_fig.draw()
+	this_fig.write(dest_dir + cir_file_name, 'PDF')
+	
+	this_fig.draw(format='linear', fragments = 1)
+	this_fig.write(dest_dir + lin_file_name, 'PDF')
 	
 def tearDownModule():
 	checker = re.compile('.*KEEP.*')
