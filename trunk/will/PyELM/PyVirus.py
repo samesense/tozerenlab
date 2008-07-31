@@ -18,8 +18,9 @@ from Bio.Seq import Seq
 from Bio.SeqRecord import SeqRecord
 from Bio.Alphabet import generic_protein, generic_nucleotide
 from Bio.Blast import NCBIXML, NCBIStandalone
-from GenomeDiagram import *
-from reportlab.lib import colors
+#from GenomeDiagram import *
+#from reportlab.lib import colors
+from AnnotUtils import *
 from AnnotUtils import *
 
 
