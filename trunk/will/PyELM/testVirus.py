@@ -19,7 +19,7 @@ def testLoading():
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes),
                                    itertools.repeat(None, 5))
@@ -50,7 +50,7 @@ def testGenotyping_SLOW():
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes))
         for this_test in this_iter:
@@ -98,7 +98,7 @@ def testGenomeToBioPython():
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes))
         for this_test in this_iter:
@@ -160,7 +160,7 @@ def testTranslateAll():
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes))
         for this_test in this_iter:
@@ -183,7 +183,7 @@ def testGetSeqFeatures():
 	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
 						PyVirus.PatSeq]
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+	with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
 		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
 									iter(possible_classes))
 		for this_test in this_iter:
@@ -253,40 +253,12 @@ def CheckLogClass(THIS_SEQ, THIS_CLASS):
 	nose.tools.assert_true(this_feat.id != None, 
 							'Did not convert values properly')
 	
-
-
-def testGenomeDiagram():
-	"""
-	Test the GenomeDiagram
-	"""
-	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-	dest_dir = os.environ['PYTHONSCRATCH']
-	ref_base = PyVirus.RefBase(base_dir, dest_dir)
-	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-						PyVirus.PatSeq]
-	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
-		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
-									iter(possible_classes))
-		for this_test in this_iter:
-			yield CheckGenomeDiagram, ref_base, this_test[1], this_test[0]
-			
-
-def CheckGenomeDiagram(REF_BASE, INPUT_CLASS, INPUT_RECORD):
-	genome = INPUT_CLASS(INPUT_RECORD.seq.tostring(), 'testseq')
-	genome.TranslateAll(REF_BASE)
 	
-	dest_file = os.environ['PYTHONSCRATCH'] + INPUT_RECORD.id + 'KEEP.pdf'
-	
-	genome.WriteGenesToDiagram()
-	genome.this_genome.write(dest_file, 'PDF')
-
-
 def testGetSingleResult():
 	"""
 	Test the GetSingleResult of BLASTController
 	"""
-	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta').next()
 	
@@ -298,7 +270,7 @@ def testBLASTController_SLOW():
 	"""
 	Test the MultiThreaded BLAST controller
 	"""
-	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta')
 		
@@ -316,7 +288,6 @@ def testBLASTController_SLOW():
 									'Returned bad value')
 		nose.tools.assert_true(counter == 50, 
 			'Did not return the proper number of sequences')
-
 
 
 def tearDownModule():

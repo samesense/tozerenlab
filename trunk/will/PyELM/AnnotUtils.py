@@ -3,6 +3,11 @@ from Bio import SeqFeature as SeqFeatClass
 #a hack but the only way I can get everything to work right
 from Bio.SeqFeature import SeqFeature
 from reportlab.lib import colors
+import pickle
+import itertools
+import subprocess
+import re
+import os
 
 class Annot():
 	def __init__(self, NAME, START_POS, END_POS, HOM):
@@ -54,12 +59,31 @@ class HomIsland(Annot):
 		self.start = START_POS
 		self.hom = HOM
 		self.name = SEQ
-		self.end = START_POS + len(SEQ)
+		self.end = END_POS
 		self.type = 'HomIsland'
 		self.color = colors.green
 		
 	def __hash__(self):
 		return hash(self.seq)
+		
+class ELM(Annot):
+	def __init__(self, NAME, START_POS, END_POS, HOM):
+		self.start = START_POS
+		self.hom = HOM
+		self.name = NAME
+		self.end = END_POS
+		self.type = 'ELM'
+		if NAME[0:3] == 'CLV':
+			self.color = colors.red
+		elif NAME[0:3] == 'LIG':
+			self.color = colors.purple
+		elif NAME[0:3] == 'MOD':
+			self.color = colors.brown
+		elif NAME[0:3] == 'TRG':
+			self.color = colors.pink
+		else:
+			self.color = colors.black
+			
 		
 def CalibrateRNAi(INPUT_FILE, OUTPUT_FILE):
 	mi_rna_dict = {}
@@ -127,31 +151,30 @@ def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
 
 	        the list of tuples:
 	            (position, energy, p-value)
-
-
 	"""
 	
-	if len(CHROM_SEQ) > 700:
+	if len(CHROM_SEQ) > 600:
 		#sequence is too long so it must be split up so recursivel call the 
 		#function with smaller OVERLAPPING segments and append them together
 		step_fun = lambda x:(max(0,(x)*500-100), (x+1)*500)
 		off_set_fun = lambda x,y: [x[0]+y,x[1]+y,x[2]+y]
 		output_list = []
 		for this_win in itertools.imap(step_fun, itertools.count()):
-			try:
+			if this_win[1] < len(CHROM_SEQ):
 				this_win_seq = CHROM_SEQ[this_win[0]:this_win[1]]
 				break_val = False
-			except:
-				this_win_seq = CHROM_SEQ[this_win[0]]
+			else:
+				this_win_seq = CHROM_SEQ[this_win[0]:]
 				break_val = True
-			
 			this_output = HybridSeq(RNA_SEQ, DELTA_THETA, this_win_seq)
 			if len(this_output) > 0:
 				this_output = list(itertools.imap(off_set_fun, 
 												iter(this_output),
 												itertools.repeat(this_win[0])))
 				output_list += this_output
-				
+			if break_val:
+				break
+		return output_list
 	command = RNA_HYBRID_PATH + 'RNAhybrid'
 
 	command += ' -c'
@@ -160,7 +183,6 @@ def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
 	command += ' -p 0.1' 
 	command += ' ' + CHROM_SEQ
 	command += ' ' + RNA_SEQ
-
 	sys_call = subprocess.Popen(command, shell = True, stdout = subprocess.PIPE)
 	sys_call.wait()
 
@@ -176,8 +198,42 @@ def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
 		for this_line in all_lines[0:-1]:
 			final_output.append(re.match(output_reg_exp,
 											this_line).groups()[1:])
-		print final_output
 		convert_fun = lambda x: [int(x[2]), float(x[0]), float(x[1])]
 		final_output = map(convert_fun, final_output)
 		
 	return final_output
+	
+def ELMParser(DIRECTORY = None):
+	"""
+		Parser
+			Parses a directory of HTML files to extract the ELM names and
+			Regular Expressions and instanciates it into SELF.
+
+			Parser(DIRECTORY)
+
+			DIRECTORY		The directory containing the HTML files downloaded
+							from the ELM database.  If left empty then
+			C:\Documents and Settings\Will\My Documents\PyELM\ELM_RAW_DOWNLOAD\
+
+	"""
+	if DIRECTORY == None:
+		DIRECTORY = os.environ['MYDOCPATH'] + "ELM_Motif_finder\\ELM_RAW_DOWNLOAD\\"
+
+	file_list = os.listdir(DIRECTORY)
+	all_reg_exps = {}
+
+	for i in xrange(1, len(file_list) - 1):
+		this_file = open(DIRECTORY + file_list[i], 'r')
+		elm_name = file_list[i].rpartition('.')
+		current_line = ''
+		while current_line.find('Pattern:') == -1:
+			current_line = this_file.readline()
+		current_line = this_file.readline()
+		
+		reg_exp = current_line[current_line.find('>') +
+												 1:current_line.find('/') - 2]
+		comp_reg_exp = re.compile(reg_exp)
+		all_reg_exps[elm_name[0]] = (reg_exp, comp_reg_exp)
+		this_file.close()
+	
+	return all_reg_exps

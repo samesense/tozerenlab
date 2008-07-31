@@ -18,10 +18,12 @@ import string
 import subprocess
 import re
 from AnnotUtils import *
+from GenomeDiagram import *
+from reportlab.lib import colors
 
 ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
-bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
 def enumerate(iterable):
     return itertools.izip(itertools.count(), iterable)
@@ -78,8 +80,23 @@ class MappingRecord():
 			#handle.write('inds \t' + str(inds))
 			self.f_look[0,inds] = range(len(inds),0,-1)
 			self.r_look[0,inds] = range(0, len(inds))
-
-
+	
+	def GetMapping(self, START_POS, END_POS):
+		"""
+		A utility function which converts the mapping position of the TEST_SEQ
+		into the REF_SEQ
+		"""
+		try:
+			print self.mapping
+			new_end = int(numpy.nonzero(self.mapping == END_POS)[1][-1])
+		except IndexError:
+			new_end = len(self.mapping)
+		try:
+			new_start = int(numpy.nonzero(self.mapping == START_POS)[1][-1])
+		except IndexError:
+			new_start = 0
+		
+		return new_start, new_end
 
 
 class MappingBase():
@@ -90,9 +107,9 @@ class MappingBase():
 		self.test_names = []
 		self.my_test_shelf_name = DEST_DIR + SHELF_NAME + '_seqs.slf'
 		self.my_map_shelf_name = DEST_DIR + SHELF_NAME + '_map.slf'
-		
 		self.my_map_shelf = shelve.DbfilenameShelf(self.my_map_shelf_name, 
 													protocol = 2)
+			
 		self.my_test_shelf = shelve.DbfilenameShelf(self.my_test_shelf_name, 
 													protocol = 2)
 		self.test_names = self.my_test_shelf.keys()
@@ -258,11 +275,94 @@ class MappingBase():
 				this_seq = this_ref.my_sequence[start_pos:start_pos+best_pos]
 				known_hom = self.CheckSeqs(this_seq)
 				
-				this_ref.LogAnnotation('HomIsland', start_pos, 
-										start_pos + best_pos,
+				this_ref.LogAnnotation('HomIsland', (start_pos, 
+										start_pos + best_pos),
 										this_seq, known_hom, None)
 				
 				start_pos += best_pos
 				
 				
+	def MakeMultiDiagram(self, WANTED_REF, FORCE = False):
+		"""
+		Uses GenomeDiagram to create a multi-genome figure.
+		"""
+		
+		this_ref = self.ref_base.GetRefSeq(WANTED_REF)
+		
+		this_figure = GDDiagram(WANTED_REF)
+		
+		dest_dir = os.environ['PYTHONSCRATCH']
+		with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
+			CALIB_DICT = pickle.load(handle)
+		for this_calib in CALIB_DICT.keys()[10:]:
+			junk = CALIB_DICT.pop(this_calib)
+			
+		ELM_DICT = ELMParser()
+		
+		gene_track = this_figure.new_track(1, scale=0).new_set('feature')
+		this_ref.WriteGenesToDiagram(gene_track)
+		
+		subtype_dict = {}
+		
+		for this_name in self.test_names:
+			
+			this_bkg_seq = self.my_test_shelf[this_name]
+			try:
+				this_mapping = self.my_map_shelf[WANTED_REF + this_name]
+			except KeyError:
+				self.AddtoShelf(iter([this_bkg_seq]))
+				this_mapping = my_map_shelf.pop([WANTED_REF + this_name])
+			
+			if FORCE:
+				this_bkg_seq.feature_annot = []
+				this_bkg_seq.feature_annot_type['MIRNA'] = False
+				this_bkg_seq.feature_annot_type['ELM'] = False
+				this_bkg_seq.feature_annot_type['HomIsland'] = False
+			if not(this_bkg_seq.feature_annot_type.get('MIRNA', False)):
+				this_bkg_seq.HumanMiRNAsite(CALIB_DICT)
+			if not(this_bkg_seq.feature_annot_type.get('HomIsland', False)):
+				this_bkg_seq.FindHomIslands(this_ref)
+			if not(this_bkg_seq.feature_annot_type.get('ELM', False)):
+				if this_bkg_seq.annotation == None:
+					this_bkg_seq.TranslateAll(self.ref_base)
+				this_bkg_seq.FindELMs(ELM_DICT)
+			
+			this_subtype = this_bkg_seq.tested_subtype
+			if subtype_dict.has_key(this_subtype):
+				subtype_dict[this_subtype].append(this_name)
+			else:
+				subtype_dict[this_subtype] = [this_name]
+			
+			#save back into the shelve for faster calculation later
+			self.my_test_shelf[this_name] = this_bkg_seq
+		sorted_keys = subtype_dict.keys()
+		sorted_keys.sort()
+		for this_key in sorted_keys:
+			for this_name in subtype_dict[this_key]:
+				this_track = this_figure.new_track(1, scale=0).new_set('feature')
+				this_bkg_seq = self.my_test_shelf[this_name]
+				for this_annot in this_bkg_seq.feature_annot:
+					# start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
+																	# this_annot.end)
+					# print (this_annot.start, this_annot.end),(start_pos, end_pos)
+					# new_annot = copy.deepcopy(this_annot)
+					# new_annot.start = start_pos
+					# new_annot.end = end_pos
+					this_track.add_feature(this_annot.GetSeqFeature(), 
+										colour = this_annot.color)
+			#create a seperator
+			this_figure.new_track(1, name = this_key).new_set('feature')
+		
+		return this_figure
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		

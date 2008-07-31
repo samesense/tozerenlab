@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import string
 import os
 import re
 import types
@@ -21,7 +22,7 @@ from Bio.Blast import NCBIXML, NCBIStandalone
 #from GenomeDiagram import *
 #from reportlab.lib import colors
 from AnnotUtils import *
-from AnnotUtils import *
+from collections import defaultdict
 
 
 class ViralSeq():
@@ -35,7 +36,9 @@ class ViralSeq():
 			self.seq_name = SEQ_NAME
 		self.annotation = None
 		self.feature_annot = []
+		self.feature_annot_type = {}
 		self.this_genome = None
+		
 
 	def __hash__(self):
 		return hash(self.my_sequence + self.seq_name)
@@ -184,12 +187,17 @@ class ViralSeq():
 			self.feature_annot.append(Annot(NAME, POS[0], POS[1], None))
 		elif TYPE == 'HomIsland':
 			self.feature_annot.append(HomIsland(SEQ, POS[0], POS[1], HOM))
+			self.feature_annot_type['HomIsland'] = True
 		elif TYPE == 'MIRNA':
 			self.feature_annot.append(HumanMiRNA(NAME, POS[0], POS[1], None))
+			self.feature_annot_type['MIRNA'] = True
+		elif TYPE == 'ELM':
+			self.feature_annot.append(ELM(NAME, POS[0], POS[1], None))
+			self.feature_annot_type['ELM'] = True
 		else:
 			raise KeyError
 		
-	def HumanMiRNAsite(self, CALIB_FILE):
+	def HumanMiRNAsite(self, CALIB_DICT):
 		"""
 		HumanMiRNAsite
 			Annotates the sites where human miRNA could potentially bind.  
@@ -197,7 +205,7 @@ class ViralSeq():
 			descriptions.
 		"""
 		
-		def HybridWorker(MI_RNA_NAME, THIS_CALIB, THIS_TEST_NAME, SEQ):
+		def HybridWorker(MI_RNA_NAME, THIS_CALIB, SEQ):
 			"""
 			HybridWorker
 				A worker function which calls the HybridSeq function in a 
@@ -227,27 +235,56 @@ class ViralSeq():
 		worker_seph = threading.Semaphore(WANTED_THREADS)
 		all_threads = []
 		
-		with open(CALIB_FILE) as handle:
-			CALIB_DICT = pickle.load(handle)
+		m_rna_frac = CALIB_DICT.keys()
 		
-		m_rna_frac = CALIB_DICT.keys()[0:2]
-		
-		counter = 0
 		for this_mi_rna in m_rna_frac:
-			counter += 1
-			print (this_test_name, this_mi_rna)
 			worker_seph.acquire()
 			this_thread = threading.Thread(target = HybridWorker, 
 									args = (this_mi_rna, 
-											CALIB_DICT[this_mi_rna],
-											this_test_name, 
+											CALIB_DICT[this_mi_rna], 
 											self.my_sequence))
 			this_thread.start()
 			all_threads.append(this_thread)
 		#make sure all threads have finished before exiting
 		for this_thread in all_threads:
 			this_thread.join()
+	def FindELMs(self, ELM_DICT):
+		"""
+		Finds the ELMs in the PROTIEN sequence and then using LogAnnotation 
+		to mark thier locations on the NUCLEOTIDE sequence.
+		"""
 		
+		for this_gene_name in self.annotation:
+			this_gene = self.annotation[this_gene_name]
+			start_pos = this_gene.start
+			for this_ELM in ELM_DICT:
+				spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq)
+				while spot != None:
+					self.LogAnnotation('ELM', (start_pos + spot.start(), 
+												start_pos + spot.end()), 
+										None, None, this_ELM)
+					spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq, 
+														spot.start() + 1)
+	
+	def FindHomIslands(self, REF_SEQ):
+		"""
+		Finds the homology islands that are identical to the reference 
+		provided and then calls LogAnnotation.
+		"""
+		check_fun = lambda x: x.type == 'HomIsland'
+		
+		for this_annot in filter(check_fun, REF_SEQ.feature_annot):
+			spot = string.find(self.my_sequence, this_annot.seq)
+			while spot != -1:
+				self.LogAnnotation('HomIsland', (spot, spot + len(this_annot.seq)),
+									this_annot.seq, this_annot.hom, None)
+				spot = string.find(self.my_sequence, this_annot.seq, spot+1)
+	
+	
+	
+	
+	
+	
 class BkgSeq(ViralSeq):
 	"""
 	Used for Background Sequences
@@ -261,6 +298,8 @@ class PatSeq(ViralSeq):
 		self.tested_subtype = None
 		self.seq_name = SEQ_NAME
 		self.this_genome = None
+		self.feature_annot = []
+		self.feature_annot_type = {}
 
 class RefSeq(ViralSeq):
 	def __init__(self, FILENAME):
@@ -276,6 +315,9 @@ class RefSeq(ViralSeq):
 		
 		self.this_genome = None
 		self.multi_genome = None
+		
+		self.feature_annot = []
+		self.feature_annot_type = {}
 		
 		self.ParseGenbank(FILENAME)
 		#self.DetSubtype()
