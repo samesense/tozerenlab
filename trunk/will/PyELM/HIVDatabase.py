@@ -17,6 +17,7 @@ import operator
 import string
 import subprocess
 import re
+import string
 from AnnotUtils import *
 from GenomeDiagram import *
 from reportlab.lib import colors
@@ -46,6 +47,7 @@ class MappingRecord():
 		return hash(self.ref_name + self.test_name)
 
 	def CalculateMapping(self, BLAST_ALIGNMENT):
+		map_fun = lambda x: x != '-'
 		self.mapping = numpy.zeros((1,self.ref_len), dtype = numpy.uint16)
 		self.is_match = numpy.zeros((1,self.ref_len), dtype = numpy.bool)
 		filter_fun = lambda x: x[0] == '|'
@@ -54,19 +56,49 @@ class MappingRecord():
 			if this_align.query_start > this_align.query_end:
 				continue
 			if this_align.sbjct_start > this_align.query_end:
-				continue	
+				continue
+			if len(this_align.query) < 20:
+				continue
 			# query_inds = range(this_align.query_start, this_align.query_end)
 			# subjct_inds = range(this_align.sbjct_start, this_align.sbjct_end)
-			
-			query_inds = range(this_align.sbjct_start, this_align.sbjct_end)
-			subjct_inds = range(this_align.query_start, this_align.query_end)
-			
+			#print this_align.query
+			#subjct_inds = range(this_align.sbjct_start, this_align.sbjct_end)
+			#t_query_inds = range(this_align.query_start, this_align.query_end+1)
+			query_inds = []
+			subjct_inds = []
+			counter=this_align.query_start
+			#print this_align.query
+			for this in xrange(len(this_align.query)):
+				if this_align.query[this] != '-':
+					counter+=1
+				query_inds.append(counter)
+			counter = this_align.sbjct_start
+			for this in xrange(len(this_align.sbjct)):
+				if this_align.sbjct[this] != '-':
+					counter+=1
+				subjct_inds.append(counter)
+			while query_inds[-1] >= self.ref_len:
+				query_inds.pop()
+				subjct_inds.pop()
+				if len(query_inds) == 0:
+					break
+				
 			self.mapping[0,query_inds] = numpy.array(subjct_inds)
-
 			matched_inds = filter(filter_fun, zip(this_align.match, query_inds))
 			matched_inds = map(unzip, matched_inds)
 			self.is_match[0,matched_inds] = 1
-	
+		
+		last_val = 0
+		for i in xrange(self.ref_len):
+			if self.mapping[0,i] == 0:
+				continue
+			elif self.mapping[0,i] > last_val:
+				last_val = self.mapping[0,i]
+			else:
+				self.mapping[0,i] = 0
+				
+		with open('C:\\pyscratch\\mapping_out_KEEP.txt', mode = 'a') as handle:
+			handle.write(str(self.mapping.tolist()))
 	def CalculateRuns(self):
 		"""
 		CalculateRuns
@@ -87,12 +119,12 @@ class MappingRecord():
 		into the REF_SEQ
 		"""
 		try:
-			print self.mapping
-			new_end = int(numpy.nonzero(self.mapping == END_POS)[1][-1])
+			#print self.mapping
+			new_end = int(numpy.nonzero(self.mapping >= END_POS)[1][0])
 		except IndexError:
 			new_end = len(self.mapping)
 		try:
-			new_start = int(numpy.nonzero(self.mapping == START_POS)[1][-1])
+			new_start = int(numpy.nonzero(self.mapping >= START_POS)[1][0])
 		except IndexError:
 			new_start = 0
 		
@@ -241,7 +273,8 @@ class MappingBase():
 		#pull all of the f_look arrays because getting each from the file 
 		#is a time-intensive task
 		multi_flook = numpy.zeros((len(self.test_names), 
-									len(this_ref.my_sequence)),'int')
+									len(this_ref.my_sequence)),
+									dtype = numpy.uint16)
 		
 		mapping_iter = self.GetIter(WANTED_REF)
 		for i in xrange(len(self.test_names)):
@@ -320,14 +353,14 @@ class MappingBase():
 				this_bkg_seq.feature_annot_type['HomIsland'] = False
 			if not(this_bkg_seq.feature_annot_type.get('MIRNA', False)):
 				this_bkg_seq.HumanMiRNAsite(CALIB_DICT)
-			if not(this_bkg_seq.feature_annot_type.get('HomIsland', False)):
-				this_bkg_seq.FindHomIslands(this_ref)
+			#if not(this_bkg_seq.feature_annot_type.get('HomIsland', False)):
+				#this_bkg_seq.FindHomIslands(this_ref)
 			if not(this_bkg_seq.feature_annot_type.get('ELM', False)):
 				if this_bkg_seq.annotation == None:
 					this_bkg_seq.TranslateAll(self.ref_base)
 				this_bkg_seq.FindELMs(ELM_DICT)
 			
-			this_subtype = this_bkg_seq.tested_subtype
+			this_subtype = this_bkg_seq.tested_subtype.split('|')[1]
 			if subtype_dict.has_key(this_subtype):
 				subtype_dict[this_subtype].append(this_name)
 			else:
@@ -337,23 +370,67 @@ class MappingBase():
 			self.my_test_shelf[this_name] = this_bkg_seq
 		sorted_keys = subtype_dict.keys()
 		sorted_keys.sort()
+		sorted_keys = ['B', 'C']
+		counter = 0
 		for this_key in sorted_keys:
-			for this_name in subtype_dict[this_key]:
+			for this_name in subtype_dict[this_key][0:min(len(subtype_dict[this_key]),100)]:
 				this_track = this_figure.new_track(1, scale=0).new_set('feature')
 				this_bkg_seq = self.my_test_shelf[this_name]
 				for this_annot in this_bkg_seq.feature_annot:
-					# start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
-																	# this_annot.end)
-					# print (this_annot.start, this_annot.end),(start_pos, end_pos)
-					# new_annot = copy.deepcopy(this_annot)
-					# new_annot.start = start_pos
-					# new_annot.end = end_pos
+					start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
+																	this_annot.end)
+					if (start_pos == 0) & (end_pos == 0):
+						continue
+					if start_pos == end_pos:
+						end_pos += 1
+					new_annot = copy.deepcopy(this_annot)
+					new_annot.start = start_pos
+					new_annot.end = end_pos
 					this_track.add_feature(this_annot.GetSeqFeature(), 
 										colour = this_annot.color)
+				counter += 1
+				#raise KeyError
+				if counter > 200:
+					break
 			#create a seperator
 			this_figure.new_track(1, name = this_key).new_set('feature')
 		
 		return this_figure
+		
+		
+	def FindAllTFBinding(self, WANTED_THREADS = 10):
+		"""
+		Makes multi-threaded calls to TFChecker.
+		"""
+		
+		def TFWorker(SEQ):
+			SEQ.FindTFSites()
+			#make sure only one thread writes to the dictionary at a time
+			#otherwise significant crap-age will happen
+			with annot_lock:
+				self.my_test_shelf[SEQ.seq_name] = SEQ
+			worker_seph.release()
+			
+		annot_lock = threading.Lock()
+		worker_seph = threading.Semaphore(WANTED_THREADS)
+		all_threads = []
+		
+		for this_name in self.test_names:
+			worker_seph.aquire()
+			with annot_lock:
+				#make sure only one thread writes to the dictionary at a time
+				#otherwise significant crap-age will happen
+				this_seq = self.my_test_shelf[this_name]
+			if not(this_bkg_seq.feature_annot_type.get('TF', False)):
+				this_thread = threading.Thread(target = TFWorker, 
+												args = (SEQ))
+				this_thread.start()
+				all_threads.append()
+			else:
+				worker_seph.release()
+		#make sure all threads have closed before returning
+		for this_thread in all_threads:
+			this_thread.join()
 		
 		
 		

@@ -19,7 +19,7 @@ def testLoading():
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes),
                                    itertools.repeat(None, 5))
@@ -50,7 +50,7 @@ def testGenotyping_SLOW():
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes))
         for this_test in this_iter:
@@ -98,7 +98,7 @@ def testGenomeToBioPython():
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes))
         for this_test in this_iter:
@@ -160,7 +160,7 @@ def testTranslateAll():
     possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
                         PyVirus.PatSeq]
     file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
+    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
         this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
                                    iter(possible_classes))
         for this_test in this_iter:
@@ -183,7 +183,7 @@ def testGetSeqFeatures():
 	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
 						PyVirus.PatSeq]
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-	with open(file_loc + '500_seqs.fasta', mode = 'r') as file_handle:
+	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
 		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
 									iter(possible_classes))
 		for this_test in this_iter:
@@ -210,7 +210,8 @@ def testAnnotClass():
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
 	
 	pos_classes = [AnnotUtils.Annot, AnnotUtils.HumanMiRNA, 
-					AnnotUtils.HomIsland]
+					AnnotUtils.HomIsland, AnnotUtils.ELM,
+					AnnotUtils.TFSite]
 	
 	
 	for this_test in pos_classes:
@@ -253,12 +254,83 @@ def CheckLogClass(THIS_SEQ, THIS_CLASS):
 	nose.tools.assert_true(this_feat.id != None, 
 							'Did not convert values properly')
 	
+def testMiRNA_SLOW():
+	"""
+	Test finding human miRNAs
+	"""
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
+			CALIB_DICT = pickle.load(handle)
+	
+	for this_calib in CALIB_DICT.keys()[10:]:
+		junk = CALIB_DICT.pop(this_calib)
+	
+	this_seq = ref_base.ref_seqs[0]
+	
+	this_seq.HumanMiRNAsite(CALIB_DICT)
+	
+	num_feats = len(this_seq.feature_annot)
+	
+	nose.tools.assert_true(this_seq.feature_annot_type['MIRNA'], 
+							'Did not set dictionary properly')
+	nose.tools.assert_true(num_feats > 0, 'No Features annotated')
+	
+def testELM():
+	"""
+	Test finding ELMs
+	"""
+	
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	ELM_DICT = AnnotUtils.ELMParser()
+	
+	test_iter = itertools.izip(iter(ref_base.ref_seqs), 
+								itertools.repeat(ELM_DICT, 4))
+	
+	for this_test in test_iter:
+		yield CheckELM, this_test[0], this_test[1]
+		
+def CheckELM(THIS_SEQ, ELM_DICT):
+	THIS_SEQ.FindELMs(ELM_DICT)
+	check_fun = lambda x: x.type == 'ELM'
+	
+	num_elms = filter(check_fun, THIS_SEQ.feature_annot)
+	
+	nose.tools.assert_true(num_elms > 0, 'Could not find any ELMs!')
+	
+def testTFFind():
+	"""
+	Test finding TF binding sites
+	"""
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	test_iter = itertools.izip(iter(ref_base.ref_seqs), 
+								itertools.repeat(None,4))
+	
+	for this_test in test_iter:
+		yield CheckTF, this_test[0]
+	
+def CheckTF(THIS_SEQ):
+	
+	THIS_SEQ.FindTFSites()
+	check_fun = lambda x: x.type == 'TFSite'
+	
+	num_tfs = filter(check_fun, THIS_SEQ.feature_annot)
+	
+	nose.tools.assert_true(num_tfs > 0, 'Could not find any TFs!')
 	
 def testGetSingleResult():
 	"""
 	Test the GetSingleResult of BLASTController
 	"""
-	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta').next()
 	
@@ -270,7 +342,7 @@ def testBLASTController_SLOW():
 	"""
 	Test the MultiThreaded BLAST controller
 	"""
-	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta')
 		
