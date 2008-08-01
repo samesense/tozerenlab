@@ -8,6 +8,8 @@ import numpy
 from Bio import SeqIO
 import itertools
 import re
+import pickle
+import AnnotUtils
 
 def setupModule():
     dest_dir = os.environ['PYTHONSCRATCH']
@@ -43,10 +45,10 @@ def testMappingBase():
     dest_dir = os.environ['PYTHONSCRATCH']
     source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 
-    mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+    m_b = HIVDatabase.MappingBase(source_dir, dest_dir,
                                            'test_self', 5)
 
-    nose.tools.assert_not_equal(mapping_base, None)
+    nose.tools.assert_not_equal(m_b, None)
     
 
 def testMappingBase():
@@ -57,10 +59,10 @@ def testMappingBase():
     source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
     seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-    mapping_base = HIVDatabase.MappingBase(source_dir, 
+    m_b = HIVDatabase.MappingBase(source_dir, 
                                            dest_dir, 'test_self')
     
-    nose.tools.assert_not_equal(mapping_base, None)
+    nose.tools.assert_not_equal(m_b, None)
     
 def testAddtoShelf_SLOW():
 	"""
@@ -70,17 +72,17 @@ def testAddtoShelf_SLOW():
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir, 
+	m_b = HIVDatabase.MappingBase(source_dir, dest_dir, 
 											'test_self_KEEP')
 	handle = open(seq_file)
 	seq_iter = SeqIO.parse(handle, 'fasta')
-	mapping_base.AddtoShelf(seq_iter)
+	m_b.AddtoShelf(seq_iter)
 	handle.close()
 	
-	for this_ref in mapping_base.ref_base:
-		for this_test in mapping_base.test_names:
+	for this_ref in m_b.ref_base:
+		for this_test in m_b.test_names:
 			this_key = this_ref.seq_name + this_test
-			nose.tools.assert_true(mapping_base.my_map_shelf.has_key(this_key),
+			nose.tools.assert_true(m_b.my_map_shelf.has_key(this_key),
 							'Shelf is missing an Item: ' + this_key)
 
 def testSaveShelf():
@@ -92,26 +94,26 @@ def testSaveShelf():
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+	m_b = HIVDatabase.MappingBase(source_dir, dest_dir,
 							   'test_self')
 	POSSIBLE_KEY = 'AJ302647.1'
 	with open(seq_file) as handle:
 		seq_val = SeqIO.parse(handle, 'fasta').next()
 		test_key = POSSIBLE_KEY + seq_val.id
 
-	mapping_base.AddtoShelf([seq_val])
+	m_b.AddtoShelf([seq_val])
 
-	del(mapping_base)
+	del(m_b)
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+	m_b = HIVDatabase.MappingBase(source_dir, dest_dir,
 							   'test_self')
 
-	nose.tools.assert_true(mapping_base.my_map_shelf.has_key(test_key),
+	nose.tools.assert_true(m_b.my_map_shelf.has_key(test_key),
 					'Shelf is missing an Item')
 
-	for this_key in mapping_base.my_map_shelf:
-		match_sum = numpy.sum(mapping_base.my_map_shelf[this_key].is_match)
-		f_look_sum = numpy.sum(mapping_base.my_map_shelf[this_key].f_look)
+	for this_key in m_b.my_map_shelf:
+		match_sum = numpy.sum(m_b.my_map_shelf[this_key].is_match)
+		f_look_sum = numpy.sum(m_b.my_map_shelf[this_key].f_look)
 		nose.tools.assert_true(match_sum > 0, 'There were no matchings found')
 		nose.tools.assert_true(f_look_sum > 0, 'F_look was not properly calculated')
 
@@ -123,18 +125,18 @@ def testMappingSlicing():
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+	m_b = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self')
 	POSSIBLE_KEY = 'AJ302647.1'
 	with open(seq_file) as handle:
 		seq_val = SeqIO.parse(handle, 'fasta').next()
 	test_key = POSSIBLE_KEY + seq_val.id
 
-	mapping_base.AddtoShelf([seq_val])
+	m_b.AddtoShelf([seq_val])
 	
-	nose.tools.assert_true(mapping_base[test_key] != None,
+	nose.tools.assert_true(m_b[test_key] != None,
 							'Could not [] into MappingBase')
-	test_mapping = mapping_base[test_key][0:5]
+	test_mapping = m_b[test_key][0:5]
 	nose.tools.assert_true(test_mapping != None,
 							'Could not [:] into .is_match')
 
@@ -147,20 +149,20 @@ def testMappingBaseIter():
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+	m_b = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self')
 	POSSIBLE_KEY = 'AJ302647.1'
 	with open(seq_file) as handle:
 		seq_val = SeqIO.parse(handle, 'fasta').next()
 	test_key = POSSIBLE_KEY + seq_val.id
 
-	mapping_base.AddtoShelf([seq_val])
+	m_b.AddtoShelf([seq_val])
 
-	for this_map in mapping_base.GetIter():
+	for this_map in m_b.GetIter():
 		nose.tools.assert_true(this_map != None, 
 				'Could not generate individual mappings')
 	
-	for this_map in mapping_base.GetIter(WANTED_SUBTYPE = 'B'):
+	for this_map in m_b.GetIter(WANTED_SUBTYPE = 'B'):
 		nose.tools.assert_true(this_map != None, 
 				'Could not generate individual mappings from a single subtype')
 	
@@ -172,16 +174,47 @@ def testCheckSeqs():
 	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 
-	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
+	m_b = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self')
 	
 	correct_seq = 'A'
 	wrong_seq = 'QQQQQQ'
 	
-	nose.tools.assert_true(mapping_base.CheckSeqs(correct_seq) == 1,
+	nose.tools.assert_true(m_b.CheckSeqs(correct_seq) == 1,
 							'Could not find "A" in all sequences.')
-	nose.tools.assert_true(mapping_base.CheckSeqs(wrong_seq) == 0,
+	nose.tools.assert_true(m_b.CheckSeqs(wrong_seq) == 0,
 							'Found wrong_seq in a sequence')
+
+def testMultiAnnot():
+	"""
+	Test the multiThreaded Annotation
+	"""
+	
+	dest_dir = os.environ['PYTHONSCRATCH']
+	source_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	seq_file = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
+	
+	with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
+		CALIB_DICT = pickle.load(handle)
+	for this_calib in CALIB_DICT.keys()[5:]:
+		junk = CALIB_DICT.pop(this_calib)
+	
+	m_b = HIVDatabase.MappingBase(source_dir, dest_dir,
+									   'test_self')
+	
+	ELM_DICT = AnnotUtils.ELMParser()
+	wanted_ref = m_b.ref_base.ref_seqs[0]
+	
+	
+	m_b.AnnotateBase(CALIB_DICT, ELM_DICT, True, wanted_ref)
+	
+	for this_seq in m_b.test_names:
+		tf_val = m_b.my_test_shelf[this_seq].feature_annot_type['TF']
+		mirna_val = m_b.my_test_shelf[this_seq].feature_annot_type['MIRNA']
+		elm_val = m_b.my_test_shelf[this_seq].feature_annot_type['ELM']
+		nose.tools.assert_true(tf_val, 'Did not process all TFs')
+		nose.tools.assert_true(mirna_val, 'Did not process all MIRNAs')
+		nose.tools.assert_true(elm_val, 'Did not process all ELMs')
 
 
 def tearDownModule():

@@ -10,27 +10,34 @@ import tempfile
 import time
 import PyBLAST
 import AnnotUtils
+import logging
+import logging.handlers
+import threading
+
+
+logger = logging.getLogger('')
 
 
 def testLoading():
-    """
-    Test Loading the Virus classes
-    """
-    possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-                        PyVirus.PatSeq]
-    file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
-        this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
-                                   iter(possible_classes),
-                                   itertools.repeat(None, 5))
-        for this_test in this_iter:
-            yield CheckStringLoading, this_test[1], this_test[0]
+	"""
+	Test Loading the Virus classes
+	"""
+	logger.info('Starting testLoading')
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
+						PyVirus.PatSeq]
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+									iter(possible_classes),
+									itertools.repeat(None, 5))
+		for this_test in this_iter:
+			yield CheckStringLoading, this_test[1], this_test[0]
 
-        this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
-                                   iter(possible_classes),
-                                   itertools.repeat(None, 5))
-        for this_test in this_iter:
-            yield CheckSeqRecordLoading, this_test[1], this_test[0]
+		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+									iter(possible_classes),
+									itertools.repeat(None, 5))
+		for this_test in this_iter:
+			yield CheckSeqRecordLoading, this_test[1], this_test[0]
         
 def CheckStringLoading(INPUT_CLASS, INPUT_REC):
     genome = INPUT_CLASS(INPUT_REC.seq.tostring(), 'testFile')
@@ -43,18 +50,19 @@ def CheckSeqRecordLoading(INPUT_CLASS, INPUT_REC):
         
 
 def testGenotyping_SLOW():
-    """
-    Test Genotyping the Virus classes
-    """
-    possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-                        PyVirus.PatSeq]
-    file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
-        this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
-                                   iter(possible_classes))
-        for this_test in this_iter:
-            yield CheckGenotyping, this_test[1], this_test[0]
+	"""
+	Test Genotyping the Virus classes
+	"""
+	logger.info('Starting testGenotyping_SLOW')
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
+						PyVirus.PatSeq]
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:	
+		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+									iter(possible_classes))
+		for this_test in this_iter:
+			yield CheckGenotyping, this_test[1], this_test[0]
         
 def CheckGenotyping(INPUT_CLASS, INPUT_REC):
     genome = INPUT_CLASS(INPUT_REC.seq.tostring(), 'testFile')
@@ -63,46 +71,48 @@ def CheckGenotyping(INPUT_CLASS, INPUT_REC):
 
 
 def testRefLoading():
-    """
-    Test Genbank parsing of Reference Sequences
-    """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-    filter_fun = lambda x: x[-3:] == '.gb'
-    this_iter = itertools.izip(itertools.ifilter(filter_fun,
-                                                 iter(os.listdir(base_dir))),
-                               itertools.repeat(None,5))
-                   
-    for this_file in this_iter:
-        yield CheckRefLoading, base_dir+this_file[0]
-    
+	"""
+	Test Genbank parsing of Reference Sequences
+	"""
+	logger.info('Starting testRefLoading')
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	filter_fun = lambda x: x[-3:] == '.gb'
+	this_iter = itertools.izip(itertools.ifilter(filter_fun,
+												iter(os.listdir(base_dir))),
+								itertools.repeat(None,5))
+	for this_file in this_iter:
+		yield CheckRefLoading, base_dir+this_file[0]
+
 
 def CheckRefLoading(INPUT_FILE):
     genome = PyVirus.RefSeq(INPUT_FILE)
     nose.tools.assert_not_equal(genome.annotation, None)
 
 def testRefBaseLoading():
-    """
-    Test RefBase loading
-    """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-    dest_dir = os.environ['PYTHONSCRATCH']
-    ref_base = PyVirus.RefBase(base_dir, dest_dir)
-    nose.tools.assert_not_equal(ref_base, None, 'Could not Load Data')
-    nose.tools.assert_not_equal(ref_base.ref_seqs, None, 'Data not present')
+	"""
+	Test RefBase loading
+	"""
+	logger.info('Starting testRefBaseLoading')
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	nose.tools.assert_not_equal(ref_base, None, 'Could not Load Data')
+	nose.tools.assert_not_equal(ref_base.ref_seqs, None, 'Data not present')
 
 
 def testGenomeToBioPython():
-    """
-    Test the whole genome conversion to BioPython SeqRecord
-    """
-    possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-                        PyVirus.PatSeq]
-    file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
-        this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
-                                   iter(possible_classes))
-        for this_test in this_iter:
-            yield CheckGenomeToBioPython, this_test[1], this_test[0]
+	"""
+	Test the whole genome conversion to BioPython SeqRecord
+	"""
+	logger.info('Starting testGenomeToBioPython')
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
+						PyVirus.PatSeq]
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+									iter(possible_classes))
+		for this_test in this_iter:
+			yield CheckGenomeToBioPython, this_test[1], this_test[0]
 
    
 
@@ -116,25 +126,26 @@ def CheckGenomeToBioPython(INPUT_CLASS, INPUT_RECORD):
 
 
 def testBLASTContext():
-    """
-    Test TempFile creation.
-    """
-    with PyVirus.BLASTContext(os.environ['PYTHONSCRATCH'], 3) as file_names:
-        for this_file in file_names:
-            with open(this_file, mode = 'w') as handle:
-                handle.write('testData')
+	"""
+	Test TempFile creation.
+	"""
+	logger.info('Starting testBLASTContext')
+	with PyVirus.BLASTContext(os.environ['PYTHONSCRATCH'], 3) as file_names:
+		for this_file in file_names:
+			with open(this_file, mode = 'w') as handle:
+				handle.write('testData')
 
-    dir_list = os.listdir(os.environ['PYTHONSCRATCH'])
-    for this_file in file_names:
-        nose.tools.assert_false(this_file in dir_list,
-                                'Did not properly destroy files')
+	dir_list = os.listdir(os.environ['PYTHONSCRATCH'])
+	for this_file in file_names:
+		nose.tools.assert_false(this_file in dir_list,
+								'Did not properly destroy files')
         
 
 def testRefBaseBuilding():
     """
     Test Building the BLAST database
     """
-
+    logger.info('Starting testRefBaseBuilding')
     correct_suffix_list = ['hr', 'in', 'sd', 'si', 'sq']
     correct_base_list = ['ref_aa.fasta.p', 'ref_nt.fasta.n']
     base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
@@ -151,20 +162,22 @@ def testRefBaseBuilding():
     
 
 def testTranslateAll():
-    """
-    Test the translation of whole genome sequences
-    """
-    base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
-    dest_dir = os.environ['PYTHONSCRATCH']
-    ref_base = PyVirus.RefBase(base_dir, dest_dir)
-    possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-                        PyVirus.PatSeq]
-    file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
-    with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
-        this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
-                                   iter(possible_classes))
-        for this_test in this_iter:
-            yield CheckTranslateAll, ref_base, this_test[1], this_test[0]
+	"""
+	Test the translation of whole genome sequences
+	"""
+	logger.info('Starting testTranslateAll')
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
+						PyVirus.PatSeq]
+	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
+	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
+		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
+									iter(possible_classes))
+		for this_test in this_iter:
+			yield CheckTranslateAll, ref_base, this_test[1], this_test[0]
+			yield CheckTrandlateAllCont, ref_base, this_test[1], this_test[0]
 
 def CheckTranslateAll(REF_BASE, INPUT_CLASS, INPUT_RECORD):
     
@@ -172,11 +185,22 @@ def CheckTranslateAll(REF_BASE, INPUT_CLASS, INPUT_RECORD):
     genome.TranslateAll(REF_BASE)
 
     nose.tools.assert_true(genome.annotation.has_key('env'))   
+
+	
+def CheckTrandlateAllCont(REF_BASE, INPUT_CLASS, INPUT_RECORD):
+
+	genome = INPUT_CLASS(INPUT_RECORD.seq.tostring(), 'testseq')
+	wanted_ref = REF_BASE.ref_seqs[0].seq_name
+	genome.TranslateAll(REF_BASE, WANTED_REF = wanted_ref)
+
+	nose.tools.assert_true(genome.annotation.has_key('env'))   
+	
 	
 def testGetSeqFeatures():
 	"""
 	Test the SeqFeature Output
 	"""
+	logger.info('Starting testGetSeqFeatures')
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
@@ -205,6 +229,7 @@ def testAnnotClass():
 	"""
 	Test Annotation Classes
 	"""
+	logger.info('Starting testAnnotClass')
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
@@ -233,6 +258,7 @@ def testLogAnnotation():
 	"""
 	Test LogAnnotation
 	"""
+	logger.info('Starting testLogAnnotation')
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
@@ -258,6 +284,7 @@ def testMiRNA_SLOW():
 	"""
 	Test finding human miRNAs
 	"""
+	logger.info('Starting testMiRNA_SLOW')
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
@@ -282,7 +309,7 @@ def testELM():
 	"""
 	Test finding ELMs
 	"""
-	
+	logger.info('Starting testELM')
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
@@ -303,10 +330,11 @@ def CheckELM(THIS_SEQ, ELM_DICT):
 	
 	nose.tools.assert_true(num_elms > 0, 'Could not find any ELMs!')
 	
-def testTFFind():
+def testTFFind_SLOW():
 	"""
 	Test finding TF binding sites
 	"""
+	logger.info('Starting testTFFind')
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
@@ -330,6 +358,7 @@ def testGetSingleResult():
 	"""
 	Test the GetSingleResult of BLASTController
 	"""
+	logger.info('Starting testGetSingleResult')
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta').next()
@@ -337,11 +366,12 @@ def testGetSingleResult():
 	b_control = PyBLAST.BLASTController(seq_iter, 'BLASTn', NUM_SEQS = 1)
 	this_res = b_control.GetSingleResult()
 	nose.tools.assert_true(this_res != None)
-	
+
 def testBLASTController_SLOW():
 	"""
 	Test the MultiThreaded BLAST controller
 	"""
+	logger.info('Starting testBLASTController_SLOW')
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\50_seqs.fasta'
 	with open(file_loc) as seq_handle:
 		seq_iter = SeqIO.parse(seq_handle, 'fasta')
@@ -362,12 +392,13 @@ def testBLASTController_SLOW():
 			'Did not return the proper number of sequences')
 
 
-def tearDownModule():
-	checker = re.compile('.*KEEP.*')
-	time.sleep(1)
-	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
-	for this_file in file_list:
-		if checker.match(this_file) == None:
-			os.remove(os.environ['PYTHONSCRATCH'] + this_file)
+# def tearDownModule():
+	# logger.info('Starting tearDownModule')
+	# checker = re.compile('.*KEEP.*')
+	# time.sleep(1)
+	# file_list = os.listdir(os.environ['PYTHONSCRATCH'])
+	# for this_file in file_list:
+		# if checker.match(this_file) == None:
+			# os.remove(os.environ['PYTHONSCRATCH'] + this_file)
 
     

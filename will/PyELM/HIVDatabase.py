@@ -48,6 +48,7 @@ class MappingRecord():
 
 	def CalculateMapping(self, BLAST_ALIGNMENT):
 		map_fun = lambda x: x != '-'
+		fil_fun = lambda x: x < self.ref_len
 		self.mapping = numpy.zeros((1,self.ref_len), dtype = numpy.uint16)
 		self.is_match = numpy.zeros((1,self.ref_len), dtype = numpy.bool)
 		filter_fun = lambda x: x[0] == '|'
@@ -77,11 +78,8 @@ class MappingRecord():
 				if this_align.sbjct[this] != '-':
 					counter+=1
 				subjct_inds.append(counter)
-			while query_inds[-1] >= self.ref_len:
-				query_inds.pop()
-				subjct_inds.pop()
-				if len(query_inds) == 0:
-					break
+			query_inds = filter(fil_fun, query_inds)
+			subjct_inds = subjct_inds[0:len(query_inds)]
 				
 			self.mapping[0,query_inds] = numpy.array(subjct_inds)
 			matched_inds = filter(filter_fun, zip(this_align.match, query_inds))
@@ -97,8 +95,6 @@ class MappingRecord():
 			else:
 				self.mapping[0,i] = 0
 				
-		with open('C:\\pyscratch\\mapping_out_KEEP.txt', mode = 'a') as handle:
-			handle.write(str(self.mapping.tolist()))
 	def CalculateRuns(self):
 		"""
 		CalculateRuns
@@ -320,6 +316,8 @@ class MappingBase():
 		Uses GenomeDiagram to create a multi-genome figure.
 		"""
 		
+		elm_filter = lambda x: x.type != 'ELM'
+		
 		this_ref = self.ref_base.GetRefSeq(WANTED_REF)
 		
 		this_figure = GDDiagram(WANTED_REF)
@@ -335,31 +333,15 @@ class MappingBase():
 		gene_track = this_figure.new_track(1, scale=0).new_set('feature')
 		this_ref.WriteGenesToDiagram(gene_track)
 		
+		
+		self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
+		
+		
 		subtype_dict = {}
 		
 		for this_name in self.test_names:
 			
 			this_bkg_seq = self.my_test_shelf[this_name]
-			try:
-				this_mapping = self.my_map_shelf[WANTED_REF + this_name]
-			except KeyError:
-				self.AddtoShelf(iter([this_bkg_seq]))
-				this_mapping = my_map_shelf.pop([WANTED_REF + this_name])
-			
-			if FORCE:
-				this_bkg_seq.feature_annot = []
-				this_bkg_seq.feature_annot_type['MIRNA'] = False
-				this_bkg_seq.feature_annot_type['ELM'] = False
-				this_bkg_seq.feature_annot_type['HomIsland'] = False
-			if not(this_bkg_seq.feature_annot_type.get('MIRNA', False)):
-				this_bkg_seq.HumanMiRNAsite(CALIB_DICT)
-			#if not(this_bkg_seq.feature_annot_type.get('HomIsland', False)):
-				#this_bkg_seq.FindHomIslands(this_ref)
-			if not(this_bkg_seq.feature_annot_type.get('ELM', False)):
-				if this_bkg_seq.annotation == None:
-					this_bkg_seq.TranslateAll(self.ref_base)
-				this_bkg_seq.FindELMs(ELM_DICT)
-			
 			this_subtype = this_bkg_seq.tested_subtype.split('|')[1]
 			if subtype_dict.has_key(this_subtype):
 				subtype_dict[this_subtype].append(this_name)
@@ -368,6 +350,7 @@ class MappingBase():
 			
 			#save back into the shelve for faster calculation later
 			self.my_test_shelf[this_name] = this_bkg_seq
+		
 		sorted_keys = subtype_dict.keys()
 		sorted_keys.sort()
 		sorted_keys = ['B', 'C']
@@ -376,6 +359,7 @@ class MappingBase():
 			for this_name in subtype_dict[this_key][0:min(len(subtype_dict[this_key]),100)]:
 				this_track = this_figure.new_track(1, scale=0).new_set('feature')
 				this_bkg_seq = self.my_test_shelf[this_name]
+				this_mapping = self.my_map_shelf[WANTED_REF + this_name]
 				for this_annot in this_bkg_seq.feature_annot:
 					start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
 																	this_annot.end)
@@ -398,13 +382,25 @@ class MappingBase():
 		return this_figure
 		
 		
-	def FindAllTFBinding(self, WANTED_THREADS = 10):
+	def AnnotateBase(self, MiRNA_DICT, ELM_DICT, FORCE, 
+						WANTED_REF, WANTED_THREADS = 10):
 		"""
 		Makes multi-threaded calls to TFChecker.
 		"""
 		
-		def TFWorker(SEQ):
-			SEQ.FindTFSites()
+		def AnnotWorker(SEQ, MI_DICT, E_DICT, FORCE_INPUT, REF_INPUT):
+			
+			SEQ.TranslateAll(self.ref_base, WANTED_REF = REF_INPUT)
+			SEQ.FindELMs(E_DICT)
+			
+			if FORCE_INPUT or not(SEQ.feature_annot_type.get('MIRNA', False)):
+				SEQ.HumanMiRNAsite(MI_DICT)
+			
+			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TF', False)):
+				SEQ.FindTFSites()
+			
+			SEQ.DetSubtype()
+			
 			#make sure only one thread writes to the dictionary at a time
 			#otherwise significant crap-age will happen
 			with annot_lock:
@@ -416,18 +412,16 @@ class MappingBase():
 		all_threads = []
 		
 		for this_name in self.test_names:
-			worker_seph.aquire()
+			worker_seph.acquire()
 			with annot_lock:
 				#make sure only one thread writes to the dictionary at a time
 				#otherwise significant crap-age will happen
 				this_seq = self.my_test_shelf[this_name]
-			if not(this_bkg_seq.feature_annot_type.get('TF', False)):
-				this_thread = threading.Thread(target = TFWorker, 
-												args = (SEQ))
-				this_thread.start()
-				all_threads.append()
-			else:
-				worker_seph.release()
+			this_thread = threading.Thread(target = AnnotWorker, 
+								args = (this_seq, MiRNA_DICT, ELM_DICT, 
+										FORCE, WANTED_REF))
+			this_thread.start()
+			all_threads.append(this_thread)
 		#make sure all threads have closed before returning
 		for this_thread in all_threads:
 			this_thread.join()

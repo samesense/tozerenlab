@@ -8,14 +8,18 @@ import Queue
 import ctypes
 import os
 import time
+import logging
 
+logger = logging.getLogger('')
 
 def fLock(FILENAME):
+	logger.debug('Getting fLock:' + FILENAME)
 	h = ctypes.cdll.msvcrt._sopen(FILENAME, 0, 0x10, 0)
 	while h == -1:
 		time.sleep(0.5)
 		h = ctypes.cdll.msvcrt._sopen(FILENAME, 0, 0x10, 0)
 	ctypes.cdll.msvcrt._close(h)
+	logger.debug('Releasing fLock:' + FILENAME)
 
 
 
@@ -60,8 +64,10 @@ class BLASTController:
 		runBLASTs
 			Controls the starting and stopping of the workers
 		"""
+		oounter = 0
 		this_seq = self.seqs.next()
-		these_files = self.MakeFiles()
+		oounter += 1
+		these_files = self.MakeFiles(oounter)
 		with open(these_files[0], mode = 'w') as seq_handle:
 			SeqIO.write([this_seq],
 						seq_handle, 'fasta')
@@ -78,8 +84,9 @@ class BLASTController:
 		
 		
 		for this_seq in self.seqs:
+			oounter += 1
 			#autimatically limits the number of files possible
-			these_files = self.MakeFiles()
+			these_files = self.MakeFiles(oounter)
 			with open(these_files[0], mode = 'w') as seq_handle:
 				SeqIO.write([this_seq],
 							seq_handle, 'fasta')
@@ -124,7 +131,7 @@ class BLASTController:
 			yield blast_rec
 				
 			
-	def MakeFiles(self):
+	def MakeFiles(self, NUM):
 		"""
 		MakeFiles
 				Creates 2 temporary files (one for sequence and one
@@ -135,7 +142,8 @@ class BLASTController:
 		file_names = []
 		for i in xrange(2):
 			self.file_seph.acquire()
-			newNamedFile = tempfile.NamedTemporaryFile(prefix = 'temp_', 
+			pref = 'temp_' + str(NUM) + '_'
+			newNamedFile = tempfile.NamedTemporaryFile(prefix = pref, 
 														dir = self.scratch_dir)
 			file_names.append(newNamedFile.name)
 			newNamedFile.close()
@@ -149,7 +157,7 @@ class BLASTController:
 			nonsense.
 		"""
 		
-		these_files = self.MakeFiles()
+		these_files = self.MakeFiles(1)
 		with open(these_files[0], mode = 'w') as seq_handle:
 				SeqIO.write([self.seqs.next()],
 							seq_handle, 'fasta')
@@ -164,9 +172,10 @@ class BLASTController:
 		
 		with open(these_files[1], mode = 'r') as handle:
 			blast_rec = NCBIXML.parse(handle).next()
-		
-		
+		#time.sleep(0.5)
+		fLock(these_files[0])
 		os.remove(these_files[0])
+		fLock(these_files[1])
 		os.remove(these_files[1])
 		
 		return blast_rec
@@ -200,8 +209,10 @@ class BLASTController:
 			
 			command = self.MakeBLASTCommand()
 			ProcessVar = subprocess.Popen(command, shell = True)
+			logger.debug('BLAST command sent')
 			ProcessVar.wait()
 			self.thread_seph.release()
+			logger.debug('BLAST finished')
 			
 				   
 						   

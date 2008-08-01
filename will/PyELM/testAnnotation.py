@@ -9,6 +9,10 @@ from Bio import SeqIO
 import itertools
 import re
 
+import logging
+
+
+
 def setupModule():
 	"""
 	Determine if the required files are present ... otherwise create 
@@ -115,12 +119,12 @@ def CheckDrawMulti(MAPPING_BASE, THIS_REF):
 	this_fig.draw(format='linear', fragments = 1)
 	this_fig.write(dest_dir + lin_file_name, 'PDF')
 	
-def tearDownModule():
-	checker = re.compile('.*KEEP.*')
-	time.sleep(1)
-	file_list = os.listdir(os.environ['PYTHONSCRATCH'])
-	for this_file in file_list:
-		if checker.match(this_file) == None:
-			os.remove(os.environ['PYTHONSCRATCH'] + this_file)
+# def tearDownModule():
+	# checker = re.compile('.*KEEP.*')
+	# time.sleep(1)
+	# file_list = os.listdir(os.environ['PYTHONSCRATCH'])
+	# for this_file in file_list:
+		# if checker.match(this_file) == None:
+			# os.remove(os.environ['PYTHONSCRATCH'] + this_file)
 
     
