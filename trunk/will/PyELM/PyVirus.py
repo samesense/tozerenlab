@@ -24,6 +24,7 @@ from reportlab.lib import colors
 from AnnotUtils import *
 from collections import defaultdict
 
+import logging
 
 class ViralSeq():
 	def __init__(self, TEST_SEQ, SEQ_NAME):
@@ -92,8 +93,7 @@ class ViralSeq():
 		HIVSubtype module.
 		"""
 		self.tested_subtype = GenoTyping.GetSimple(self.my_sequence)
-
-	def TranslateAll(self, REFBASE):
+	def TranslateAll(self, REFBASE, WANTED_REF = None):
 		"""
 		TranslateAll
 				Uses a BLASTx query to determine the which ORFs
@@ -102,9 +102,14 @@ class ViralSeq():
 		"""
 		blast_record = REFBASE.BLASTx(self.GenomeToBioPython())
 		gene_dict = {}
-		reg = re.compile('.*?:(\w{3}).*')
+		reg = re.compile('.*?\|(.*?):(\w{3}).*')
 		for this_check in blast_record.alignments:
-			this_gene = str(reg.match(this_check.title).groups()[0])
+			label = reg.match(this_check.title).groups()
+			this_gene = str(label[1])
+			this_ref = str(label[0])
+			if (WANTED_REF != None) & (this_ref != WANTED_REF):
+				#make sure we translate "in context" of a reference
+				continue
 			if not(gene_dict.has_key(this_gene)):
 				aa_seq = str(this_check.hsps[0].query)
 				start_pos = this_check.hsps[0].query_start
@@ -114,7 +119,6 @@ class ViralSeq():
 							nt_seq, aa_seq, start_pos, end_pos)
 				gene_dict[this_gene] = gene
 		self.annotation = gene_dict
-	
 	def CheckSeq(self, INPUT_SEQ):
 		"""
 		CheckSeq
@@ -271,7 +275,7 @@ class ViralSeq():
 										None, None, this_ELM)
 					spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq, 
 														spot.start() + 1)
-	
+		self.feature_annot_type['ELM'] = True
 	def FindHomIslands(self, REF_SEQ):
 		"""
 		Finds the homology islands that are identical to the reference 
@@ -285,7 +289,7 @@ class ViralSeq():
 				self.LogAnnotation('HomIsland', (spot, spot + len(this_annot.seq)),
 									this_annot.seq, this_annot.hom, None)
 				spot = string.find(self.my_sequence, this_annot.seq, spot+1)
-	
+		self.feature_annot_type['HomIsland'] = True
 	def FindTFSites(self):
 		"""
 		Makes a call to AnnotUtils.TFChecker to annotate the transcription 
@@ -299,7 +303,7 @@ class ViralSeq():
 				spot = (this_annot[0], this_annot[0] + len(this_annot[4]))
 				self.LogAnnotation('TF', spot, this_annot[4], 
 									this_annot[3], this_annot[6])
-	
+		self.feature_annot_type['TF'] = True
 	
 	
 	
