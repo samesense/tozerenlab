@@ -18,7 +18,10 @@ class Annot():
 		self.end = END_POS
 		self.type = 'default'
 		self.color = colors.black
-		
+	
+	def __str__(self):
+		return self.type + ":" + self.name + ":" + str(self.start)
+	
 	def GetSeqFeature(self):
 		"""
 		Returns a BioPython SeqFeature describing the gene represented
@@ -27,6 +30,53 @@ class Annot():
 		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
 								id = self.name)
 		return seq_feat
+	
+	def GeneAnnot(self, GENE, REL_START, REL_STOP):
+		"""
+		Annotate the gene position where this ELM occurs
+		"""
+		self.gene = GENE
+		self.rel_start = REL_START
+		self.rel_stop = REL_STOP
+	
+	def GetSeqFeature_PROT(self):
+		"""
+		Returns a BioPython SeqFeature describing the ELM represented
+		in reference to the protein it is on.
+		"""
+		seq_loc = SeqFeatClass.FeatureLocation(self.rel_start, self.rel_stop)
+		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
+								id = self.name)
+		return seq_feat
+		
+	def MapToMe(self, EQ, MAPPING):
+		"""
+		Returns reference coordiates inwhich self and EQ are identical
+		"""
+		
+		disp = EQ.start - self.start
+		
+		MAPPING.start -= disp
+		MAPPING.end -= disp
+		
+		if MAPPING.start < 0:
+			return
+		
+		return MAPPING
+	
+	def CheckRange(self, TYPE, POS, FUDGE_POS = 1000):
+		"""
+		Returns True if this Annotation is of the proper type and starts 
+		within the FUDGE region
+		"""
+		
+		if self.type != TYPE:
+			return False
+		
+		if abs(self.start - POS) < FUDGE_POS:
+			return True
+		else:
+			return False
 
 class Gene(Annot):
 	def __init__(self, NAME, PRODUCT, NT_SEQ, AA_SEQ, START, END):
@@ -37,6 +87,8 @@ class Gene(Annot):
 		self.name = NAME
 		self.product = PRODUCT
 		self.type = 'GENE'
+		self.rel_start = None
+		self.rel_stop = None
 
 	def __str__(self):
 		temp_str = '(Gene Class '
@@ -54,6 +106,11 @@ class HumanMiRNA(Annot):
 		self.end = END_POS
 		self.type = 'HumanMiRNA'
 		self.color = colors.blue
+
+	def GetSeqFeature_PROT(self):
+		raise NotImplemented
+	def GeneAnnot(self, GENE, REL_START, REL_STOP):
+		raise NotImplemented
 		
 class HomIsland(Annot):
 	def __init__(self, SEQ, START_POS, END_POS, HOM):
@@ -64,6 +121,10 @@ class HomIsland(Annot):
 		self.end = END_POS
 		self.type = 'HomIsland'
 		self.color = colors.green
+	def GetSeqFeature_PROT(self):
+		raise NotImplemented
+	def GeneAnnot(self, GENE, REL_START, REL_STOP):
+		raise NotImplemented
 		
 	def __hash__(self):
 		return hash(self.seq)
@@ -75,6 +136,10 @@ class ELM(Annot):
 		self.name = NAME
 		self.end = END_POS
 		self.type = 'ELM'
+		self.gene = None
+		self.rel_start = None
+		self.rel_stop = None
+		
 		if NAME[0:3] == 'CLV':
 			self.color = colors.red
 		elif NAME[0:3] == 'LIG':
@@ -85,7 +150,8 @@ class ELM(Annot):
 			self.color = colors.pink
 		else:
 			self.color = colors.black
-			
+	
+
 class TFSite(Annot):
 	def __init__(self, NAME, START_POS, END_POS, HOM):
 		self.start = START_POS
@@ -94,7 +160,11 @@ class TFSite(Annot):
 		self.end = END_POS
 		self.type = 'TFSite'
 		self.color = colors.silver
-		
+	
+	def GetSeqFeature_PROT(self):
+		raise NotImplemented
+	def GeneAnnot(self, GENE, REL_START, REL_STOP):
+		raise NotImplemented
 		
 		
 		

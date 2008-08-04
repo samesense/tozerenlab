@@ -78,10 +78,10 @@ class MappingRecord():
 				if this_align.sbjct[this] != '-':
 					counter+=1
 				subjct_inds.append(counter)
-			query_inds = filter(fil_fun, query_inds)
-			subjct_inds = subjct_inds[0:len(query_inds)]
-				
-			self.mapping[0,query_inds] = numpy.array(subjct_inds)
+			subjct_inds = filter(fil_fun, subjct_inds)
+			query_inds = subjct_inds[0:len(subjct_inds)]
+			
+			self.mapping[0,subjct_inds] = numpy.array(query_inds)
 			matched_inds = filter(filter_fun, zip(this_align.match, query_inds))
 			matched_inds = map(unzip, matched_inds)
 			self.is_match[0,matched_inds] = 1
@@ -320,7 +320,8 @@ class MappingBase():
 		
 		this_ref = self.ref_base.GetRefSeq(WANTED_REF)
 		
-		this_figure = GDDiagram(WANTED_REF)
+		this_gene_figure = GDDiagram(WANTED_REF)
+		this_prot_figure = GDDiagram(WANTED_REF)
 		
 		dest_dir = os.environ['PYTHONSCRATCH']
 		with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
@@ -330,12 +331,50 @@ class MappingBase():
 			
 		ELM_DICT = ELMParser()
 		
-		gene_track = this_figure.new_track(1, scale=0).new_set('feature')
+		gene_track = this_gene_figure.new_track(1, scale=0).new_set('feature')
 		this_ref.WriteGenesToDiagram(gene_track)
 		
+		prot_tack = this_prot_figure.new_track(1, scale=0).new_set('feature')
+		this_ref.WriteGenesToDiagram(prot_tack, PROT = True)
 		
-		self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
+		#self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
 		
+		this_ref.HumanMiRNAsite(CALIB_DICT)
+		this_ref.FindELMs(ELM_DICT)
+		#this_ref.FindHomIslands(this_ref)
+		this_ref.FindTFSites()
+		
+		#guess which feature
+		cached_seqs = self.my_test_shelf.values()
+		all_features = []
+		for this_seq in cached_seqs:
+			all_features += this_seq.feature_annot
+		
+		
+		current_min_val = 5000000
+		current_annot = None
+		for this_annot in all_features:
+			
+			if this_annot.CheckRange('HumanMiRNA', 1000) == False:
+				#print 'skipping'
+				continue
+			#print 'continuing: ' + str(this_annot.start)
+			pos_fun = lambda x: abs(x.start - this_annot.start)
+			obj_val = 0
+			for this_seq in cached_seqs:
+				poss_annot = this_seq.FindEqAnnot(this_annot, 300)
+				if poss_annot != None:
+					obj_val += pos_fun(poss_annot)
+				else:
+					obj_val += 1000
+			if obj_val < current_min_val:
+				#print (str(this_annot), obj_val, current_min_val)
+				current_min_val = obj_val
+				current_annot = this_annot
+		
+		#raise KeyError
+		anchor = copy.deepcopy(current_annot)
+		del(cached_seqs)
 		
 		subtype_dict = {}
 		
@@ -357,29 +396,51 @@ class MappingBase():
 		counter = 0
 		for this_key in sorted_keys:
 			for this_name in subtype_dict[this_key][0:min(len(subtype_dict[this_key]),100)]:
-				this_track = this_figure.new_track(1, scale=0).new_set('feature')
+				this_gene_track = this_gene_figure.new_track(1, scale=0).new_set('feature')
+				this_prot_track = this_prot_figure.new_track(1, scale=0).new_set('feature')
+				
 				this_bkg_seq = self.my_test_shelf[this_name]
 				this_mapping = self.my_map_shelf[WANTED_REF + this_name]
+				
+				anchor_eq = this_bkg_seq.FindEqAnnot(anchor, 300)
+				
+				#print 'here'
+				if anchor_eq == None:
+					continue
+				#anchor_copy = copy.deepcopy(anchor_eq)
+				#new_anchor = anchor.MapToMe(anchor_eq, anchor_copy)
+				
+				#print (str(anchor), str(anchor_eq), str(new_anchor))
+				
+				
 				for this_annot in this_bkg_seq.feature_annot:
-					start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
-																	this_annot.end)
-					if (start_pos == 0) & (end_pos == 0):
-						continue
-					if start_pos == end_pos:
-						end_pos += 1
+				
+					# start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
+																	# this_annot.end)
+					# if (start_pos == 0) & (end_pos == 0):
+						# continue
+					# if start_pos == end_pos:
+						# end_pos += 1
+					
 					new_annot = copy.deepcopy(this_annot)
-					new_annot.start = start_pos
-					new_annot.end = end_pos
-					this_track.add_feature(this_annot.GetSeqFeature(), 
-										colour = this_annot.color)
+					new_annot = anchor.MapToMe(anchor_eq, new_annot)
+					if new_annot != None:
+						this_gene_track.add_feature(new_annot.GetSeqFeature(), 
+											colour = new_annot.color)
+					#print (str(this_annot), str(new_annot))
+					if this_annot.type == 'ELM':
+						this_prot_track.add_feature(this_annot.GetSeqFeature_PROT(),
+														colour = this_annot.color)
+				
 				counter += 1
 				#raise KeyError
 				if counter > 200:
 					break
 			#create a seperator
-			this_figure.new_track(1, name = this_key).new_set('feature')
-		
-		return this_figure
+			#raise KeyError
+			this_gene_figure.new_track(1, name = this_key).new_set('feature')
+			this_prot_figure.new_track(1, name = this_key).new_set('feature')
+		return (this_gene_figure, this_prot_figure)
 		
 		
 	def AnnotateBase(self, MiRNA_DICT, ELM_DICT, FORCE, 
@@ -391,12 +452,18 @@ class MappingBase():
 		def AnnotWorker(SEQ, MI_DICT, E_DICT, FORCE_INPUT, REF_INPUT):
 			
 			SEQ.TranslateAll(self.ref_base, WANTED_REF = REF_INPUT)
+			fil_fun = lambda x: x.type != 'ELM'
+			SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
 			SEQ.FindELMs(E_DICT)
 			
+			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('MIRNA', False)):
+				fil_fun = lambda x: x.type != 'MIRNA'
+				SEQ
 				SEQ.HumanMiRNAsite(MI_DICT)
 			
-			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TF', False)):
+			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TFSite', False)):
+				fil_fun = lambda x: x.type != 'TFSite'
 				SEQ.FindTFSites()
 			
 			SEQ.DetSubtype()

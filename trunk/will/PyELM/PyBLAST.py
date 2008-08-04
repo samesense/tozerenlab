@@ -173,10 +173,14 @@ class BLASTController:
 		with open(these_files[1], mode = 'r') as handle:
 			blast_rec = NCBIXML.parse(handle).next()
 		#time.sleep(0.5)
-		fLock(these_files[0])
-		os.remove(these_files[0])
-		fLock(these_files[1])
-		os.remove(these_files[1])
+		try:
+			fLock(these_files[0])
+			os.remove(these_files[0])
+			fLock(these_files[1])
+			os.remove(these_files[1])
+		except:
+			print 'Did not remove files'
+		
 		
 		return blast_rec
 					

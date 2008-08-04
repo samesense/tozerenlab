@@ -74,15 +74,22 @@ class ViralSeq():
 			final_list.append(this_record)
 		return final_list
 	
-	def GetSeqFeatures(self):
+	def GetSeqFeatures(self, PROT_REL = False):
 		"""
 		GetSeqFeatures
 			Returns a list of SeqFeatures describing each protein in 
 			self.annotation suitalbe for using with GenomeDiagram
 		"""
 		feat_list = []
+		start = 0
 		for this_gene in self.annotation:
-			feat_list.append(self.annotation[this_gene].GetSeqFeature())
+			self.annotation[this_gene].GeneAnnot(None, start, 
+								start + len(self.annotation[this_gene].aa_seq))
+			start += len(self.annotation[this_gene].aa_seq)
+			if PROT_REL:
+				feat_list.append(self.annotation[this_gene].GetSeqFeature_PROT())
+			else:
+				feat_list.append(self.annotation[this_gene].GetSeqFeature())
 		
 		return feat_list
 
@@ -103,6 +110,7 @@ class ViralSeq():
 		blast_record = REFBASE.BLASTx(self.GenomeToBioPython())
 		gene_dict = {}
 		reg = re.compile('.*?\|(.*?):(\w{3}).*')
+		aa_start = 0
 		for this_check in blast_record.alignments:
 			label = reg.match(this_check.title).groups()
 			this_gene = str(label[1])
@@ -117,6 +125,8 @@ class ViralSeq():
 				nt_seq = self.my_sequence[start_pos:end_pos]
 				gene = Gene(this_gene, this_gene.upper(),
 							nt_seq, aa_seq, start_pos, end_pos)
+				gene.GeneAnnot(None, aa_start, aa_start + len(aa_seq))
+				aa_start += len(aa_seq)
 				gene_dict[this_gene] = gene
 		self.annotation = gene_dict
 	def CheckSeq(self, INPUT_SEQ):
@@ -127,14 +137,14 @@ class ViralSeq():
 		"""
 		return self.my_sequence.find(INPUT_SEQ) != -1
 	
-	def WriteGenesToDiagram(self, INPUT_TRACK):
+	def WriteGenesToDiagram(self, INPUT_TRACK, PROT = False):
 		"""
 		WriteGenomeDiagram
 			Use the GenomeDiagram module to write a publication quality figure
 			of the genes and features in self.annotation
 		"""
 		
-		gene_feat_list = self.GetSeqFeatures()
+		gene_feat_list = self.GetSeqFeatures(PROT_REL = PROT)
 		if len(gene_feat_list) == 0:
 			return
 		
@@ -148,6 +158,7 @@ class ViralSeq():
 		feat_dict['env'] = (colors.darkorchid, 1)
 		feat_dict['nef'] = (colors.pink, -1)
 		feat_dict['vpu'] = (colors.purple, 1)
+		
 		
 		for feat in gene_feat_list:
 			feat.strand = feat_dict[feat.id][1]
@@ -203,6 +214,28 @@ class ViralSeq():
 			self.feature_annot_type['TF'] = True
 		else:
 			raise KeyError
+	def FindEqAnnot(self, WANTED_ANNOT, POS_FUDGE):
+		"""
+		Attemps to find the equivelant Annotation recored within 
+		self.feature_annot
+		"""
+		type_fil = lambda x: x.type == WANTED_ANNOT.type
+		name_fil = lambda x: x.name == WANTED_ANNOT.name
+		pos_fun = lambda x: abs(x.start - WANTED_ANNOT.start)
+		
+		fil_feat_1 = filter(type_fil, self.feature_annot)
+		fil_feat_2 = filter(name_fil, fil_feat_1)
+		
+		if len(fil_feat_2) > 0:
+			pos_val = min(fil_feat_2, key = pos_fun)
+		else:
+			return
+		
+		if pos_fun(pos_val) < POS_FUDGE:
+			return pos_val
+		else:
+			return
+		
 		
 	def HumanMiRNAsite(self, CALIB_DICT):
 		"""
@@ -267,12 +300,17 @@ class ViralSeq():
 		for this_gene_name in self.annotation:
 			this_gene = self.annotation[this_gene_name]
 			start_pos = this_gene.start
+			rel_start = this_gene.rel_start
 			for this_ELM in ELM_DICT:
 				spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq)
 				while spot != None:
 					self.LogAnnotation('ELM', (start_pos + spot.start(), 
 												start_pos + spot.end()), 
 										None, None, this_ELM)
+					
+					self.feature_annot[-1].GeneAnnot(this_gene_name, 
+									rel_start + spot.start(), 
+									rel_start + spot.end())
 					spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq, 
 														spot.start() + 1)
 		self.feature_annot_type['ELM'] = True
@@ -351,7 +389,7 @@ class RefSeq(ViralSeq):
 
 		self.my_sequence = this_record.seq.tostring()
 		self.seq_name = this_record.id
-		
+		aa_start = 0
 		self.annotation = {}
 		for feat in this_record.features:
 			if feat.qualifiers.has_key('gene') & feat.qualifiers.has_key('translation'):
@@ -367,7 +405,8 @@ class RefSeq(ViralSeq):
 				
 				this_gene = Gene(gene_name, prod_name, nt_seq,
 								 trans_data, start_pos, end_pos)
-
+				this_gene.GeneAnnot(None, aa_start, aa_start + len(trans_data))
+				aa_start += len(trans_data)
 				self.annotation[feat.qualifiers['gene'][0]] = this_gene
 				
 		
