@@ -10,6 +10,7 @@ import re
 import os
 import PyMozilla
 import string
+import copy
 
 class Annot():
 	def __init__(self, NAME, START_POS, END_POS, HOM):
@@ -18,6 +19,15 @@ class Annot():
 		self.end = END_POS
 		self.type = 'default'
 		self.color = colors.black
+		self.hom = HOM
+		
+	def __del__(self):
+		del(self.name)
+		del(self.start)
+		del(self.end)
+		del(self.type)
+		#del(self.hom)
+		del(self.color)
 	
 	def __str__(self):
 		return self.type + ":" + self.name + ":" + str(self.start)
@@ -49,20 +59,37 @@ class Annot():
 								id = self.name)
 		return seq_feat
 		
-	def MapToMe(self, EQ, MAPPING):
+	def MapMeToUS(self, EQ, ANCHOR):
 		"""
-		Returns reference coordiates inwhich self and EQ are identical
+		Returns a new instance of self in which the start-end coordinates are 
+		an average mapping to the provided coordinates
+		
+		EQ			Equivelent features on THIS GENOME
+		ANCHOR		An ANCHORED set of features
 		"""
 		
-		disp = EQ.start - self.start
+		output_mapping = copy.deepcopy(self)
 		
-		MAPPING.start -= disp
-		MAPPING.end -= disp
+		disp = 0
+		count = 0
+		#for this_mapping in zip(EQ, ANCHOR):
+		this_mapping = (EQ, ANCHOR)
+		if (this_mapping[0] != None) & (this_mapping[1] != None):
+			disp = this_mapping[0].start - this_mapping[1].start
+			count = 1
+			#break
+	
+		if count == 0:
+			return
+		disp_mean = disp/count
 		
-		if MAPPING.start < 0:
+		output_mapping.start -= disp_mean
+		output_mapping.end -= disp_mean
+		
+		if output_mapping.start < 0:
 			return
 		
-		return MAPPING
+		return output_mapping
 	
 	def CheckRange(self, TYPE, POS, FUDGE_POS = 1000):
 		"""
@@ -95,6 +122,18 @@ class Gene(Annot):
 		temp_str += 'Name: ' + self.name
 		temp_str += ', Start: ' + str(self.start) + ')'
 		return temp_str
+	
+	def __del__(self):
+		del(self.nt_seq)
+		del(self.aa_seq)
+		del(self.start)
+		del(self.end)
+		del(self.name)
+		del(self.product)
+		del(self.type)
+		del(self.rel_start)
+		del(self.rel_stop)
+		
 		
 	def __hash__(self):
 		return hash(self.aa_seq)
@@ -106,6 +145,7 @@ class HumanMiRNA(Annot):
 		self.end = END_POS
 		self.type = 'HumanMiRNA'
 		self.color = colors.blue
+		self.hom = HOM
 
 	def GetSeqFeature_PROT(self):
 		raise NotImplemented
@@ -125,6 +165,15 @@ class HomIsland(Annot):
 		raise NotImplemented
 	def GeneAnnot(self, GENE, REL_START, REL_STOP):
 		raise NotImplemented
+	
+	def __del__(self):
+		del(self.seq)
+		del(self.start)
+		del(self.end)
+		del(self.name)
+		del(self.type)
+		del(self.hom)
+		del(self.color)
 		
 	def __hash__(self):
 		return hash(self.seq)

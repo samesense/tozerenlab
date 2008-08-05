@@ -123,7 +123,7 @@ def testAnnotation_SLOW():
 									   'test_self_KEEP')
 	#mapping_base.ref_base.FinalizeAnnotations()
 	this_iter = itertools.izip(iter(mapping_base.ref_base),
-					itertools.repeat(None,5))
+					itertools.repeat(None,1))
 	for this_ref in this_iter:
 		#yield CheckAnnotGlobalHom, mapping_base, this_ref[0]
 		#yield CheckFindWindows, mapping_base, this_ref[0]
