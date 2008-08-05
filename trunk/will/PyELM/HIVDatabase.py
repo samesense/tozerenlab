@@ -345,36 +345,39 @@ class MappingBase():
 		this_ref.FindTFSites()
 		
 		#guess which feature
-		cached_seqs = self.my_test_shelf.values()
+		#cached_seqs = self.my_test_shelf.values()
 		all_features = []
-		for this_seq in cached_seqs:
-			all_features += this_seq.feature_annot
+		for this_seq in self.test_names:
+			bkg_seq = self.my_test_shelf[this_seq]
+			for this_annot in bkg_seq.feature_annot:
+				if this_annot.CheckRange('ELM', 1000):
+					all_features.append(this_annot)
+				#if this_annot.CheckRange('HumanMiRNA', 7000):
+					#all_features.append(this_annot)
 		
+		obj_vals = numpy.zeros((1,len(all_features)), dtype=numpy.uint16)
 		
 		current_min_val = 5000000
 		current_annot = None
-		for this_annot in all_features:
+		pos_fun = lambda x: abs(x[0].start - x[1].start)
+		for this_seq in self.test_names:
+			bkg_seq = self.my_test_shelf[this_seq]
 			
-			if this_annot.CheckRange('HumanMiRNA', 1000) == False:
-				#print 'skipping'
-				continue
-			#print 'continuing: ' + str(this_annot.start)
-			pos_fun = lambda x: abs(x.start - this_annot.start)
-			obj_val = 0
-			for this_seq in cached_seqs:
-				poss_annot = this_seq.FindEqAnnot(this_annot, 300)
+			for i in xrange(len(all_features)):
+				this_annot = all_features[i]
+				poss_annot = bkg_seq.FindEqAnnot(this_annot, 300)
 				if poss_annot != None:
-					obj_val += pos_fun(poss_annot)
+					obj_vals[0,i] += pos_fun((this_annot, poss_annot))
 				else:
-					obj_val += 1000
-			if obj_val < current_min_val:
-				#print (str(this_annot), obj_val, current_min_val)
-				current_min_val = obj_val
-				current_annot = this_annot
+					obj_vals[0,i] += 1000
 		
-		#raise KeyError
-		anchor = copy.deepcopy(current_annot)
-		del(cached_seqs)
+		best_inds = obj_vals.argsort()
+		anchors = []
+		#for i in xrange(1):
+		anchors = copy.deepcopy(all_features[best_inds[0,0]])
+		#anchors = copy.deepcopy(all_features[best_inds.tolist()])
+		del(obj_vals)
+		del(all_features)
 		
 		subtype_dict = {}
 		
@@ -395,22 +398,18 @@ class MappingBase():
 		sorted_keys = ['B', 'C']
 		counter = 0
 		for this_key in sorted_keys:
-			for this_name in subtype_dict[this_key][0:min(len(subtype_dict[this_key]),100)]:
-				this_gene_track = this_gene_figure.new_track(1, scale=0).new_set('feature')
-				this_prot_track = this_prot_figure.new_track(1, scale=0).new_set('feature')
-				
+			for this_name in subtype_dict[this_key][0:min(len(subtype_dict[this_key]),300)]:
 				this_bkg_seq = self.my_test_shelf[this_name]
 				this_mapping = self.my_map_shelf[WANTED_REF + this_name]
 				
-				anchor_eq = this_bkg_seq.FindEqAnnot(anchor, 300)
+				anchor_eq = this_bkg_seq.FindEqAnnot(anchors, 300, IS_LIST = False)
 				
 				#print 'here'
 				if anchor_eq == None:
 					continue
-				#anchor_copy = copy.deepcopy(anchor_eq)
-				#new_anchor = anchor.MapToMe(anchor_eq, anchor_copy)
 				
-				#print (str(anchor), str(anchor_eq), str(new_anchor))
+				this_gene_track = this_gene_figure.new_track(1, scale=0).new_set('feature')
+				#this_prot_track = this_prot_figure.new_track(1, scale=0).new_set('feature')
 				
 				
 				for this_annot in this_bkg_seq.feature_annot:
@@ -422,20 +421,19 @@ class MappingBase():
 					# if start_pos == end_pos:
 						# end_pos += 1
 					
-					new_annot = copy.deepcopy(this_annot)
-					new_annot = anchor.MapToMe(anchor_eq, new_annot)
+					new_annot = this_annot.MapMeToUS(anchor_eq, anchors)
 					if new_annot != None:
 						this_gene_track.add_feature(new_annot.GetSeqFeature(), 
 											colour = new_annot.color)
 					#print (str(this_annot), str(new_annot))
-					if this_annot.type == 'ELM':
-						this_prot_track.add_feature(this_annot.GetSeqFeature_PROT(),
-														colour = this_annot.color)
+					#if this_annot.type == 'ELM':
+					#	this_prot_track.add_feature(this_annot.GetSeqFeature_PROT(),
+					#									colour = this_annot.color)
 				
 				counter += 1
 				#raise KeyError
-				if counter > 200:
-					break
+				#if counter > 500:
+					#break
 			#create a seperator
 			#raise KeyError
 			this_gene_figure.new_track(1, name = this_key).new_set('feature')

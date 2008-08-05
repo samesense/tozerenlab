@@ -204,7 +204,7 @@ class ViralSeq():
 			self.feature_annot.append(HomIsland(SEQ, POS[0], POS[1], HOM))
 			self.feature_annot_type['HomIsland'] = True
 		elif TYPE == 'MIRNA':
-			self.feature_annot.append(HumanMiRNA(NAME, POS[0], POS[1], None))
+			self.feature_annot.append(HumanMiRNA(NAME, POS[0], POS[1], 1.0))
 			self.feature_annot_type['MIRNA'] = True
 		elif TYPE == 'ELM':
 			self.feature_annot.append(ELM(NAME, POS[0], POS[1], None))
@@ -214,11 +214,21 @@ class ViralSeq():
 			self.feature_annot_type['TF'] = True
 		else:
 			raise KeyError
-	def FindEqAnnot(self, WANTED_ANNOT, POS_FUDGE):
+	def FindEqAnnot(self, WANTED_ANNOT, POS_FUDGE, IS_LIST = False):
 		"""
 		Attemps to find the equivelant Annotation recored within 
 		self.feature_annot
 		"""
+		
+		if IS_LIST:
+			output = []
+			for this_annot in WANTED_ANNOT:
+				val = self.FindEqAnnot(this_annot, POS_FUDGE)
+				output.append(val)
+			return output
+					
+					
+					
 		type_fil = lambda x: x.type == WANTED_ANNOT.type
 		name_fil = lambda x: x.name == WANTED_ANNOT.name
 		pos_fun = lambda x: abs(x.start - WANTED_ANNOT.start)
@@ -334,8 +344,8 @@ class ViralSeq():
 		factor binding sites.  It will then call LogAnnotation to add the data
 		to the object.
 		"""
-		
 		output = TFChecker(self.my_sequence)
+		
 		if len(output) > 0:
 			for this_annot in output:
 				spot = (this_annot[0], this_annot[0] + len(this_annot[4]))
