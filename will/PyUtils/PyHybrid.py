@@ -71,7 +71,7 @@ def Calibrate(SEQ, NUM_SAMPLES = 5000, PRECOMPUTE_DICT = None,
               SEQ           The miRNA sequence to calibrate
 
               NUM_SAMPLES   The number of random sequences to generate
-                            while determining the extreme value distribution.
+                            while determining the extreme value dithisstribution.
 
               PRECOMPUTE_DICT   A dictionary in which the KEY is a miRNA
                                 sequence and the value is the (delta,theta)
