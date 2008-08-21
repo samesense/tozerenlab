@@ -1,17 +1,19 @@
-"""	
-can't calculate 1-HyperGeoPDF_safe(158,10700,3382,404) ... should be 4.7304e-4 but returns 0 or -inf
+"""
+PyHyperGeo
+	A set of functions for doing the hypergeometric test on large sets of 
+	numbers without the worry of overflow/underflow/round-off errors.
 
 """
-from __future__ import with_statement
 from decimal import *
-import pickle
-import sys
 import itertools as IT
 
 def nchoosek(n, k):
 	"""
 	returns the number of possible ways of choosing k items from a group of a 
 	total of n items.
+	
+	@param n:	The total number of items
+	@param k:	The number of draws
 	"""
 	n = Decimal(n)
 	k = Decimal(k)
@@ -33,10 +35,12 @@ def HyperGeoCDF(k, N, m, n):
 	returns the probability that UPTO k objects are defective in a sample 
 	of n distinctive objects drawn from the shipment.
 	
-	k:	Num of genes in list with TF
-	N:	Total num of genes in database
-	m:	Num of genes with TF in database
-	n:	Total Num of genes in list
+	TESTED SAFELY AGAINST OVERFLOW/ROUND-OFF ERRORS!!!
+	
+	@param k:	Num of genes in list with TF
+	@param N:	Total num of genes in database
+	@param m:	Num of genes with TF in database
+	@param n:	Total Num of genes in list
 	"""
 	
 	if k > n:
@@ -60,12 +64,12 @@ def HyperGeoPDF(k, N, m, n):
 	returns the probability that EXACTLY k objects are defective in a sample 
 	of n distinctive objects drawn from the shipment.
 	
-	TESTED SAFELY AGAINST OVERFLOW ERRORS!!!
+	TESTED SAFELY AGAINST OVERFLOW/ROUND-OFF ERRORS!!!
 	
-	k:	Num of genes in list with TF
-	N:	Total num of genes in database
-	m:	Num of genes with TF in database
-	n:	Total Num of genes in list
+	@param k:	Num of genes in list with TF
+	@param N:	Total num of genes in database
+	@param m:	Num of genes with TF in database
+	@param n:	Total Num of genes in list
 	"""
 	
 	if k > n:
@@ -79,3 +83,4 @@ def HyperGeoPDF(k, N, m, n):
 							{'N':N, 'm':m}
 	
 	return nchoosek(m,k)*nchoosek(N-m,n-k)/nchoosek(N,n)
+	
