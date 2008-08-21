@@ -7,6 +7,8 @@ PyHyperGeo
 from decimal import *
 import itertools as IT
 
+
+
 def nchoosek(n, k):
 	"""
 	returns the number of possible ways of choosing k items from a group of a 
@@ -52,9 +54,18 @@ def HyperGeoCDF(k, N, m, n):
 	elif m > N:
 		raise ValueError, 'N:%(N)s must be larger than m:%(m)s' %\
 							{'N':N, 'm':m}
+	
 	prob = 0
+	const_denom = nchoosek(N,n)
+	n_ch_k_dict = {}
+	
 	for i in xrange(1, k + 1):
-		prob += HyperGeoPDF(i, N, m, n)
+		if not(n_ch_k_dict.has_key((m,i))):
+			n_ch_k_dict[(m,i)] = nchoosek(m,i)
+		if not(n_ch_k_dict.has_key((N-m, n-i))):
+			n_ch_k_dict[(N-m, n-i)] = nchoosek(N-m, n-i)
+		
+		prob += n_ch_k_dict[(m,i)]*n_ch_k_dict[(N-m, n-i)]/const_denom
 	
 	return prob
 	

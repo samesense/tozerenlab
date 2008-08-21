@@ -38,7 +38,7 @@ def CheckPDF(in_val):
 	
 	val = PyHyperGeo.HyperGeoPDF(in_val[1], in_val[2],
 										in_val[3], in_val[4])
-	diff = abs(math.log(Decimal(str(val)),10) - math.log(in_val[0],10))
+	diff = Decimal(str(abs(math.log(val,10) - math.log(in_val[0],10))))
 	
 	for tol in xrange(10):
 		nose.tools.assert_true(diff < Decimal(str(10**(-tol))), 
@@ -52,7 +52,9 @@ def CheckCDF(in_val):
 	
 	val = PyHyperGeo.HyperGeoCDF(in_val[1], in_val[2],
 										in_val[3], in_val[4])
-	diff = abs(math.log(Decimal(str(val)),10) - math.log(in_val[0],10))
+	diff = Decimal(str(abs(math.log(val,10) - math.log(in_val[0],10))))
+	
+	
 	
 	for tol in xrange(10):
 		nose.tools.assert_true(diff < Decimal(str(10**(-tol))), 
