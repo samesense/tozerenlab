@@ -22,5 +22,5 @@ def testWebLogo():
 	out_file = os.environ['MYDOCPATH'] + 'HomologyPage\\test_fig.eps'
 	
 	WebLogoGenerate.GenerateSeqLogo(test_seqs, out_file)
-	
 	os.remove(out_file)
+	
