@@ -1,6 +1,9 @@
 from __future__ import with_statement
 import re
 import PyMozilla
+from collections import defaultdict
+from optparse import OptionParser
+import logging
 
 def TFChecker(INPUT_SEQ):
 	"""
@@ -25,6 +28,7 @@ def TFChecker(INPUT_SEQ):
 	login_post += '&request_uri=%2Findex.html&Log+In=Log+In'
 	
 	#login and get the cookie
+	logging.info('Logging into MATCH')
 	moz_emu.download(base_url + '/login', login_post)
 	
 	match_base = '/cgi-bin/pub/programs/match/bin/match.cgi'
@@ -42,6 +46,7 @@ def TFChecker(INPUT_SEQ):
 	post_data += '&core=0.75'
 	post_data += '&ourProfile=muscle_specific.prf'
 	
+	logging.info('Getting Match Data')
 	output = moz_emu.download(base_url + match_base,post_data)
 	
 	val = map(string.strip,info_getter.findall(output))
@@ -88,6 +93,7 @@ def GetSequence(CHR_NUM, BEGIN, END):
 	search_post += '&to=%(end)s' %{'end':str(END)}
 	search_post += '&&fmt=fasta'
 	
+	logging.info('Downloading Sequence:\t' + CHR_NUM + ':' + str(BEGIN))
 	moz_emu = PyMozilla.MozillaEmulator(cacher = None)
 	
 	page_dl = moz_emu.download(search_url, search_post)
@@ -98,6 +104,8 @@ def GetSequence(CHR_NUM, BEGIN, END):
 	for this_post in post:
 		post_data = 'val=%(seq)s&from=%(from)s&to=%(to)s&fmt=fasta' % \
 			{'seq':this_post[0], 'from':this_post[1],'to':this_post[2]}
+		
+		logging.info('Retrieving Sequence:\t' + CHR_NUM + ':' + str(BEGIN))
 		this_dl = moz_emu.download(seq_url, post_data)
 		this_fasta = fasta_re.findall(this_dl)
 		parts = this_fasta[0].split('\n')
@@ -113,12 +121,73 @@ def ParseInput(FILE_NAME):
 	File FMT
 	
 	CHR_NUM \t BASE_POS
+	"""
+	
+	chrom_dict = defaultdict(set)
 	
 	
+	with open(FILE_NAME) as handle:
+		for this_line in handle:
+			parts = this_line.split('\t')
+			chrom_dict[parts[0]].add(int(parts[1]))
+	
+	return chrom_dict
+	
+def CheckPositions(CHROM_DICT, WIDTH):
+	"""
+	Checks the positions defined in CHROM_DICT for TF binding positions.
+	
+	@param CHROM_DICT:		A dict with (key,value) as (CHR_NUM, list(POS))
+	
+	@returns:				A list of tuples (CHR_NUM, POS, DIST_to_nearest_TF)
+	"""
 	
 	
+	pos_fun = lambda x: abs(x[0] - WIDTH)
+	output_data = []
 	
+	for this_chrom in CHROM_DICT:
+		for this_pos in CHROM_DICT[this_chrom]:
+			start_pos = this_pos - WIDTH
+			end_post = this_pos + WIDTH
+			seq_data = GetSequence(this_chrom, start_pos, end_post)
+			
+			tf_data = TFChecker(seq_data)
+			if len(tf_data) == 0:
+				continue
+			
+			best_pos = min(tf_data, key = pos_fun)
+			
+			output_data.append([this_chrom, this_pos, WIDTH - best_pos[0], best_pos[5]])
+			
+			
+	return output_data
 	
+if __name__ == '__main__':
+	
+	parser = OptionParser()
+	
+	parser.add_option('-f', '--filename',
+						dest = 'out_file',
+						type = 'string',
+						action = 'store',
+						help = 'Input FileName')
+	parser.add_option('-v', '--verbose',
+						dest = 'verbose',
+						action = 'store_true',
+						default = true,
+						help = 'Be Verbose')
+	parser.add_option('-l', '--logname',
+						dest = 'log_name'
+						type = 'string',
+						action = 'store'
+						help = 'Log FileName')
+	parser.add_option('-w', '--width',
+						dest = 'width'
+						type = 'int',
+						action = 'store'
+						default = 500
+						help = 'Log FileName')
 	
 	
 	
