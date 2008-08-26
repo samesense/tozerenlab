@@ -2,8 +2,9 @@ from __future__ import with_statement
 import re
 import PyMozilla
 from collections import defaultdict
-from optparse import OptionParser
+from optparse import OptionParser, OptionGroup
 import logging
+import string
 
 def TFChecker(INPUT_SEQ):
 	"""
@@ -111,6 +112,14 @@ def GetSequence(CHR_NUM, BEGIN, END):
 		parts = this_fasta[0].split('\n')
 		for this_line in parts[1:]:
 			all_seq += this_line.upper()
+	
+	if len(all_seq) - 1 != END - BEGIN:
+		num_missing = abs((END - BEGIN) - len(all_seq))
+		str_dict = {'m': num_missing, 'c': CHR_NUM, 'b':BEGIN, 'e':END}
+		bad_str = 'Could not retrieve %(m)d bp' % str_dict
+		bad_str += ' for region %(c)s [%(b)d:%(e)d]' % str_dict
+		logging.warning(bad_str)
+	
 	return all_seq
 	
 def ParseInput(FILE_NAME):
@@ -133,13 +142,13 @@ def ParseInput(FILE_NAME):
 	
 	return chrom_dict
 	
-def CheckPositions(CHROM_DICT, WIDTH):
+def CheckPositions(CHROM_DICT, WIDTH, TOL):
 	"""
 	Checks the positions defined in CHROM_DICT for TF binding positions.
 	
 	@param CHROM_DICT:		A dict with (key,value) as (CHR_NUM, list(POS))
 	
-	@returns:				A list of tuples (CHR_NUM, POS, DIST_to_nearest_TF)
+	@returns:				A list of lists [CHR_NUM, POS, DIST_to_nearest_TF]
 	"""
 	
 	
@@ -156,42 +165,93 @@ def CheckPositions(CHROM_DICT, WIDTH):
 			if len(tf_data) == 0:
 				continue
 			
-			best_pos = min(tf_data, key = pos_fun)
 			
-			output_data.append([this_chrom, this_pos, WIDTH - best_pos[0], best_pos[5]])
+			tf_data.sort(key = pos_fun)
+			for this_tf in tf_data:
+				if pos_fun(this_tf) > TOL:
+					break
+				else:
+					str_dict = {'c':this_chrom, 'p':this_pos, 
+								'o':WIDTH - this_tf[0], 'n':this_tf[5]}
+					out_str = 'FOUND TF! %(c)s:%(p)d:%(o)d:%(n)s' % str_dict
+					logging.warning(out_str)
+					output_data.append([this_chrom, this_pos, WIDTH - this_tf[0], this_tf[5]])
 			
 			
 	return output_data
 	
 if __name__ == '__main__':
 	
-	parser = OptionParser()
+	parser = OptionParser(usage = 'usage: %prog [options] input_file')
 	
-	parser.add_option('-f', '--filename',
-						dest = 'out_file',
-						type = 'string',
-						action = 'store',
-						help = 'Input FileName')
 	parser.add_option('-v', '--verbose',
 						dest = 'verbose',
 						action = 'store_true',
-						default = true,
+						default = False,
 						help = 'Be Verbose')
 	parser.add_option('-l', '--logname',
-						dest = 'log_name'
+						dest = 'log_name',
 						type = 'string',
-						action = 'store'
+						action = 'store',
 						help = 'Log FileName')
-	parser.add_option('-w', '--width',
-						dest = 'width'
+	parser.add_option('-o', '--outputfile',
+						dest = 'out_file',
+						type = 'string',
+						action = 'store',
+						help = 'Output FileName')
+	
+	group = OptionGroup(parser, 'Sequence Options')
+	
+	group.add_option('-w', '--width',
+						dest = 'width',
 						type = 'int',
-						action = 'store'
-						default = 500
-						help = 'Log FileName')
+						action = 'store',
+						default = 500,
+						help = 'The sequence width to retrieve from NCBI')
+	group.add_option('-t', '--tolerance',
+						dest = 'tol',
+						type = 'int',
+						action = 'store',
+						default = 5,
+						help = 'The width to accept a TF')
+	parser.add_option_group(group)
+	
+	(options, args) = parser.parse_args()
+	
+	file_fmt = '%(levelname)s \t %(threadName)s \t %(funcName)s \t %(asctime)s \t %(message)s'
+	console_fmt = '%(asctime)-7s %(message)s'
 	
 	
 	
 	
+	logging.basicConfig(level = logging.INFO)
+	
+	console = logging.StreamHandler()
+	if options.verbose:
+		console.setLevel(logging.INFO)
+	else:
+		console.setLevel(logging.WARNING)
+	
+	formatter = logging.Formatter(console_fmt)
+	console.setFormatter(formatter)
+	logging.getLogger('').addHandler(console)
+	
+	if options.log_name != None:
+		file_log = logging.StreamHandler()
+		formatter = logging.Formatter(file_fmt)
+		file_log.setLevel(logging.INFO)
+		file_log.setFormatter(formatter)
+		logging.getLogger('').addHandler(file_log)
+	
+	input_data = ParseInput(args[0])
+	
+	output_data = CheckPositions(input_data, options.width, options.tol)
+	str_conv = lambda x: str(x)
+	with open(options.out_file, mode = 'w') as handle:
+		for this_out in output_data:
+			out_list = map(str_conv, this_out)
+			out_str = string.join(out_list, '\t')
+			handle.write(out_str + '\n')
 	
 	
 	
