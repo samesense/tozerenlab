@@ -337,7 +337,7 @@ class MappingBase():
 		prot_tack = this_prot_figure.new_track(1, scale=0).new_set('feature')
 		this_ref.WriteGenesToDiagram(prot_tack, PROT = True)
 		
-		#self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
+		self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
 		
 		this_ref.HumanMiRNAsite(CALIB_DICT)
 		this_ref.FindELMs(ELM_DICT)
@@ -350,7 +350,7 @@ class MappingBase():
 		for this_seq in self.test_names:
 			bkg_seq = self.my_test_shelf[this_seq]
 			for this_annot in bkg_seq.feature_annot:
-				if this_annot.CheckRange('ELM', 1000):
+				if this_annot.CheckRange('HumanMiRNA', 1000):
 					all_features.append(this_annot)
 				#if this_annot.CheckRange('HumanMiRNA', 7000):
 					#all_features.append(this_annot)
@@ -457,12 +457,21 @@ class MappingBase():
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('MIRNA', False)):
 				fil_fun = lambda x: x.type != 'MIRNA'
-				SEQ
+				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
 				SEQ.HumanMiRNAsite(MI_DICT)
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TFSite', False)):
 				fil_fun = lambda x: x.type != 'TFSite'
+				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
 				SEQ.FindTFSites()
+			
+			if FORCE_INPUT or not(SEQ.feature_annot_type.get('HomIsland', False)):
+				fil_fun = lambda x: x.type != 'HomIsland'
+				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
+				this_ref = self.ref_base.GetRefSeq(WANTED_REF)
+				SEQ.FindHomIslands(this_ref)
+				
+			
 			
 			SEQ.DetSubtype()
 			

@@ -23,8 +23,7 @@ def testLoading():
 	Test Loading the Virus classes
 	"""
 	logger.info('Starting testLoading')
-	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-						PyVirus.PatSeq]
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq]
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
 	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
 		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
@@ -54,8 +53,7 @@ def testGenotyping_SLOW():
 	Test Genotyping the Virus classes
 	"""
 	logger.info('Starting testGenotyping_SLOW')
-	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-						PyVirus.PatSeq]
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq]
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
 	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:	
@@ -105,8 +103,7 @@ def testGenomeToBioPython():
 	Test the whole genome conversion to BioPython SeqRecord
 	"""
 	logger.info('Starting testGenomeToBioPython')
-	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-						PyVirus.PatSeq]
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq]
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
 	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
 		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
@@ -169,8 +166,7 @@ def testTranslateAll():
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
-	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-						PyVirus.PatSeq]
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq]
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
 	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
 		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
@@ -204,8 +200,7 @@ def testGetSeqFeatures():
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
-	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq,
-						PyVirus.PatSeq]
+	possible_classes = [PyVirus.ViralSeq, PyVirus.BkgSeq]
 	file_loc = os.environ['MYDOCPATH'] + 'PyELM\\'
 	with open(file_loc + '50_seqs.fasta', mode = 'r') as file_handle:
 		this_iter = itertools.izip(SeqIO.parse(file_handle, 'fasta'),
