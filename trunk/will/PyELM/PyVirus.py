@@ -11,6 +11,7 @@ import re
 import types
 import Queue
 import PyBLAST
+import string
 from Bio import SeqIO
 from Bio import SeqFeature as SeqFeatClass
 #a hack but the only way I can get everything to work right
@@ -360,17 +361,6 @@ class BkgSeq(ViralSeq):
 	Used for Background Sequences
 	"""
 
-
-class PatSeq(ViralSeq):
-	def __init__(self, TEST_SEQ, SEQ_NAME):
-		self.my_sequence = TEST_SEQ
-		self.pat_data = None
-		self.tested_subtype = None
-		self.seq_name = SEQ_NAME
-		self.this_genome = None
-		self.feature_annot = []
-		self.feature_annot_type = {}
-
 class RefSeq(ViralSeq):
 	def __init__(self, FILENAME):
 		self.my_sequence = None
@@ -444,18 +434,36 @@ class RefSeq(ViralSeq):
 			this_set = this_track.new_set('feature')
 			for this_annot in this_annot_list:
 				this_set.add_feature(this_annot.GetSeqFeature(), color = this_annot.color)
+	
+	def GetHomIslandFromFile(self, F_HANDLE):
+		"""
+		Read previously found Homology Islands from a file.
+		"""
 		
+		island_dict = {}
+		for this_line in F_HANDLE:
+			island_dict[string.split(this_line, '/t')[0]] = None
+		
+		for this_island in island_dict:
+			pos = self.my_sequence.find(this_island)
+			if pos != -1:
+				self.LogAnnotation('HomIsland', (pos, pos+len(this_island)), 
+									this_island, 1.0, None)
 
 class RefBase():
 	def __init__(self, SOURCE_DIR, DEST_DIR, BUILD = False,
-				 BLAST_DIR = 'C:\\local_blast\\'):
+				 BLAST_DIR = 'C:\\local_blast\\', SEQ_FILES = None):
 
 
 		self.ref_seqs = []
-		for this_file in filter(lambda x: x[-3:] == '.gb',
-								os.listdir(SOURCE_DIR)):
-				
-			self.ref_seqs.append(RefSeq(SOURCE_DIR + this_file))
+		if SOURCE_DIR != None:
+			for this_file in filter(lambda x: x[-3:] == '.gb',
+									os.listdir(SOURCE_DIR)):
+					
+				self.ref_seqs.append(RefSeq(SOURCE_DIR + this_file))
+		else:
+			for this_file in SEQ_FILES:
+				self.ref_seqs.append(RefSeq(this_file))
 		
 		self.nt_name = DEST_DIR + 'ref_nt.fasta'
 		self.aa_name = DEST_DIR + 'ref_aa.fasta'

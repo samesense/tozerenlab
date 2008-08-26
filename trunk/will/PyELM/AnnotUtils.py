@@ -21,14 +21,6 @@ class Annot():
 		self.color = colors.black
 		self.hom = HOM
 		
-	def __del__(self):
-		del(self.name)
-		del(self.start)
-		del(self.end)
-		del(self.type)
-		#del(self.hom)
-		del(self.color)
-	
 	def __str__(self):
 		return self.type + ":" + self.name + ":" + str(self.start)
 	
@@ -123,16 +115,6 @@ class Gene(Annot):
 		temp_str += ', Start: ' + str(self.start) + ')'
 		return temp_str
 	
-	def __del__(self):
-		del(self.nt_seq)
-		del(self.aa_seq)
-		del(self.start)
-		del(self.end)
-		del(self.name)
-		del(self.product)
-		del(self.type)
-		del(self.rel_start)
-		del(self.rel_stop)
 		
 		
 	def __hash__(self):
@@ -166,15 +148,6 @@ class HomIsland(Annot):
 	def GeneAnnot(self, GENE, REL_START, REL_STOP):
 		raise NotImplemented
 	
-	def __del__(self):
-		del(self.seq)
-		del(self.start)
-		del(self.end)
-		del(self.name)
-		del(self.type)
-		del(self.hom)
-		del(self.color)
-		
 	def __hash__(self):
 		return hash(self.seq)
 		
@@ -369,7 +342,6 @@ def ELMParser(DIRECTORY = None):
 		this_file.close()
 	
 	return all_reg_exps
-
 	
 	
 def TFChecker(INPUT_SEQ):

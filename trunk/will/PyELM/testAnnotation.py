@@ -102,6 +102,10 @@ def testAnnotation_FAST():
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self_KEEP')
 	#mapping_base.ref_base.FinalizeAnnotations()
+	
+	with open(dest_dir + 'HomIsland_list_KEEP.txt') as handle:
+		mapping_base.ref_base.ref_seqs[0].GetHomIslandFromFile(handle)
+	
 	this_iter = itertools.izip(iter(mapping_base.ref_base),
 					itertools.repeat(None,1))
 	for this_ref in this_iter:
@@ -122,6 +126,10 @@ def testAnnotation_SLOW():
 	mapping_base = HIVDatabase.MappingBase(source_dir, dest_dir,
 									   'test_self_KEEP')
 	#mapping_base.ref_base.FinalizeAnnotations()
+	with open(dest_dir + 'HomIsland_list_KEEP.txt') as handle:
+		mapping_base.ref_base.ref_seqs[0].GetHomIslandFromFile(handle)
+		
+		
 	this_iter = itertools.izip(iter(mapping_base.ref_base),
 					itertools.repeat(None,1))
 	for this_ref in this_iter:
