@@ -49,8 +49,14 @@ class ViralSeq():
 		if NAME == 'tested_subtype':
 			self.DetSubtype()
 			return self.tested_subtype
+		if NAME == 'id':
+			return self.GenomeToBioPython().id
+		if NAME == 'description':
+			return self.GenomeToBioPython().description
+		if NAME == 'seq':
+			return self.GenomeToBioPython().seq
 		else:
-			raise AttributeError
+			raise AttributeError, NAME
 		
 	def GenomeToBioPython(self):
 		"""
@@ -100,7 +106,10 @@ class ViralSeq():
 				Determines the subtype of the sequence using the
 		HIVSubtype module.
 		"""
+		logging.debug('Determining Subtype: ' + self.seq_name)
 		self.tested_subtype = GenoTyping.GetSimple(self.my_sequence)
+		self.tested_subtype = self.tested_subtype.split('|')[1]
+		logging.debug(self.seq_name + ': ' + self.tested_subtype)
 	def TranslateAll(self, REFBASE, WANTED_REF = None):
 		"""
 		TranslateAll
@@ -248,7 +257,7 @@ class ViralSeq():
 			return
 		
 		
-	def HumanMiRNAsite(self, CALIB_DICT):
+	def HumanMiRNAsite(self, CALIB_DICT, NUM_THREADS = 10):
 		"""
 		HumanMiRNAsite
 			Annotates the sites where human miRNA could potentially bind.  
@@ -280,7 +289,7 @@ class ViralSeq():
 			return
 			
 		RNA_HYBRID_PATH = 'C:\\RNAHybrid\\'
-		WANTED_THREADS = 10
+		WANTED_THREADS = NUM_THREADS
 		
 		annot_lock = threading.Lock()
 		worker_seph = threading.Semaphore(WANTED_THREADS)
@@ -502,29 +511,37 @@ class RefBase():
 				Uses the RefSeqs provided to create a protein and nucleotide
 		blast database.
 		"""
-
+		logging.debug('Building Database')
 		this_iter = IT.imap(RefSeq.GenomeToBioPython, iter(self.ref_seqs))
+		
+		logging.debug('Writting nt_file:' + self.nt_name)
 		with open(self.nt_name, mode='w') as handle:
 			SeqIO.write(this_iter, handle, "fasta")
-
+		
+		logging.debug('Writting aa_file:' + self.aa_name)
 		with open(self.aa_name, mode='w') as handle:
 			for this_data in self.ref_seqs:
 				this_iter = this_data.AnnotToBioPython()
 				SeqIO.write(this_iter, handle, "fasta")
-
+		
+		logging.debug('Making BLAST nt database:' + self.nt_name)
 		command = self.MakeBLASTCommand('formatdb',
 										self.nt_name,
 										EXTRA_FLAGS = ' -p F -o T')
 		
 		ProcessVar = subprocess.Popen(command, shell = True)
 		ProcessVar.wait()
-
+		
+		logging.debug('Making BLAST aa database:' + self.aa_name)
 		command = self.MakeBLASTCommand('formatdb',
 										self.aa_name,
 										EXTRA_FLAGS = ' -p T -o T')
 
 		ProcessVar = subprocess.Popen(command, shell = True)
 		ProcessVar.wait()
+		
+		logging.debug('BLAST databases properly created')
+		
 
 	def BLASTx(self, INPUT_SEQ_RECORD, NUM_THREADS = None):
 		"""

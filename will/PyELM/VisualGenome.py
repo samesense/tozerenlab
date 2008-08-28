@@ -1,5 +1,5 @@
 from __future__ import with_statement
-import optparse, sys, os, string
+import optparse, sys, os, string, pickle, logging
 import HIVDatabase, PyVirus, AnnotUtils
 from Bio import SeqIO
 
@@ -7,7 +7,7 @@ from Bio import SeqIO
 
 
 
-def Fasta2ViralSeq(INPUT_FILE):
+def Fasta2ViralSeq(INPUT_FILE, WANTED_SUBS):
 	"""
 	Reads the fasta-file provided and converts them to ViralSeq objects
 	for further processing.
@@ -21,7 +21,11 @@ def Fasta2ViralSeq(INPUT_FILE):
 	
 	with open(INPUT_FILE) as handle:
 		for this_seq in SeqIO.parse(handle, 'fasta'):
-			output_list.append(PyVirus.ViralSeq(this_seq, None))
+			this_virus = PyVirus.ViralSeq(this_seq, None)
+			if WANTED_SUBS == None:
+				output_list.append(this_virus)
+			elif this_virus.tested_subtype in WANTED_SUBS:
+				output_list.append(this_virus)
 	
 	return output_list
 	
@@ -49,6 +53,15 @@ def ParseOptions(INPUT_STRING):
 						type = 'int',
 						default = 10,
 						help = 'Number of threads to process')
+	parser.add_option('-v', '--verbose',
+						dest = 'verbose',
+						action = 'store_true',
+						default = False,
+						help = 'Be Verbose')
+	parser.add_option('--log_file',
+						dest = 'log_name',
+						type = 'string',
+						help = 'Log File Name')
 	
 	#take input sequences
 	seq_group = optparse.OptionGroup(parser, 'Seqeunce Inputs')
@@ -61,7 +74,12 @@ def ParseOptions(INPUT_STRING):
 	seq_group.add_option('--ref_direc',
 						dest = 'ref_direc',
 						type = 'string',
+						default = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\',
 						help = 'Directory of Reference Sequences')
+	seq_group.add_option('-s','--subtype',
+						dest = 'wanted_subs',
+						action = 'append',
+			help = 'The desired subtypes in the output: can be used multiple times')
 	
 	parser.add_option_group(seq_group)
 	
@@ -111,19 +129,21 @@ def ParseOptions(INPUT_STRING):
 						help = 'Location of Hybrid binaries')
 	dep_group.add_option('--hybrid_calib',
 						dest = 'hybrid_calib',
-						default = string.join([os.environ['PYTHONSCRATCH'],
-												'RNAiCalibrations_KEEP.pkl'], 
-												os.sep),
+						default = os.environ['PYTHONSCRATCH'] + 'RNAiCalibrations_KEEP.pkl',
 						type = 'string',
 						help = 'Location of Hybrid binaries')
 	dep_group.add_option('--elm_direc',
-						dest = 'elm_direc'
-						default = string.join([os.environ['MYDOCPATH'],
-									'ELM_Motif_finder',
-									'ELM_RAW_DOWNLOAD'], os.sep)
+						dest = 'elm_direc',
+						default = os.environ['MYDOCPATH'] + string.join(['ELM_Motif_finder',
+									'ELM_RAW_DOWNLOAD'], os.sep) + os.sep,
 						type = 'string',
 						help = 'Location of ELM website Files')
-	
+	dep_group.add_option('--scratch_dir',
+						dest = 'scratch_dir',
+						default = string.join(['C:', 'new_scratch'], 
+												os.sep),
+						type = 'string',
+						help = 'A scratch directory needed for data storage.')
 	
 	parser.add_option_group(dep_group)
 	
@@ -143,27 +163,33 @@ class VisualController():
 		
 		self.options = OPTIONS
 		self.args = ARGS
+		
+		self.ProcessOptions()
 	
 	def ProcessOptions(self):
 		"""
 		Processes the options provided
 		"""
 		
+		logging.info('Reading sequences')
 		#process input sequences
 		self.test_seqs = []
 		for this_file in self.options.input_fasta:
-			self.test_seqs += Fasta2ViralSeq(this_file)
-		
-		ref_files = self.option.ref_files
+			self.test_seqs += Fasta2ViralSeq(this_file, self.options.wanted_subs)
+		logging.info('%(num)d sequences read' % {'num': len(self.test_seqs)})
 		
 		#process reference sequences
 		
-		self.mapping_base = PyVirus.HIVDatabase(self.options.cache_dir, 
-												self.options.ref_direc,
+		logging.info('Creating MappingBase')
+		self.mapping_base = HIVDatabase.MappingBase(self.options.ref_direc,
+												self.options.scratch_dir, 
 												'SEQ_FILE')
 		
+		logging.info('Building Fasta Database')
 		self.mapping_base.BuildRefBase()
-		self.AddtoShelf(self.test_seqs)
+		
+		logging.info('Adding sequences to the Shelf')
+		self.mapping_base.AddtoShelf(self.test_seqs)
 		
 	def run(self):
 		"""
@@ -171,24 +197,25 @@ class VisualController():
 		"""
 		
 		ref_base = self.mapping_base.ref_base
+		calib_dict = None
+		elm_dict = None
 		
 		if self.options.elm_flag:
-			elm_direc = AnnotUtils.ELMParser(DIRECTORY = self.options.elm_direc)
+			elm_dict = AnnotUtils.ELMParser(DIRECTORY = self.options.elm_direc)
 		if self.options.mirna_flag:
-			
+			with open(self.options.hybrid_calib) as handle:
+				calib_dict = pickle.load(handle)
+		for this_calib in calib_dict.keys()[10:]:
+			junk = calib_dict.pop(this_calib)
 		
+		logging.debug('Beginning Annotation')
+		self.mapping_base.AnnotateBase(calib_dict, elm_dict, True, 
+									ref_base.ref_seqs[0].seq_name)
 		
-		for this_seq_name in self.mapping_base.test_names:
-			this_seq = self.mapping_base.my_test_shelf[this_seq_name]
-			if self.options.elm_flag:
-				this_seq.TranslateAll(ref_base)
-				this_seq.FindELMs(elm_direc)
-			if self.options.tf_flag:
-				this_seq.FindTFSites()
-			if self.options.mirna_flag:
-				this_seq.HumanMiRNAsite()
-				
-	
+		(gene_fig, prot_fig) = self.mapping_base.MakeMultiDiagram(ref_base.ref_seqs[0].seq_name,
+															self.options.wanted_subs)
+		gene_fig.draw(format = 'linear', fragments = 1)
+		gene_fig.write(self.options.out_direc + 'test_out.pdf', 'PDF')
 
 
 
@@ -198,9 +225,36 @@ if __name__ == '__main__':
 	
 	options, args = ParseOptions(sys.argv[1:])
 	
+	file_fmt = '%(levelname)s \t %(threadName)s \t %(funcName)s \t %(asctime)s \t %(message)s'
+	console_fmt = '%(asctime)-7s %(message)s'
+	
+	
+	
+	
+	if options.verbose:
+		logging.basicConfig(level = logging.DEBUG, fmt = console_fmt)
+	else:
+		logging.basicConfig(level = logging.WARNING, fmt = console_fmt)
+	
+	if options.log_name != None:
+		file_name = options.out_direc + options.log_name
+		file_log = logging.StreamHandler(open(file_name, mode = 'w'))
+		formatter = logging.Formatter(file_fmt)
+		file_log.setLevel(logging.DEBUG)
+		file_log.setFormatter(formatter)
+		logging.getLogger('').addHandler(file_log)
+	
+	logging.info('Finished Input Parsing')
+	
+	
 	this_visual = VisualController(options, args)
 	
+	logging.info('Finished Pre-Processing')
+	
+	
 	this_visual.run()
+	
+	logging.info('Finished Running')
 	
 	#start doing stuff with input options
 	
