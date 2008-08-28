@@ -26,6 +26,7 @@ ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
 bkg_file = os.environ['MYDOCPATH'] + 'PyELM\\500_seqs.fasta'
 
+
 def enumerate(iterable):
     return itertools.izip(itertools.count(), iterable)
 	
@@ -129,15 +130,19 @@ class MappingRecord():
 
 class MappingBase():
 	def __init__(self, REF_SOURCE, DEST_DIR, SHELF_NAME):
+		
 		self.ref_source = REF_SOURCE
 		self.dest_dir = DEST_DIR
 		self.ref_base = PyVirus.RefBase(REF_SOURCE, DEST_DIR)
 		self.test_names = []
 		self.my_test_shelf_name = DEST_DIR + SHELF_NAME + '_seqs.slf'
 		self.my_map_shelf_name = DEST_DIR + SHELF_NAME + '_map.slf'
-		self.my_map_shelf = shelve.DbfilenameShelf(self.my_map_shelf_name, 
-													protocol = 2)
-			
+		
+		logging.debug('Mapping shelf: ' + self.my_map_shelf_name)
+		# self.my_map_shelf = shelve.DbfilenameShelf(self.my_map_shelf_name,  protocol = 2)
+		self.my_map_shelf = {}
+		
+		logging.debug('Testing shelf: ' + self.my_test_shelf_name)
 		self.my_test_shelf = shelve.DbfilenameShelf(self.my_test_shelf_name, 
 													protocol = 2)
 		self.test_names = self.my_test_shelf.keys()
@@ -172,7 +177,8 @@ class MappingBase():
 			for this_mapping in self.MapToRefs(this_blast, map_seq_iter.next()):
 				volume_name = this_mapping.ref_name
 				volume_name += this_mapping.test_name
-				
+				time.sleep(0.1)
+				logging.debug('Writting Mapping: ' + volume_name)
 				self.my_map_shelf[volume_name] = this_mapping
 
 	def GetIter(self, WANTED_REF = None, WANTED_SUBTYPE = None):
@@ -311,7 +317,7 @@ class MappingBase():
 				start_pos += best_pos
 				
 				
-	def MakeMultiDiagram(self, WANTED_REF, FORCE = False):
+	def MakeMultiDiagram(self, WANTED_REF, WANTED_SUBTYPES, FORCE = False):
 		"""
 		Uses GenomeDiagram to create a multi-genome figure.
 		"""
@@ -323,11 +329,11 @@ class MappingBase():
 		this_gene_figure = GDDiagram(WANTED_REF)
 		this_prot_figure = GDDiagram(WANTED_REF)
 		
-		dest_dir = os.environ['PYTHONSCRATCH']
-		with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
-			CALIB_DICT = pickle.load(handle)
-		for this_calib in CALIB_DICT.keys()[10:]:
-			junk = CALIB_DICT.pop(this_calib)
+		# dest_dir = os.environ['PYTHONSCRATCH']
+		# with open(dest_dir + 'RNAiCalibrations_KEEP.pkl') as handle:
+			# CALIB_DICT = pickle.load(handle)
+		# for this_calib in CALIB_DICT.keys()[10:]:
+			# junk = CALIB_DICT.pop(this_calib)
 			
 		ELM_DICT = ELMParser()
 		
@@ -337,15 +343,16 @@ class MappingBase():
 		prot_tack = this_prot_figure.new_track(1, scale=0).new_set('feature')
 		this_ref.WriteGenesToDiagram(prot_tack, PROT = True)
 		
-		self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
+		#self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
 		
-		this_ref.HumanMiRNAsite(CALIB_DICT)
-		this_ref.FindELMs(ELM_DICT)
+		#this_ref.HumanMiRNAsite(CALIB_DICT)
+		#this_ref.FindELMs(ELM_DICT)
 		#this_ref.FindHomIslands(this_ref)
-		this_ref.FindTFSites()
+		#this_ref.FindTFSites()
 		
 		#guess which feature
 		#cached_seqs = self.my_test_shelf.values()
+		logging.debug('Annotating features')
 		all_features = []
 		for this_seq in self.test_names:
 			bkg_seq = self.my_test_shelf[this_seq]
@@ -357,6 +364,7 @@ class MappingBase():
 		
 		obj_vals = numpy.zeros((1,len(all_features)), dtype=numpy.uint16)
 		
+		logging.debug('Finding alignment features')
 		current_min_val = 5000000
 		current_annot = None
 		pos_fun = lambda x: abs(x[0].start - x[1].start)
@@ -381,10 +389,11 @@ class MappingBase():
 		
 		subtype_dict = {}
 		
+		logging.debug('Finding subtypes')
 		for this_name in self.test_names:
 			
 			this_bkg_seq = self.my_test_shelf[this_name]
-			this_subtype = this_bkg_seq.tested_subtype.split('|')[1]
+			this_subtype = this_bkg_seq.tested_subtype
 			if subtype_dict.has_key(this_subtype):
 				subtype_dict[this_subtype].append(this_name)
 			else:
@@ -393,10 +402,9 @@ class MappingBase():
 			#save back into the shelve for faster calculation later
 			self.my_test_shelf[this_name] = this_bkg_seq
 		
-		sorted_keys = subtype_dict.keys()
-		sorted_keys.sort()
-		sorted_keys = ['B', 'C']
+		sorted_keys = WANTED_SUBTYPES
 		counter = 0
+		logging.debug('Adding features to figure')
 		for this_key in sorted_keys:
 			for this_name in subtype_dict[this_key][0:min(len(subtype_dict[this_key]),300)]:
 				this_bkg_seq = self.my_test_shelf[this_name]
@@ -448,24 +456,28 @@ class MappingBase():
 		"""
 		
 		def AnnotWorker(SEQ, MI_DICT, E_DICT, FORCE_INPUT, REF_INPUT):
-			
+			logging.debug('Translating: ' + SEQ.seq_name)
 			SEQ.TranslateAll(self.ref_base, WANTED_REF = REF_INPUT)
 			fil_fun = lambda x: x.type != 'ELM'
 			SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
+			logging.debug('ELMing: ' + SEQ.seq_name)
 			SEQ.FindELMs(E_DICT)
 			
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('MIRNA', False)):
+				logging.debug('miRNAing: ' + SEQ.seq_name)
 				fil_fun = lambda x: x.type != 'MIRNA'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-				SEQ.HumanMiRNAsite(MI_DICT)
+				SEQ.HumanMiRNAsite(MI_DICT, NUM_THREADS = 1)
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TFSite', False)):
+				logging.debug('TFing: ' + SEQ.seq_name)
 				fil_fun = lambda x: x.type != 'TFSite'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
 				SEQ.FindTFSites()
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('HomIsland', False)):
+				logging.debug('HomIslanding: ' + SEQ.seq_name)
 				fil_fun = lambda x: x.type != 'HomIsland'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
 				this_ref = self.ref_base.GetRefSeq(WANTED_REF)
@@ -473,7 +485,7 @@ class MappingBase():
 				
 			
 			
-			SEQ.DetSubtype()
+			#SEQ.DetSubtype()
 			
 			#make sure only one thread writes to the dictionary at a time
 			#otherwise significant crap-age will happen
