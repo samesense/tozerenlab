@@ -22,7 +22,7 @@ class Annot():
 		self.hom = HOM
 		
 	def __str__(self):
-		return self.type + ":" + self.name + ":" + str(self.start)
+		return str(self.__dict__)
 	
 	def GetSeqFeature(self):
 		"""

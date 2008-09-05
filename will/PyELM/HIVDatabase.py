@@ -357,7 +357,7 @@ class MappingBase():
 		for this_seq in self.test_names:
 			bkg_seq = self.my_test_shelf[this_seq]
 			for this_annot in bkg_seq.feature_annot:
-				if this_annot.CheckRange('HumanMiRNA', 1000):
+				if this_annot.CheckRange('ELM', 1000):
 					all_features.append(this_annot)
 				#if this_annot.CheckRange('HumanMiRNA', 7000):
 					#all_features.append(this_annot)
@@ -402,13 +402,16 @@ class MappingBase():
 			#save back into the shelve for faster calculation later
 			self.my_test_shelf[this_name] = this_bkg_seq
 		
-		sorted_keys = WANTED_SUBTYPES
+		if WANTED_SUBTYPES != None:
+			sorted_keys = WANTED_SUBTYPES
+		else:
+			sorted_keys = subtype_dict.keys()
 		counter = 0
 		logging.debug('Adding features to figure')
 		for this_key in sorted_keys:
-			for this_name in subtype_dict[this_key][0:min(len(subtype_dict[this_key]),300)]:
+			for this_name in subtype_dict[this_key]:
 				this_bkg_seq = self.my_test_shelf[this_name]
-				this_mapping = self.my_map_shelf[WANTED_REF + this_name]
+				#this_mapping = self.my_map_shelf[WANTED_REF + this_name]
 				
 				anchor_eq = this_bkg_seq.FindEqAnnot(anchors, 300, IS_LIST = False)
 				
@@ -449,39 +452,45 @@ class MappingBase():
 		return (this_gene_figure, this_prot_figure)
 		
 		
-	def AnnotateBase(self, MiRNA_DICT, ELM_DICT, FORCE, 
+	def AnnotateBase(self, MiRNA_DICT, ELM_DICT, WANT_TF, WANT_HOM, FORCE, 
 						WANTED_REF, WANTED_THREADS = 10):
 		"""
 		Makes multi-threaded calls to TFChecker.
 		"""
 		
-		def AnnotWorker(SEQ, MI_DICT, E_DICT, FORCE_INPUT, REF_INPUT):
+		def AnnotWorker(SEQ, MI_DICT, E_DICT, WANT_TF, WANT_HOM, 
+						FORCE_INPUT, REF_INPUT):
 			logging.debug('Translating: ' + SEQ.seq_name)
 			SEQ.TranslateAll(self.ref_base, WANTED_REF = REF_INPUT)
 			fil_fun = lambda x: x.type != 'ELM'
 			SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-			logging.debug('ELMing: ' + SEQ.seq_name)
-			SEQ.FindELMs(E_DICT)
+			if E_DICT != None:
+				logging.debug('ELMing: ' + SEQ.seq_name)
+				SEQ.FindELMs(E_DICT)
 			
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('MIRNA', False)):
-				logging.debug('miRNAing: ' + SEQ.seq_name)
+				
 				fil_fun = lambda x: x.type != 'MIRNA'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-				SEQ.HumanMiRNAsite(MI_DICT, NUM_THREADS = 1)
+				if MI_DICT != None:
+					logging.debug('miRNAing: ' + SEQ.seq_name)
+					SEQ.HumanMiRNAsite(MI_DICT, NUM_THREADS = 1)
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TFSite', False)):
-				logging.debug('TFing: ' + SEQ.seq_name)
 				fil_fun = lambda x: x.type != 'TFSite'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-				SEQ.FindTFSites()
+				if WANT_TF:
+					logging.debug('TFing: ' + SEQ.seq_name)
+					SEQ.FindTFSites()
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('HomIsland', False)):
-				logging.debug('HomIslanding: ' + SEQ.seq_name)
 				fil_fun = lambda x: x.type != 'HomIsland'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-				this_ref = self.ref_base.GetRefSeq(WANTED_REF)
-				SEQ.FindHomIslands(this_ref)
+				if WANT_HOM:
+					logging.debug('HomIslanding: ' + SEQ.seq_name)
+					this_ref = self.ref_base.GetRefSeq(WANTED_REF)
+					SEQ.FindHomIslands(this_ref)
 				
 			
 			
@@ -505,7 +514,8 @@ class MappingBase():
 				this_seq = self.my_test_shelf[this_name]
 			this_thread = threading.Thread(target = AnnotWorker, 
 								args = (this_seq, MiRNA_DICT, ELM_DICT, 
-										FORCE, WANTED_REF))
+										WANT_TF, WANT_HOM, FORCE, 
+										WANTED_REF))
 			this_thread.start()
 			all_threads.append(this_thread)
 		#make sure all threads have closed before returning

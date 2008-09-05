@@ -27,6 +27,8 @@ from collections import defaultdict
 
 import logging
 
+
+
 class ViralSeq():
 	def __init__(self, TEST_SEQ, SEQ_NAME):
 		#if SEQ_NAME is None then assume that TEST_SEQ is a SeqRecord
@@ -109,7 +111,8 @@ class ViralSeq():
 		logging.debug('Determining Subtype: ' + self.seq_name)
 		self.tested_subtype = GenoTyping.GetSimple(self.my_sequence)
 		self.tested_subtype = self.tested_subtype.split('|')[1]
-		logging.debug(self.seq_name + ': ' + self.tested_subtype)
+		logging.debug( self.seq_name + ': ' + self.tested_subtype)
+		
 	def TranslateAll(self, REFBASE, WANTED_REF = None):
 		"""
 		TranslateAll
@@ -224,6 +227,10 @@ class ViralSeq():
 			self.feature_annot_type['TF'] = True
 		else:
 			raise KeyError
+		ans_str = '%(name)s\t%(annot)s' % {'name':self.seq_name, 
+						'annot':str(self.feature_annot[-1])}
+		logging.debug( ans_str)
+		
 	def FindEqAnnot(self, WANTED_ANNOT, POS_FUDGE, IS_LIST = False):
 		"""
 		Attemps to find the equivelant Annotation recored within 
