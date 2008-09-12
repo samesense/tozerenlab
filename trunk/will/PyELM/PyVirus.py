@@ -370,6 +370,13 @@ class ViralSeq():
 									this_annot[3], this_annot[6])
 		self.feature_annot_type['TF'] = True
 	
+	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR):
+		"""
+		Checks a list of provided features and returns a boolean array 
+		indicating whether that feature is present on this sequence.
+		"""
+		raise NotImplemented
+		
 	
 	
 class BkgSeq(ViralSeq):

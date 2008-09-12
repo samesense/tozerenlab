@@ -36,9 +36,6 @@ def constant_factory(value):
 	return PatSeq(None, None, None, None)
 
 
-
-
-
 class PatRecord():
 	def __init__(self, DELTA_T, TYPE, VALUE):
 		self.delta_t = DELTA_T
@@ -146,7 +143,23 @@ class PatSeq(PyVirus.ViralSeq):
 		self.cd4_tc[1,:] = map(get_nums,cd4_annots)
 		
 		
-	
+	def CheckPatWindow(self, START, STOP):
+		"""
+		Checks to make sure the patient can evaluate over the START STOP
+		window.
+		"""
+		if (self.rna_tc == None) | (self.cd4_tc == None):
+			self.MakeNumpyTimeCourse()
+		try:
+			if (self.rna_tc[0,0] > START) | (self.cd4_tc[0,0] > START):
+				return False
+			elif (self.rna_tc[0,-1] < STOP) | (self.cd4_tc[0,-1] < STOP):
+				return False
+			else:
+				return True
+		except IndexError:
+			return False
+		
 	
 	
 	def GetClinVal(self, TIME):
@@ -168,24 +181,34 @@ class PatSeq(PyVirus.ViralSeq):
 		except AttributeError:
 			this_time = TIME
 		
-		if (this_time < self.rna_tc[0,0]) | ((this_time < self.cd4_tc[0,0])):
-			#if the desired time is less than the lowest time then we cannot
-			#interpolate properly
+		try:
+			rna_interp = interp1d(self.rna_tc[0,:], self.rna_tc[1,:], 
+							copy = False)
+			cd4_interp = interp1d(self.cd4_tc[0,:], self.cd4_tc[1,:], 
+							copy = False)
+			return numpy.append(cd4_interp(this_time), rna_interp(this_time))
+		except ValueError:
 			return numpy.array([numpy.nan, numpy.nan])
-		elif (this_time > self.rna_tc[0,-1]) | ((this_time > self.cd4_tc[0,-1])):
-			#if the desired time is greater than the last time then we cannot
-			#interpolate properly
+		except AssertionError:
 			return numpy.array([numpy.nan, numpy.nan])
-			
 		
-		rna_interp = interp1d(self.rna_tc[0,:], self.rna_tc[1,:], 
-						copy = False)
-		cd4_interp = interp1d(self.cd4_tc[0,:], self.cd4_tc[1,:], 
-						copy = False)
 		
-		return numpy.append(cd4_interp(this_time), rna_interp(this_time))
 		
-	
+	def DetermineResponder(self, METHOD):
+		"""
+		Uses the clinical time-course to determine the 
+		
+		"""
+		if METHOD == 'SD':
+			#use the standard datum method
+			val = self.GetClinVal(8)[1] // self.GetClinVal(0)[1]
+			return val < 0.01
+		elif METHOD == 'WND':
+			times = [0,2,4,8,12,24]
+			check_vals = map(lambda x: self.GetClinVal(x)[1], times)
+			check_array = numpy.array(check_vals)
+			check_array = numpy.diff(check_array) <= 0
+			return numpy.sum(check_array) > 3
 	
 	
 class PatBase(collections.defaultdict):
@@ -308,20 +331,49 @@ class PatBase(collections.defaultdict):
 		"""
 		
 		times = [0,2,4,8,12,24]
+		#times = [0,8]
 		
 		base_axis = 230
 		
+		pat_list = self.keys()
 		
-		for this_time in xrange(len(times)):
+		color_list = map(lambda x: x.DetermineResponder('WND'), self.values())
+		
+		text_dict = {'size':'smaller'}
+		
+		pylab.subplots_adjust(wspace=0.1, hspace=0.1)
+		
+		
+		for this_time in xrange(1, len(times)+1):
 			this_axes = pylab.subplot(base_axis + this_time)
-			this_win = numpy.array((2,len(self)))
-			for this_pat_name in self.keys():
-				pass
+			this_win = numpy.zeros((len(self),2))
+			for i in xrange(len(pat_list)):
+				if self[pat_list[i]].CheckPatWindow(times[0], times[-1]):
+					this_win[i,:] = self[pat_list[i]].GetClinVal(times[this_time - 1])
+			print this_win
+			pylab.scatter(this_win[:,1], this_win[:,0], c=color_list)#, {'axes':this_axes})
+			pylab.axis([0, 10, 0, 1500])
+			
+			
+			if (this_time == 1) | (this_time == 4):
+				pylab.ylabel('CD4 Count', text_dict)
+			if this_time in [4,5,6]:
+				pylab.xlabel('log(Viral Load)',text_dict)
+			if this_time in [2,3]:
+				pylab.xticks('')
+				pylab.yticks('')
+			if this_time in [1,2,3]:
+				pylab.xticks('')
+			if this_time in [5,6]:
+				pylab.yticks('')
+			
+			
+			
+			pylab.title('%(time)d weeks' % {'time': times[this_time - 1]},text_dict)
+		
+		pylab.savefig(FILE_NAME)
 		
 		
-		
-		
-	
 	
 	
 	

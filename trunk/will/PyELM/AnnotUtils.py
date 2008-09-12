@@ -96,6 +96,15 @@ class Annot():
 			return True
 		else:
 			return False
+	
+	def FuzzyEquals(self, ANNOT, FUDGE_POS = 1000):
+		"""
+		Returns True if the provided annotation is of the proper type and 
+		within the fudge region.
+		"""
+		return self.CheckRange(ANNOT.type, ANNOT.start, FUDGE_POS = FUDGE_POS)
+	
+	
 
 class Gene(Annot):
 	def __init__(self, NAME, PRODUCT, NT_SEQ, AA_SEQ, START, END):

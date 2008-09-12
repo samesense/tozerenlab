@@ -147,9 +147,9 @@ def testGetClinVal():
 	test_base.ReadDirec(PAT_BASE_DIREC)
 	
 	#a few PatIDs manually gathered for spot checking
-	test_ids = [23424, 23430, 23434]
-	this_cd4_0 = [178, 78, 17]
-	this_cd4_4 = [228, 140, 21]
+	test_ids = [23430, 23434]
+	this_cd4_0 = [78, 17]
+	this_cd4_4 = [140, 21]
 	
 	for this_check in zip(test_ids, this_cd4_0, this_cd4_4):
 		nose.tools.assert_true(test_base.has_key(this_check[0]), 
@@ -175,9 +175,22 @@ def testGetClinVal():
 					% {'L':this_check[1], 'M':this_check[2], 'T':test[0]})
 		
 		
-		
-		
-		
+def testClinFig():
+	"""
+	Test Generating the Clinical Scatter Plot figure
+	"""
+	
+	PAT_BASE_DIREC = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\stanfordDBs\\'
+	
+	test_base = PatUtils.PatBase()
+	
+	nose.tools.assert_true(test_base != None, 'Could not load PatBase')
+	
+	test_base.ReadDirec(PAT_BASE_DIREC)
+	
+	fig_name = os.environ['PYTHONSCRATCH'] + 'clin_figure.png'
+	
+	test_base.PatTimeCourseFig(fig_name)
 		
 		
 		
