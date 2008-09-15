@@ -26,8 +26,13 @@ class Annot():
 	
 	def GetSeqFeature(self):
 		"""
-		Returns a BioPython SeqFeature describing the gene represented
+		A utility function for creating a BioPython style SeqFeature which
+		contains information of this gene.
+		
+		@param:		None
+		@returns:	A BioPython SeqFeature
 		"""
+		
 		seq_loc = SeqFeatClass.FeatureLocation(self.start, self.end)
 		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
 								id = self.name)
@@ -36,6 +41,12 @@ class Annot():
 	def GeneAnnot(self, GENE, REL_START, REL_STOP):
 		"""
 		Annotate the gene position where this ELM occurs
+		
+		@param GENE:		The gene name
+		@param REL_START:	The relative start position of the gene
+		@param REL_STOP:	The relative stop position of the gene
+		
+		@returns:		None
 		"""
 		self.gene = GENE
 		self.rel_start = REL_START
@@ -45,6 +56,9 @@ class Annot():
 		"""
 		Returns a BioPython SeqFeature describing the ELM represented
 		in reference to the protein it is on.
+		
+		@param:		None
+		@returns:	A BioPython SeqFeature
 		"""
 		seq_loc = SeqFeatClass.FeatureLocation(self.rel_start, self.rel_stop)
 		seq_feat = SeqFeature(location = seq_loc, strand = 1, 
@@ -56,8 +70,11 @@ class Annot():
 		Returns a new instance of self in which the start-end coordinates are 
 		an average mapping to the provided coordinates
 		
-		EQ			Equivelent features on THIS GENOME
-		ANCHOR		An ANCHORED set of features
+		@param EQ:			Equivelent features on THIS GENOME
+		@param ANCHOR:		An ANCHORED set of features
+		
+		@returns:			A new Annot instance which is the equivelence of 
+							self.
 		"""
 		
 		output_mapping = copy.deepcopy(self)

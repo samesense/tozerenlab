@@ -185,7 +185,7 @@ def testCheckSeqs():
 	nose.tools.assert_true(m_b.CheckSeqs(wrong_seq) == 0,
 							'Found wrong_seq in a sequence')
 
-def testMultiAnnot():
+def testMultiAnnot_SLOW():
 	"""
 	Test the multiThreaded Annotation
 	"""
