@@ -100,7 +100,7 @@ class Annot():
 		
 		return output_mapping
 	
-	def CheckRange(self, TYPE, POS, FUDGE_POS = 1000):
+	def CheckRange(self, TYPE, POS, FUDGE_POS = 1000, NAME = None):
 		"""
 		Returns True if this Annotation is of the proper type and starts 
 		within the FUDGE region
@@ -108,6 +108,7 @@ class Annot():
 		
 		if self.type != TYPE:
 			return False
+		
 		
 		if abs(self.start - POS) < FUDGE_POS:
 			return True
@@ -119,8 +120,19 @@ class Annot():
 		Returns True if the provided annotation is of the proper type and 
 		within the fudge region.
 		"""
-		return self.CheckRange(ANNOT.type, ANNOT.start, FUDGE_POS = FUDGE_POS)
-	
+		
+		if self.name != ANNOT.name:
+			return -1
+		
+		if self.type != ANNOT.type:
+			return -1
+		
+		val = abs(ANNOT.start - self.start)
+		if val < FUDGE_POS:
+			return val
+		else:
+			return -1
+
 	
 
 class Gene(Annot):

@@ -12,6 +12,7 @@ import types
 import Queue
 import PyBLAST
 import string
+import numpy
 from Bio import SeqIO
 from Bio import SeqFeature as SeqFeatClass
 #a hack but the only way I can get everything to work right
@@ -370,12 +371,47 @@ class ViralSeq():
 									this_annot[3], this_annot[6])
 		self.feature_annot_type['TF'] = True
 	
-	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR):
+	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR, NUM_CHECKS = 5, 
+									CHECK_CUTOFF = .2):
 		"""
 		Checks a list of provided features and returns a boolean array 
 		indicating whether that feature is present on this sequence.
 		"""
-		raise NotImplemented
+		
+		all_checks = numpy.zeros((len(FEAT_LIST), NUM_CHECKS))
+		
+		min_func = lambda x: x[0]
+		
+		for this_check_num in xrange(NUM_CHECKS):
+			#do multiple checks with different permutations
+			#it may be slightly order dependent
+			check_feat = copy.deepcopy(self.feature_annot)
+			numpy.random.shuffle(check_feat)
+			
+			#loop through each feature in FEAT_LIST
+			for this_feat in xrange(len(FEAT_LIST)):
+				poss_items = []
+				#loop through each feature in the shuffled copy of this list
+				for this_check in xrange(len(check_feat)):
+					val = check_feat[this_check].FuzzyEquals(FEAT_LIST[this_feat],
+													FUDGE_POS = FUDGE_FACTOR)
+					#val == -1 refers to "wrong type or not within "
+					if val != -1:
+						poss_items.append((val, this_check))
+				
+				if len(poss_items) > 0:
+					best_ind = min(poss_items, key = min_func)[1]
+					all_checks[this_feat, this_check_num] = 1
+					check_feat.pop(best_ind)
+					
+				
+		
+		avg_find = numpy.mean(all_checks, axis=1)
+		
+		return avg_find > CHECK_CUTOFF
+		
+		
+		
 		
 	
 	

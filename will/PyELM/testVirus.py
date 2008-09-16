@@ -13,7 +13,8 @@ import AnnotUtils
 import logging
 import logging.handlers
 import threading
-
+import numpy
+import copy
 
 logger = logging.getLogger('')
 
@@ -274,7 +275,67 @@ def CheckLogClass(THIS_SEQ, THIS_CLASS):
 	this_feat = THIS_SEQ.feature_annot[0].GetSeqFeature()
 	nose.tools.assert_true(this_feat.id != None, 
 							'Did not convert values properly')
+
+def testCheckFeatures():
+	"""
+	Test the Feature Checking
+	"""
+	logger.info('Starting testLogAnnotation')
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
 	
+	ELM_DICT = AnnotUtils.ELMParser()
+	
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	
+	
+	test_seq = ref_base.ref_seqs[0]
+	test_seq.FindELMs(ELM_DICT)
+	
+	s = (1, len(test_seq.feature_annot))
+	
+	numpy.random.seed(15)
+	
+	#when intersected with itself it should return an array of ones
+	for i in range(5):
+		bool_array = numpy.random.uniform(high = 10, size = s) > i
+		yield CheckCheckFeatures, copy.deepcopy(test_seq), bool_array
+	
+
+def CheckCheckFeatures(TEST_SEQ, BOOL_ARRAY):
+	
+	testing_features = copy.deepcopy(TEST_SEQ.feature_annot)
+	
+	feats = numpy.where(BOOL_ARRAY==0)[1].tolist()
+	feats.reverse()
+	
+	
+	
+	map(lambda x: TEST_SEQ.feature_annot.pop(x), feats)
+	
+	#TEST_SEQ.feature_annot = TEST_SEQ.feature_annot.pop(feats)
+	
+	output_array = TEST_SEQ.CheckFeatures(testing_features, 50)
+	
+	
+	TP = numpy.sum(output_array[BOOL_ARRAY[0]])
+	FP = numpy.sum(output_array[BOOL_ARRAY[0] == 0])
+	TN = numpy.sum(output_array[BOOL_ARRAY[0] == 0] == 0)
+	FN = numpy.sum(output_array[BOOL_ARRAY[0]] == 0)
+	
+	rec = float(TP)/float(TP + FN)
+	pre = float(TP)/float(TP + FP)
+	
+	
+	f = 2 * float(pre * rec) / float(pre + rec)
+	
+	
+	nose.tools.assert_true(f > 0.8, 
+		'Found: F-Measure: %(F)f TP:%(TP)d, FP:%(FP)d, TN:%(TN)d, FN:%(FN)d'%\
+		{'TP': TP, 'FP': FP, 'TN': TN, 'FN': FN, 'F':f})
+	
+
 def testMiRNA_SLOW():
 	"""
 	Test finding human miRNAs
