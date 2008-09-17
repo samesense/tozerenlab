@@ -371,8 +371,8 @@ class ViralSeq():
 									this_annot[3], this_annot[6])
 		self.feature_annot_type['TF'] = True
 	
-	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR, NUM_CHECKS = 5, 
-									CHECK_CUTOFF = .2):
+	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR, NUM_CHECKS = 3, 
+									CHECK_CUTOFF = 1):
 		"""
 		Checks a list of provided features and returns a boolean array 
 		indicating whether that feature is present on this sequence.
@@ -406,7 +406,7 @@ class ViralSeq():
 					
 				
 		
-		avg_find = numpy.mean(all_checks, axis=1)
+		avg_find = numpy.sum(all_checks, axis=1)
 		
 		return avg_find > CHECK_CUTOFF
 		

@@ -293,14 +293,20 @@ def testCheckFeatures():
 	test_seq = ref_base.ref_seqs[0]
 	test_seq.FindELMs(ELM_DICT)
 	
-	s = (1, len(test_seq.feature_annot))
 	
-	numpy.random.seed(15)
+	
+	numpy.random.seed(22)
 	
 	#when intersected with itself it should return an array of ones
-	for i in range(5):
-		bool_array = numpy.random.uniform(high = 10, size = s) > i
-		yield CheckCheckFeatures, copy.deepcopy(test_seq), bool_array
+	
+	for test_seq in ref_base.ref_seqs[1:]:
+		test_seq.FindELMs(ELM_DICT)
+		s = (1, len(test_seq.feature_annot))
+		if len(test_seq.feature_annot) == 0:
+			continue
+		for i in range(5):
+			bool_array = numpy.random.uniform(high = 10, size = s) > i
+			yield CheckCheckFeatures, copy.deepcopy(test_seq), bool_array
 	
 
 def CheckCheckFeatures(TEST_SEQ, BOOL_ARRAY):
@@ -324,9 +330,12 @@ def CheckCheckFeatures(TEST_SEQ, BOOL_ARRAY):
 	TN = numpy.sum(output_array[BOOL_ARRAY[0] == 0] == 0)
 	FN = numpy.sum(output_array[BOOL_ARRAY[0]] == 0)
 	
-	rec = float(TP)/float(TP + FN)
-	pre = float(TP)/float(TP + FP)
-	
+	try:
+		rec = float(TP)/float(TP + FN)
+		pre = float(TP)/float(TP + FP)
+	except ZeroDivisionError:
+		raise ZeroDivisionError, 'TP:%(TP)d, FP:%(FP)d, TN:%(TN)d, FN:%(FN)d'%\
+			{'TP': TP, 'FP': FP, 'TN': TN, 'FN': FN}
 	
 	f = 2 * float(pre * rec) / float(pre + rec)
 	
@@ -448,13 +457,6 @@ def testBLASTController_SLOW():
 			'Did not return the proper number of sequences')
 
 
-# def tearDownModule():
-	# logger.info('Starting tearDownModule')
-	# checker = re.compile('.*KEEP.*')
-	# time.sleep(1)
-	# file_list = os.listdir(os.environ['PYTHONSCRATCH'])
-	# for this_file in file_list:
-		# if checker.match(this_file) == None:
-			# os.remove(os.environ['PYTHONSCRATCH'] + this_file)
+
 
     
