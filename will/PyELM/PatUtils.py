@@ -15,6 +15,7 @@ import string
 import bisect
 import PyVirus
 import collections
+import logging
 from Bio import SeqIO
 from Bio import SeqFeature as SeqFeatClass
 #a hack but the only way I can get everything to work right
@@ -80,21 +81,76 @@ class PatSeq(PyVirus.ViralSeq):
 		self.rx_time_line = []
 		self.pat_id = None
 		self.study = STUDY
+		self.offset = None
+		self.final_pos = None
 		
 		self.rna_tc = None
 		self.cd4_tc = None
 		
+	def GenomeToBioPython(self):
+		"""
+		GenomeToBioPython
+				Returns a generic SeqRecord in the biopython format for
+		the whole genome sequence.
+		"""
+		return SeqRecord(Seq(self.my_sequence, generic_nucleotide),
+						 id = str(self.study) + ':' + str(self.pat_id))
+	
+	def SetOffset(self, REF_SEQ):
+		"""
+		Uses a REF_SEQ to create an offset for all features.  Currently uses
+		a protein as an anchor and then creates an offset based on that.  
+		Currently only works with SINGLE proteins in each sequence.
+		"""
 		
+		offset = 0
+		for this_gene in REF_SEQ.annotation:
+			if this_gene in self.annotation:
+				offset = REF_SEQ.annotation[this_gene].start - \
+								self.annotation[this_gene].start
+				break
+		self.annotation[this_gene].start += offset
+		self.annotation[this_gene].end += offset
 		
-	def __getattr__(self, NAME):
-		if NAME == 'tested_subtype':
-			self.DetSubtype()
-			return self.tested_subtype
-		elif NAME == 'my_sequence':
-			self.GetSequence()
-			return self.my_sequence
+		self.offset = offset
+		self.final_pos = self.annotation[this_gene].end
+		
+	
+	def LogAnnotation(self, TYPE, POS, SEQ, HOM, NAME):
+		"""
+		LogAnnotation
+			Logs various types of annotations about the sequence for various
+			features such as Genes, homology, and ELMs ... use none if the data
+			does not apply
+		"""
+		
+		if self.offset == None:
+			raise AttributeError, 'Offset is not set properly'
+		
+		if TYPE == 'Annot':
+			self.feature_annot.append(Annot(NAME, self.offset + POS[0], 
+										self.offset + POS[1], None))
+		elif TYPE == 'HomIsland':
+			self.feature_annot.append(HomIsland(SEQ, self.offset + POS[0], 
+										self.offset + POS[1], HOM))
+			self.feature_annot_type['HomIsland'] = True
+		elif TYPE == 'MIRNA':
+			self.feature_annot.append(HumanMiRNA(NAME, self.offset + POS[0], 
+										self.offset + POS[1], 1.0))
+			self.feature_annot_type['MIRNA'] = True
+		elif TYPE == 'ELM':
+			self.feature_annot.append(ELM(NAME, self.offset + POS[0], 
+										self.offset + POS[1], None))
+			self.feature_annot_type['ELM'] = True
+		elif TYPE == 'TF':
+			self.feature_annot.append(TFSite(NAME, self.offset + POS[0], 
+										self.offset + POS[1], HOM))
+			self.feature_annot_type['TF'] = True
 		else:
-			raise AttributeError
+			raise KeyError
+		ans_str = '%(name)s\t%(annot)s' % {'name':self.seq_name, 
+						'annot':str(self.feature_annot[-1])}
+		#logging.debug( ans_str)
 		
 	def AnnotateClinical(self, DELTA_T, TYPE, VAL):
 		"""
@@ -210,6 +266,58 @@ class PatSeq(PyVirus.ViralSeq):
 			check_array = numpy.diff(check_array) <= 0
 			return numpy.sum(check_array) > 3
 	
+	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR, NUM_CHECKS = 3, 
+									CHECK_CUTOFF = 1):
+		"""
+		Checks a list of provided features and returns a boolean array 
+		indicating whether that feature is present on this sequence.
+		"""
+		
+		all_checks = numpy.zeros((len(FEAT_LIST), NUM_CHECKS))
+		
+		min_func = lambda x: x[0]
+		
+		for this_check_num in xrange(NUM_CHECKS):
+			#do multiple checks with different permutations
+			#it may be slightly order dependent
+			check_feat = copy.deepcopy(self.feature_annot)
+			numpy.random.shuffle(check_feat)
+			
+			#loop through each feature in FEAT_LIST
+			for this_feat in xrange(len(FEAT_LIST)):
+				poss_items = []
+				#loop through each feature in the shuffled copy of this list
+				
+				if FEAT_LIST[this_feat].start + FUDGE_FACTOR < self.offset:
+					continue
+				if FEAT_LIST[this_feat].start - FUDGE_FACTOR > self.final_pos:
+					continue
+				
+				for this_check in xrange(len(check_feat)):
+					val = check_feat[this_check].FuzzyEquals(FEAT_LIST[this_feat],
+													FUDGE_POS = FUDGE_FACTOR)
+					#val == -1 refers to "wrong type or not within "
+					if val != -1:
+						poss_items.append((val, this_check))
+				
+				if len(poss_items) > 0:
+					best_ind = min(poss_items, key = min_func)[1]
+					all_checks[this_feat, this_check_num] = 1
+					check_feat.pop(best_ind)
+					
+				
+		avg_find = numpy.sum(all_checks, axis=1)
+		
+		found = avg_find > CHECK_CUTOFF
+		found = found.astype(None)
+		
+		
+		for this_feat in xrange(len(FEAT_LIST)):
+			if FEAT_LIST[this_feat].start + FUDGE_FACTOR < self.offset:
+				found[this_feat] = numpy.nan
+			if FEAT_LIST[this_feat].start - FUDGE_FACTOR > self.final_pos:
+				found[this_feat] = numpy.nan
+		return found
 	
 class PatBase(collections.defaultdict):
 	"""
@@ -228,7 +336,25 @@ class PatBase(collections.defaultdict):
 		self[KEY] = PatSeq(KEY, None, None, None)
 		return self[KEY]
 		
-		
+	
+	def ResponderGen(self, METHOD = 'WND'):
+		"""
+		A generator which returns all of the responders from the PatBase
+		"""
+		for this_pat in self:
+			if self[this_pat].DetermineResponder(METHOD):
+				yield self[this_pat]
+	
+	def NonResponderGen(self, METHOD = 'WND'):
+		"""
+		A generator which returns all of the NON-responders from the PatBase
+		"""
+		for this_pat in self:
+			if not(self[this_pat].DetermineResponder(METHOD)):
+				yield self[this_pat]
+	
+	
+	
 	def ReadDirec(self, DIREC):
 		"""
 		Reads the data in the directory and appends it into the self.pat_data 
@@ -295,6 +421,8 @@ class PatBase(collections.defaultdict):
 					
 					this_pat = self[this_pat_id]
 					this_pat.study = STUDY
+					this_pat.pat_id = this_pat_id
+					this_pat.seq_name = STUDY + ':' + str(this_pat_id)
 					this_pat.AnnotateClinical(this_time, 'SEQ', this_seq.upper())
 					
 			
@@ -321,8 +449,14 @@ class PatBase(collections.defaultdict):
 					ProcessFasta(handle, study)
 				else:
 					KeyError
-			
 		
+		need_pop = []
+		for this_pat in self:
+			if self[this_pat].my_sequence == None:
+				need_pop.append(this_pat)
+		if len(need_pop) != 0:
+			for this_pat in need_pop:
+				self.pop(this_pat)
 		
 	def PatTimeCourseFig(self, FILE_NAME):
 		"""
@@ -350,7 +484,6 @@ class PatBase(collections.defaultdict):
 			for i in xrange(len(pat_list)):
 				if self[pat_list[i]].CheckPatWindow(times[0], times[-1]):
 					this_win[i,:] = self[pat_list[i]].GetClinVal(times[this_time - 1])
-			print this_win
 			pylab.scatter(this_win[:,1], this_win[:,0], c=color_list)#, {'axes':this_axes})
 			pylab.axis([0, 10, 0, 1500])
 			

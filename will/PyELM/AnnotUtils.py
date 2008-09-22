@@ -109,6 +109,8 @@ class Annot():
 		if self.type != TYPE:
 			return False
 		
+		if POS == None:
+			return True
 		
 		if abs(self.start - POS) < FUDGE_POS:
 			return True

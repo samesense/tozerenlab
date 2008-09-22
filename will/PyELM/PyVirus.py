@@ -58,9 +58,12 @@ class ViralSeq():
 			return self.GenomeToBioPython().description
 		if NAME == 'seq':
 			return self.GenomeToBioPython().seq
+		if NAME == 'my_sequence':
+			self.GetSequence()
+			return self.my_sequence
 		else:
 			raise AttributeError, NAME
-		
+	
 	def GenomeToBioPython(self):
 		"""
 		GenomeToBioPython
@@ -83,6 +86,15 @@ class ViralSeq():
 										id = self.seq_name + ':' + this_gene)
 			final_list.append(this_record)
 		return final_list
+	
+	def SetOffset(self, REF_SEQ):
+		"""
+		A utility function which provides backcompatibilty with the SetOffset
+		of PatSeq.  This function does nothing for RefSeqs and PyVirus's
+		"""
+		pass
+	
+	
 	
 	def GetSeqFeatures(self, PROT_REL = False):
 		"""
@@ -143,6 +155,10 @@ class ViralSeq():
 				aa_start += len(aa_seq)
 				gene_dict[this_gene] = gene
 		self.annotation = gene_dict
+		
+		self.SetOffset(REFBASE.GetRefSeq(WANTED_REF))
+		
+		
 	def CheckSeq(self, INPUT_SEQ):
 		"""
 		CheckSeq
@@ -230,7 +246,7 @@ class ViralSeq():
 			raise KeyError
 		ans_str = '%(name)s\t%(annot)s' % {'name':self.seq_name, 
 						'annot':str(self.feature_annot[-1])}
-		logging.debug( ans_str)
+		#logging.debug( ans_str)
 		
 	def FindEqAnnot(self, WANTED_ANNOT, POS_FUDGE, IS_LIST = False):
 		"""
@@ -409,6 +425,21 @@ class ViralSeq():
 		avg_find = numpy.sum(all_checks, axis=1)
 		
 		return avg_find > CHECK_CUTOFF
+		
+	def WriteFeatures(self, FEAT_LIST, FILE_HANDLE, FUDGE_FACTOR = 50, 
+						NUM_CHECKS = 3, CHECK_CUTOFF = 1):
+		"""
+		Writes the feature list to a file-handle
+		"""
+		
+		found_feats = self.CheckFeatures(FEAT_LIST, FUDGE_FACTOR, 
+											NUM_CHECKS = NUM_CHECKS,
+											CHECK_CUTOFF = CHECK_CUTOFF)
+		
+		found_feats = map(lambda x: str(x), found_feats.tolist())
+		
+		FILE_HANDLE.write(string.join(found_feats, '\t') + '\n')
+		
 		
 		
 		
