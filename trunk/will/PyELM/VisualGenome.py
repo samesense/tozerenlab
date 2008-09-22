@@ -1,6 +1,6 @@
 from __future__ import with_statement
 import optparse, sys, os, string, pickle, logging, ConfigParser, types
-import HIVDatabase, PyVirus, AnnotUtils
+import HIVDatabase, PyVirus, AnnotUtils, PatUtils
 import pylab
 
 from Bio import SeqIO
@@ -30,6 +30,11 @@ def Fasta2ViralSeq(INPUT_FILE, WANTED_SUBS, PICT_FILE):
 	with open(INPUT_FILE) as handle:
 		for this_seq in SeqIO.parse(handle, 'fasta'):
 			this_virus = PyVirus.ViralSeq(this_seq, None)
+			
+			########DEBUG VALUE!!!!!!!!!!!!!!!!!!
+			this_virus.tested_subtype = 'DEBUG'
+			
+			
 			logging.debug('read sequence:' + this_virus.seq_name)
 			subtype_count[this_virus.tested_subtype] += 1
 			if WANTED_SUBS == None:
@@ -106,6 +111,23 @@ def ParseOptions(INPUT_STRING):
 						default = None)
 	
 	parser.add_option_group(seq_group)
+	
+	pat_group = optparse.OptionGroup(parser, 'Patient Options')
+	
+	pat_group.add_option('--pat_direc',
+					dest = 'pat_direc',
+					default = None,
+					type = 'string',
+					help = 'The full path to a directory of patient sequences')
+	pat_group.add_option('--sd_method',
+					dest = 'sd_method',
+					default = False,
+					action = 'store_true',
+					help = 'Use the SD method for determining responders')
+					
+	
+	
+	
 	
 	#options for types of outputs
 	feat_group = optparse.OptionGroup(parser, 'Feature Outputs')
@@ -190,7 +212,24 @@ def ParseOptions(INPUT_STRING):
 							type = 'string',
 							help = 'Location to output Alignment Figure')
 	
+	fig_group.add_option('--clin_fig',
+							dest = 'clin_fig',
+							default = None,
+							type = 'string',
+					help = 'Location to output the Clinical Timecourse figure')
+	
 	parser.add_option_group(fig_group)
+	
+	out_feat_group = optparse.OptionGroup(parser, 'Feature Output')
+	
+	out_feat_group.add_option('--base_name',
+								dest = 'base_name',
+								default = 'feature',
+								type = 'string',
+								help = 'The base name to save feature-lists')
+	
+	parser.add_option_group(out_feat_group)
+	
 	
 	(options, args) = parser.parse_args(INPUT_STRING)
 	
@@ -222,6 +261,10 @@ class VisualController():
 		self.args = ARGS
 		self.outconfig = ConfigParser.ConfigParser()
 		
+		self.test_seqs = None
+		self.pat_base = None
+		
+		
 		self.LoadData()
 		self.ProcessOptions()
 	
@@ -237,16 +280,22 @@ class VisualController():
 				self.test_seqs += Fasta2ViralSeq(this_file, 
 												self.options.wanted_subs,
 												self.options.sub_figure)
-		else:
+		elif type(self.options.input_fasta) == types.StringType:
 			self.test_seqs = Fasta2ViralSeq(self.options.input_fasta, 
 												self.options.wanted_subs,
 												self.options.sub_figure)
+		
 		logging.warning('%(num)d sequences read' % {'num': len(self.test_seqs)})
 		#log the output
 		logging.debug('Logging the output')
 		self.outconfig.set('DEFAULT', 'sub_figure', self.options.sub_figure)
 		self.outconfig.set('DEFAULT', 'wanted_seqs', len(self.test_seqs))
-	
+		
+		if self.options.pat_direc != None:
+			logging.warning('Reading Patient Sequences')
+			self.pat_base = PatUtils.PatBase()
+			self.pat_base.ReadDirec(self.options.pat_direc)
+			logging.warning('Done reading Patient Sequences')
 	
 	
 	def ProcessOptions(self):
@@ -266,7 +315,19 @@ class VisualController():
 		self.mapping_base.BuildRefBase()
 		
 		logging.warning('Adding sequences to the Shelf')
-		self.mapping_base.AddtoShelf(self.test_seqs)
+		if len(self.test_seqs) != 0:
+			self.mapping_base.AddtoShelf(self.test_seqs)
+		
+		if self.pat_base != None:
+			logging.warning('Adding Patient Sequences to the shelf')
+			self.mapping_base.AddtoShelf(self.pat_base.values())
+		if self.options.clin_fig != None:
+			self.pat_base.PatTimeCourseFig(self.options.clin_fig)
+			self.outconfig.set('DEFAULT', 'ClinicalTimcourseFigure', 
+								self.options.clin_fig)
+			
+		
+		
 		
 	def run(self):
 		"""
@@ -290,14 +351,47 @@ class VisualController():
 									self.options.hom_flag, True, 
 									ref_base.ref_seqs[0].seq_name)
 		
+		if self.options.mirna_flag:
+			ref_base.ref_seqs[0].HumanMiRNAsite(calib_dict)
+		if self.options.elm_flag:
+			ref_base.ref_seqs[0].FindELMs(elm_dict)
+		if self.options.tf_flag:
+			ref_base.ref_seqs[0].FindTFSites()
+		if self.options.hom_flag:
+			ref_base.ref_seqs[0].FindHomIslands(ref_base.ref_seqs[0])
+		
+		
+		resp_name = self.options.out_direc + self.options.base_name + '_resp.txt'
+		nonresp_name = self.options.out_direc + self.options.base_name + '_nonresp.txt'
+		annot_name = self.options.out_direc + self.options.base_name + '_description.txt'
+		
+		with open(resp_name, mode = 'w') as handle:
+			for this_pat in self.pat_base.ResponderGen(METHOD = self.options.sd_method):
+				this_pat.WriteFeatures(ref_base.ref_seqs[0].feature_annot, handle)
+		
+		with open(nonresp_name, mode = 'w') as handle:
+			for this_pat in self.pat_base.NonResponderGen(METHOD = self.options.sd_method):
+				this_pat.WriteFeatures(ref_base.ref_seqs[0].feature_annot, handle)
+		
+		with open(annot_name, mode = 'w') as handle:
+			for this_feat in ref_base.ref_seqs[0].feature_annot:
+				handle.write(str(this_feat) + '\n')
+				
+		
+		
+		filter_fun = lambda x: x.CheckRange('HumanMiRNA', None)
+		
 		(gene_fig, prot_fig) = self.mapping_base.MakeMultiDiagram(ref_base.ref_seqs[0].seq_name,
-															self.options.wanted_subs)
+															self.options.wanted_subs,
+															ANCHOR_FILT = filter_fun)
 		
 		if self.options.align_fig != None:
 			gene_fig.draw(format = 'linear', fragments = 1)
 			gene_fig.write(self.options.align_fig, 'PDF')
 		
 		self.outconfig.set('DEFAULT', 'AlignmentFigure', self.options.align_fig)
+		
+		
 
 	def FinalCleanup(self):
 		"""

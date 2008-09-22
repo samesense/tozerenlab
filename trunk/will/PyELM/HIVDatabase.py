@@ -143,8 +143,9 @@ class MappingBase():
 		self.my_map_shelf = {}
 		
 		logging.debug('Testing shelf: ' + self.my_test_shelf_name)
-		self.my_test_shelf = shelve.DbfilenameShelf(self.my_test_shelf_name, 
-													protocol = 2)
+		#self.my_test_shelf = shelve.DbfilenameShelf(self.my_test_shelf_name, 
+		#											protocol = 2)
+		self.my_test_shelf = {}
 		self.test_names = self.my_test_shelf.keys()
 
 	
@@ -233,8 +234,8 @@ class MappingBase():
 		"""
 		#reg_exp gets the Genbank ID from the header
 		checker = re.compile('.*?\|(\w{1,2}\d*\.\d*).*')
-		
-		this_bkgseq = PyVirus.BkgSeq(SEQ_RECORD, None)
+		this_bkgseq = SEQ_RECORD
+		#this_bkgseq = PyVirus.BkgSeq(SEQ_RECORD, None)
 		if not(this_bkgseq.seq_name in self.test_names):
 			self.test_names.append(this_bkgseq.seq_name)
 			self.my_test_shelf[this_bkgseq.seq_name] = this_bkgseq
@@ -317,7 +318,8 @@ class MappingBase():
 				start_pos += best_pos
 				
 				
-	def MakeMultiDiagram(self, WANTED_REF, WANTED_SUBTYPES, FORCE = False):
+	def MakeMultiDiagram(self, WANTED_REF, WANTED_SUBTYPES, FORCE = False, 
+							ANCHOR_FILT = None, DISPLAY_FILTER = None):
 		"""
 		Uses GenomeDiagram to create a multi-genome figure.
 		"""
@@ -343,34 +345,19 @@ class MappingBase():
 		prot_tack = this_prot_figure.new_track(1, scale=0).new_set('feature')
 		this_ref.WriteGenesToDiagram(prot_tack, PROT = True)
 		
-		#self.AnnotateBase(CALIB_DICT, ELM_DICT, FORCE, WANTED_REF)
-		
-		#this_ref.HumanMiRNAsite(CALIB_DICT)
-		#this_ref.FindELMs(ELM_DICT)
-		#this_ref.FindHomIslands(this_ref)
-		#this_ref.FindTFSites()
-		
-		#guess which feature
-		#cached_seqs = self.my_test_shelf.values()
 		logging.debug('Annotating features')
-		all_features = []
-		for this_seq in self.test_names:
-			bkg_seq = self.my_test_shelf[this_seq]
-			for this_annot in bkg_seq.feature_annot:
-				if this_annot.CheckRange('ELM', 1000):
-					all_features.append(this_annot)
-				#if this_annot.CheckRange('HumanMiRNA', 7000):
-					#all_features.append(this_annot)
+		all_features = filter(ANCHOR_FILT, this_ref.feature_annot)
 		
 		obj_vals = numpy.zeros((1,len(all_features)), dtype=numpy.uint16)
 		
 		logging.debug('Finding alignment features')
+		logging.debug(str(len(all_features)) + ':' + str(len(this_ref.feature_annot)))
 		current_min_val = 5000000
 		current_annot = None
 		pos_fun = lambda x: abs(x[0].start - x[1].start)
 		for this_seq in self.test_names:
 			bkg_seq = self.my_test_shelf[this_seq]
-			
+			logging.debug('Checking Seq:' + this_seq)
 			for i in xrange(len(all_features)):
 				this_annot = all_features[i]
 				poss_annot = bkg_seq.FindEqAnnot(this_annot, 300)
@@ -423,7 +410,8 @@ class MappingBase():
 				#this_prot_track = this_prot_figure.new_track(1, scale=0).new_set('feature')
 				
 				
-				for this_annot in this_bkg_seq.feature_annot:
+				for this_annot in filter(DISPLAY_FILTER, 
+										this_bkg_seq.feature_annot):
 				
 					# start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
 																	# this_annot.end)
@@ -494,7 +482,7 @@ class MappingBase():
 				
 			
 			
-			#SEQ.DetSubtype()
+			SEQ.DetSubtype()
 			
 			#make sure only one thread writes to the dictionary at a time
 			#otherwise significant crap-age will happen
@@ -506,8 +494,11 @@ class MappingBase():
 		worker_seph = threading.Semaphore(WANTED_THREADS)
 		all_threads = []
 		
+		
+		
 		for this_name in self.test_names:
 			worker_seph.acquire()
+			logging.debug('Annotating: ' + this_name)
 			with annot_lock:
 				#make sure only one thread writes to the dictionary at a time
 				#otherwise significant crap-age will happen
