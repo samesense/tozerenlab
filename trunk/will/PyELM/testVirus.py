@@ -292,6 +292,7 @@ def testCheckFeatures():
 	
 	test_seq = ref_base.ref_seqs[0]
 	test_seq.FindELMs(ELM_DICT)
+	test_seq.FindTFSites()
 	
 	
 	
@@ -322,7 +323,7 @@ def CheckCheckFeatures(TEST_SEQ, BOOL_ARRAY):
 	
 	#TEST_SEQ.feature_annot = TEST_SEQ.feature_annot.pop(feats)
 	
-	output_array = TEST_SEQ.CheckFeatures(testing_features, 50)
+	output_array = TEST_SEQ.CheckFeatures(testing_features, 100)
 	
 	
 	TP = numpy.sum(output_array[BOOL_ARRAY[0]])
@@ -340,7 +341,7 @@ def CheckCheckFeatures(TEST_SEQ, BOOL_ARRAY):
 	f = 2 * float(pre * rec) / float(pre + rec)
 	
 	
-	nose.tools.assert_true(f > 0.8, 
+	nose.tools.assert_true(f > 0.9, 
 		'Found: F-Measure: %(F)f TP:%(TP)d, FP:%(FP)d, TN:%(TN)d, FN:%(FN)d'%\
 		{'TP': TP, 'FP': FP, 'TN': TN, 'FN': FN, 'F':f})
 	

@@ -234,7 +234,7 @@ class ViralSeq():
 			self.feature_annot.append(HomIsland(SEQ, POS[0], POS[1], HOM))
 			self.feature_annot_type['HomIsland'] = True
 		elif TYPE == 'MIRNA':
-			self.feature_annot.append(HumanMiRNA(NAME, POS[0], POS[1], 1.0))
+			self.feature_annot.append(HumanMiRNA(NAME, POS[0], POS[1], HOM))
 			self.feature_annot_type['MIRNA'] = True
 		elif TYPE == 'ELM':
 			self.feature_annot.append(ELM(NAME, POS[0], POS[1], None))
@@ -281,7 +281,7 @@ class ViralSeq():
 			return
 		
 		
-	def HumanMiRNAsite(self, CALIB_DICT, NUM_THREADS = 10):
+	def HumanMiRNAsite(self, CALIB_DICT, P_VAL = 0.05, NUM_THREADS = 10):
 		"""
 		HumanMiRNAsite
 			Annotates the sites where human miRNA could potentially bind.  
@@ -305,9 +305,13 @@ class ViralSeq():
 				#need a lock because we are modifying lists and dictionaries 
 				#in weird ways on the other side of the function call
 				for this_spot in output_list:
+					if this_spot[2] > P_VAL:
+						logging.debug('Skipping miRNA: ' + str(this_spot))
+						continue
 					this_val = (this_spot[0], 
 									this_spot[0] + len(THIS_CALIB[0]))
-					self.LogAnnotation('MIRNA', this_val, None, None, 
+					
+					self.LogAnnotation('MIRNA', this_val, None, this_spot[2], 
 										MI_RNA_NAME)
 			worker_seph.release()
 			return
@@ -353,8 +357,7 @@ class ViralSeq():
 										None, None, this_ELM)
 					
 					self.feature_annot[-1].GeneAnnot(this_gene_name, 
-									rel_start + spot.start(), 
-									rel_start + spot.end())
+									spot.start(), spot.end())
 					spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq, 
 														spot.start() + 1)
 		self.feature_annot_type['ELM'] = True
