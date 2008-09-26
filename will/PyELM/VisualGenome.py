@@ -365,21 +365,39 @@ class VisualController():
 		nonresp_name = self.options.out_direc + self.options.base_name + '_nonresp.txt'
 		annot_name = self.options.out_direc + self.options.base_name + '_description.txt'
 		
+		
+		#color_list = map(lambda x: x.DetermineResponder('WND'), self.pat_base.values())
+		
+		t_resp_count = 0
+		t_non_resp = 0
+		resp = []
+		non_resp = []
+		for this_val in self.pat_base.values():
+			if this_val.DetermineResponder('WND'):
+				t_resp_count += 1
+				resp.append(this_val)
+			else:
+				t_non_resp += 1
+				non_resp.append(this_val)
+		logging.debug('Test Found %(r)d responders and %(nr)d non-resp' % \
+						{'r':t_resp_count, 'nr':t_non_resp})
+		
+		
 		with open(resp_name, mode = 'w') as handle:
-			for this_pat in self.pat_base.ResponderGen(METHOD = self.options.sd_method):
+			for this_pat in resp:
 				this_pat.WriteFeatures(ref_base.ref_seqs[0].feature_annot, handle)
 		
 		with open(nonresp_name, mode = 'w') as handle:
-			for this_pat in self.pat_base.NonResponderGen(METHOD = self.options.sd_method):
+			for this_pat in non_resp:
 				this_pat.WriteFeatures(ref_base.ref_seqs[0].feature_annot, handle)
 		
 		with open(annot_name, mode = 'w') as handle:
 			for this_feat in ref_base.ref_seqs[0].feature_annot:
 				handle.write(str(this_feat) + '\n')
-				
 		
 		
-		filter_fun = lambda x: x.CheckRange('HumanMiRNA', None)
+		#filter_fun = lambda x: x.CheckRange('HumanMiRNA', None)
+		filter_fun = None
 		
 		(gene_fig, prot_fig) = self.mapping_base.MakeMultiDiagram(ref_base.ref_seqs[0].seq_name,
 															self.options.wanted_subs,

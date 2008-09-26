@@ -369,7 +369,15 @@ class MappingBase():
 		best_inds = obj_vals.argsort()
 		anchors = []
 		#for i in xrange(1):
-		anchors = copy.deepcopy(all_features[best_inds[0,0]])
+		
+		try:
+			anchors = copy.deepcopy(all_features[best_inds[0,0]])
+		except IndexError:
+			if ANCHOR_FILT != None:
+				raise IndexError, 'The AnchorFilter is too restrictive.'
+			else:
+				raise IndexError, 'The Features were never annotated properly.'
+			
 		#anchors = copy.deepcopy(all_features[best_inds.tolist()])
 		del(obj_vals)
 		del(all_features)
@@ -408,8 +416,6 @@ class MappingBase():
 				
 				this_gene_track = this_gene_figure.new_track(1, scale=0).new_set('feature')
 				#this_prot_track = this_prot_figure.new_track(1, scale=0).new_set('feature')
-				
-				
 				for this_annot in filter(DISPLAY_FILTER, 
 										this_bkg_seq.feature_annot):
 				
@@ -424,6 +430,9 @@ class MappingBase():
 					if new_annot != None:
 						this_gene_track.add_feature(new_annot.GetSeqFeature(), 
 											colour = new_annot.color)
+						if new_annot.start > 9000:
+							logging.warning('bad_mapping seq: %(name)s old: %(old)s : %(new)s' % \
+								{'name':this_bkg_seq.seq_name, 'old': str(this_annot), 'new':str(new_annot)})
 					#print (str(this_annot), str(new_annot))
 					#if this_annot.type == 'ELM':
 					#	this_prot_track.add_feature(this_annot.GetSeqFeature_PROT(),
