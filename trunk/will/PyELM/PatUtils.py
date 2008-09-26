@@ -96,6 +96,61 @@ class PatSeq(PyVirus.ViralSeq):
 		return SeqRecord(Seq(self.my_sequence, generic_nucleotide),
 						 id = str(self.study) + ':' + str(self.pat_id))
 	
+	def TranslateAll(self, REFBASE, WANTED_REF = None):
+		"""
+		TranslateAll
+				Uses a BLASTx query to determine the which ORFs
+		correspond to HIV-1 proteins.  It then stores the data in a
+		dictionary keyed by "genename".
+		"""
+		blast_record = REFBASE.BLASTx(self.GenomeToBioPython())
+		gene_dict = {}
+		reg = re.compile('.*?\|(.*?):(\w{3}).*')
+		aa_start = 0
+		for this_check in blast_record.alignments:
+			label = reg.match(this_check.title).groups()
+			this_gene = str(label[1])
+			this_ref = str(label[0])
+			if (WANTED_REF != None) & (this_ref != WANTED_REF):
+				#make sure we translate "in context" of a reference
+				continue
+			if this_check.hsps[0].score < 900:
+				continue
+			if not(gene_dict.has_key(this_gene)):
+				ref_gene = REFBASE[this_ref].annotation[this_gene]
+				
+				aa_seq = str(this_check.hsps[0].query)
+				start_pos = this_check.hsps[0].query_start
+				end_pos = start_pos + this_check.length*3
+				nt_seq = self.my_sequence[start_pos:end_pos]
+				
+				whole_genome_start_pos = start_pos + ref_gene.start#ref_gene.start
+				whole_genome_end_pos = whole_genome_start_pos + this_check.length*3
+				
+				
+				gene = Gene(this_gene, this_gene.upper(),
+							nt_seq, aa_seq, start_pos, 
+							end_pos)
+				gene.GeneAnnot(None, aa_start, aa_start + len(aa_seq))
+				
+				aa_start += len(aa_seq)
+				gene_dict[this_gene] = gene
+			#end indent back
+				# view_str = '%(seq)s:%(gene)s\n%(this)s\n%(ref)s' % \
+								# {'seq':self.seq_name, 'gene':this_gene,
+								# 'this':aa_seq,'ref':ref_gene.aa_seq}
+				
+				# logging.debug(view_str)
+				
+				
+		self.annotation = gene_dict
+		self.SetOffset(REFBASE[WANTED_REF])
+	
+	
+	
+	
+	
+	
 	def SetOffset(self, REF_SEQ):
 		"""
 		Uses a REF_SEQ to create an offset for all features.  Currently uses
@@ -103,18 +158,42 @@ class PatSeq(PyVirus.ViralSeq):
 		Currently only works with SINGLE proteins in each sequence.
 		"""
 		
-		offset = 0
+		offset = None
+		last_gene = None
 		for this_gene in REF_SEQ.annotation:
 			if this_gene in self.annotation:
-				offset = REF_SEQ.annotation[this_gene].start - \
+				this_offset = REF_SEQ.annotation[this_gene].start - \
 								self.annotation[this_gene].start
-				break
-		self.annotation[this_gene].start += offset
-		self.annotation[this_gene].end += offset
+				if last_gene == None:
+					last_gene = this_gene
+					offset = this_offset
+				else:
+					warn_str = '%(seq)s:too many genes mapped:%(this)s:%(last)s' \
+						% {'seq':self.seq_name, 'this':this_gene, 'last':last_gene}
+					logging.warning(warn_str)
+					
+					if this_offset < offset:
+						last_gene = this_gene
+						offset = this_offset
+					
+					
+					
+				
 		
-		self.offset = offset
-		self.final_pos = self.annotation[this_gene].end
+		if last_gene == None:
+			warn_str = '%(seq)s:had no genes:PAT:%(my_genes)s:REF:%(ref_genes)s' \
+						% {'seq':self.seq_name, 'my_genes':str(self.annotation.keys()), 
+								'ref_genes':str(REF_SEQ.annotation.keys())}
+			logging.warning(warn_str)
+			self.offset = 0
+		else:
+			self.annotation[last_gene].start += offset
+			self.annotation[last_gene].end += offset
+			
+			self.offset = offset
+			self.final_pos = self.annotation[last_gene].end
 		
+		logging.debug(self.seq_name + ':offset:' + str(self.offset))
 	
 	def LogAnnotation(self, TYPE, POS, SEQ, HOM, NAME):
 		"""
@@ -127,30 +206,39 @@ class PatSeq(PyVirus.ViralSeq):
 		if self.offset == None:
 			raise AttributeError, 'Offset is not set properly'
 		
-		if TYPE == 'Annot':
-			self.feature_annot.append(Annot(NAME, self.offset + POS[0], 
-										self.offset + POS[1], None))
+		if (type(POS) != types.TupleType):
+			try:
+				type(POS.type) == types.StringType
+			except AttributeError:
+				raise TypeError, 'If POS is not a tuple then it must be an ANNOT'
+			new_feat = POS
+			new_feat.start += self.offset
+			new_feat.end += self.offset
+		elif TYPE == 'Annot':
+			new_feat = Annot(NAME, self.offset + POS[0], 
+								self.offset + POS[1], None)
 		elif TYPE == 'HomIsland':
-			self.feature_annot.append(HomIsland(SEQ, self.offset + POS[0], 
-										self.offset + POS[1], HOM))
-			self.feature_annot_type['HomIsland'] = True
+			new_feat = HomIsland(SEQ, self.offset + POS[0], 
+									self.offset + POS[1], HOM)
 		elif TYPE == 'MIRNA':
-			self.feature_annot.append(HumanMiRNA(NAME, self.offset + POS[0], 
-										self.offset + POS[1], 1.0))
-			self.feature_annot_type['MIRNA'] = True
+			new_feat = HumanMiRNA(NAME, self.offset + POS[0], 
+									self.offset + POS[1], HOM)
 		elif TYPE == 'ELM':
-			self.feature_annot.append(ELM(NAME, self.offset + POS[0], 
-										self.offset + POS[1], None))
-			self.feature_annot_type['ELM'] = True
+			new_feat = ELM(NAME, self.offset + POS[0], 
+							self.offset + POS[1], None)
 		elif TYPE == 'TF':
-			self.feature_annot.append(TFSite(NAME, self.offset + POS[0], 
-										self.offset + POS[1], HOM))
-			self.feature_annot_type['TF'] = True
+			new_feat = TFSite(NAME, self.offset + POS[0], 
+								self.offset + POS[1], HOM)
 		else:
 			raise KeyError
-		ans_str = '%(name)s\t%(annot)s' % {'name':self.seq_name, 
-						'annot':str(self.feature_annot[-1])}
-		#logging.debug( ans_str)
+		
+		if new_feat.start > 8000:
+			logging.warning('Bad feat found:%(name)s:%(bad)s' % {'name':self.seq_name, 'bad':str(new_feat)})
+		else:
+			logging.warning('Good feat found:%(name)s:%(bad)s' % {'name':self.seq_name, 'bad':str(new_feat)})
+		bisect.insort(self.feature_annot, new_feat)
+		self.feature_annot_type[new_feat.type] = True
+		
 		
 	def AnnotateClinical(self, DELTA_T, TYPE, VAL):
 		"""
@@ -309,15 +397,30 @@ class PatSeq(PyVirus.ViralSeq):
 		avg_find = numpy.sum(all_checks, axis=1)
 		
 		found = avg_find > CHECK_CUTOFF
-		found = found.astype(None)
 		
+		return found
+		
+	def WriteFeatures(self, FEAT_LIST, FILE_HANDLE, FUDGE_FACTOR = 50, 
+						NUM_CHECKS = 3, CHECK_CUTOFF = 1):
+		"""
+		Writes the feature list to a file-handle
+		"""
+		
+		found_feats = self.CheckFeatures(FEAT_LIST, FUDGE_FACTOR, 
+											NUM_CHECKS = NUM_CHECKS,
+											CHECK_CUTOFF = CHECK_CUTOFF)
+		
+		trans_dict = {True: '1', False: '0'}
+		found_feats = map(lambda x: trans_dict[x], found_feats.tolist())
 		
 		for this_feat in xrange(len(FEAT_LIST)):
 			if FEAT_LIST[this_feat].start + FUDGE_FACTOR < self.offset:
-				found[this_feat] = numpy.nan
-			if FEAT_LIST[this_feat].start - FUDGE_FACTOR > self.final_pos:
-				found[this_feat] = numpy.nan
-		return found
+				FILE_HANDLE.write('NaN\t')
+			elif FEAT_LIST[this_feat].start - FUDGE_FACTOR > self.final_pos:
+				FILE_HANDLE.write('NaN\t')
+			else:
+				FILE_HANDLE.write(found_feats[this_feat] + '\t')
+		FILE_HANDLE.write('\n')
 	
 class PatBase(collections.defaultdict):
 	"""
@@ -341,17 +444,17 @@ class PatBase(collections.defaultdict):
 		"""
 		A generator which returns all of the responders from the PatBase
 		"""
-		for this_pat in self:
-			if self[this_pat].DetermineResponder(METHOD):
-				yield self[this_pat]
+		for this_pat in self.values():
+			if this_pat.DetermineResponder(METHOD) == True:
+				yield this_pat
 	
 	def NonResponderGen(self, METHOD = 'WND'):
 		"""
 		A generator which returns all of the NON-responders from the PatBase
 		"""
-		for this_pat in self:
-			if not(self[this_pat].DetermineResponder(METHOD)):
-				yield self[this_pat]
+		for this_pat in self.values():
+			if this_pat.DetermineResponder(METHOD) == False:
+				yield this_pat
 	
 	
 	
@@ -472,6 +575,20 @@ class PatBase(collections.defaultdict):
 		pat_list = self.keys()
 		
 		color_list = map(lambda x: x.DetermineResponder('WND'), self.values())
+		
+		logging.debug('checking: ' + str(color_list))
+		
+		resp_count = 0
+		non_resp = 0
+		for this_val in self.values():
+			if this_val.DetermineResponder('WND'):
+				resp_count += 1
+			else:
+				non_resp += 1
+		logging.debug('Found %(r)d responders and %(nr)d non-resp' % \
+						{'r':resp_count, 'nr':non_resp})
+		
+		
 		
 		text_dict = {'size':'smaller'}
 		

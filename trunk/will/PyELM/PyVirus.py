@@ -5,6 +5,7 @@ import subprocess
 import tempfile
 import threading
 import time
+import types
 import string
 import os
 import re
@@ -13,6 +14,7 @@ import Queue
 import PyBLAST
 import string
 import numpy
+import bisect
 from Bio import SeqIO
 from Bio import SeqFeature as SeqFeatClass
 #a hack but the only way I can get everything to work right
@@ -144,6 +146,8 @@ class ViralSeq():
 			if (WANTED_REF != None) & (this_ref != WANTED_REF):
 				#make sure we translate "in context" of a reference
 				continue
+			if this_check.hsps[0].score < 900:
+				continue
 			if not(gene_dict.has_key(this_gene)):
 				aa_seq = str(this_check.hsps[0].query)
 				start_pos = this_check.hsps[0].query_start
@@ -152,8 +156,11 @@ class ViralSeq():
 				gene = Gene(this_gene, this_gene.upper(),
 							nt_seq, aa_seq, start_pos, end_pos)
 				gene.GeneAnnot(None, aa_start, aa_start + len(aa_seq))
+				
 				aa_start += len(aa_seq)
 				gene_dict[this_gene] = gene
+			
+			#end indent back
 		self.annotation = gene_dict
 		
 		self.SetOffset(REFBASE.GetRefSeq(WANTED_REF))
@@ -228,25 +235,29 @@ class ViralSeq():
 			does not apply
 		"""
 		
-		if TYPE == 'Annot':
-			self.feature_annot.append(Annot(NAME, POS[0], POS[1], None))
+		if (type(POS) != types.TupleType):
+			try:
+				type(POS.type) == types.StringType
+			except AttributeError:
+				raise TypeError, 'If POS is not a tuple then it must be an ANNOT'
+			new_feat = POS
+		elif TYPE == 'Annot':
+			new_feat = Annot(NAME, POS[0], POS[1], None)
 		elif TYPE == 'HomIsland':
-			self.feature_annot.append(HomIsland(SEQ, POS[0], POS[1], HOM))
-			self.feature_annot_type['HomIsland'] = True
+			new_feat = HomIsland(SEQ, POS[0], POS[1], HOM)
 		elif TYPE == 'MIRNA':
-			self.feature_annot.append(HumanMiRNA(NAME, POS[0], POS[1], HOM))
-			self.feature_annot_type['MIRNA'] = True
+			new_feat = HumanMiRNA(NAME, POS[0], POS[1], HOM)
 		elif TYPE == 'ELM':
-			self.feature_annot.append(ELM(NAME, POS[0], POS[1], None))
+			new_feat = ELM(NAME, POS[0], POS[1], None)
 			self.feature_annot_type['ELM'] = True
 		elif TYPE == 'TF':
-			self.feature_annot.append(TFSite(NAME, POS[0], POS[1], HOM))
-			self.feature_annot_type['TF'] = True
+			new_feat = TFSite(NAME, POS[0], POS[1], HOM)
 		else:
 			raise KeyError
-		ans_str = '%(name)s\t%(annot)s' % {'name':self.seq_name, 
-						'annot':str(self.feature_annot[-1])}
-		#logging.debug( ans_str)
+		
+		bisect.insort(self.feature_annot, new_feat)
+		self.feature_annot_type[new_feat.type] = True
+		
 		
 	def FindEqAnnot(self, WANTED_ANNOT, POS_FUDGE, IS_LIST = False):
 		"""
@@ -306,7 +317,6 @@ class ViralSeq():
 				#in weird ways on the other side of the function call
 				for this_spot in output_list:
 					if this_spot[2] > P_VAL:
-						logging.debug('Skipping miRNA: ' + str(this_spot))
 						continue
 					this_val = (this_spot[0], 
 									this_spot[0] + len(THIS_CALIB[0]))
@@ -352,12 +362,14 @@ class ViralSeq():
 			for this_ELM in ELM_DICT:
 				spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq)
 				while spot != None:
-					self.LogAnnotation('ELM', (start_pos + spot.start(), 
-												start_pos + spot.end()), 
-										None, None, this_ELM)
+					new_elm = ELM(this_ELM, start_pos + spot.start(), 
+									start_pos + spot.end(), None)
 					
-					self.feature_annot[-1].GeneAnnot(this_gene_name, 
+					new_elm.GeneAnnot(this_gene_name, 
 									spot.start(), spot.end())
+					
+					self.LogAnnotation('ELM', new_elm, None, None, this_ELM)
+					
 					spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq, 
 														spot.start() + 1)
 		self.feature_annot_type['ELM'] = True
@@ -439,7 +451,9 @@ class ViralSeq():
 											NUM_CHECKS = NUM_CHECKS,
 											CHECK_CUTOFF = CHECK_CUTOFF)
 		
-		found_feats = map(lambda x: str(x), found_feats.tolist())
+		trans_dict = {True: '1', False: '0'}
+		
+		found_feats = map(lambda x: trans_dict[x], found_feats.tolist())
 		
 		FILE_HANDLE.write(string.join(found_feats, '\t') + '\n')
 		
@@ -569,11 +583,14 @@ class RefBase():
 	def __iter__(self):
 		return iter(self.ref_seqs)
 	
+	def __getitem__(self, KEY):
+		return self.GetRefSeq(KEY)
+	
 	def GetRefSeq(self, WANTED_REF):
 		for this_ref in self.ref_seqs:
 			if this_ref.seq_name == WANTED_REF:
 				return this_ref
-		raise KeyError
+		raise KeyError, "Couldn't find the RefSeq %(k)s" % {'k':WANTED_REF} 
 	
 	def FinalizeAnnotations(self):
 		"""

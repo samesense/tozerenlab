@@ -11,6 +11,8 @@ import os
 import PyMozilla
 import string
 import copy
+import logging
+
 
 class Annot():
 	def __init__(self, NAME, START_POS, END_POS, HOM):
@@ -21,8 +23,19 @@ class Annot():
 		self.color = colors.black
 		self.hom = HOM
 		
+		self.gene = None
+		self.rel_start = None
+		self.rel_stop = None
+		
 	def __str__(self):
-		return str(self.__dict__)
+		out_str = '%(type)s - %(name)s [%(start)d:%(end)d]' % self.__dict__
+		return out_str
+	
+	def __gt__(self, RHS):
+		return self.start > RHS.start
+	
+	def __lt__(self, RHS):
+		return self.start < RHS.start
 	
 	def GetSeqFeature(self):
 		"""
@@ -148,27 +161,25 @@ class Gene(Annot):
 		self.type = 'GENE'
 		self.rel_start = None
 		self.rel_stop = None
-
-	def __str__(self):
-		temp_str = '(Gene Class '
-		temp_str += 'Name: ' + self.name
-		temp_str += ', Start: ' + str(self.start) + ')'
-		return temp_str
-	
 		
 		
 	def __hash__(self):
 		return hash(self.aa_seq)
 		
 class HumanMiRNA(Annot):
-	def __init__(self, NAME, START_POS, END_POS, HOM):
+	def __init__(self, NAME, START_POS, END_POS, P_VAL):
 		self.name = NAME
 		self.start = START_POS
 		self.end = END_POS
 		self.type = 'HumanMiRNA'
 		self.color = colors.blue
-		self.hom = HOM
-
+		self.p_val = P_VAL
+	
+	def __str__(self):
+		out_str = '%(type)s - %(name)s ' % self.__dict__
+		out_str += '[%(start)d:%(end)d] %(p_val)f ' % self.__dict__
+		return out_str
+	
 	def GetSeqFeature_PROT(self):
 		raise NotImplemented
 	def GeneAnnot(self, GENE, REL_START, REL_STOP):
@@ -183,6 +194,12 @@ class HomIsland(Annot):
 		self.end = END_POS
 		self.type = 'HomIsland'
 		self.color = colors.green
+		
+	def __str__(self):
+		out_str = '%(type)s - %(name)s [%(start)d:%(end)d] %(hom)d \%' \
+				% self.__dict__
+		return out_str
+		
 	def GetSeqFeature_PROT(self):
 		raise NotImplemented
 	def GeneAnnot(self, GENE, REL_START, REL_STOP):
@@ -213,6 +230,42 @@ class ELM(Annot):
 		else:
 			self.color = colors.black
 	
+	def __str__(self):
+		out_str = '%(type)s - %(name)s ' % self.__dict__
+		out_str += '[%(start)d:%(end)d] ' % self.__dict__
+		if (self.gene != None) & (self.rel_start != None) & (self.rel_stop != None):
+			out_str += '%(gene)s - [%(rel_start)d:%(rel_stop)d]' % self.__dict__
+		
+		return out_str
+	
+	def FuzzyEquals(self, ANNOT, FUDGE_POS = 1000, AA_FUDGE = 5):
+		"""
+		Returns True if the provided annotation is of the proper type and 
+		within the fudge region.
+		"""
+		
+		if self.name != ANNOT.name:
+			return -1
+		
+		if self.type != ANNOT.type:
+			return -1
+		
+		if (self.gene != None) & (ANNOT.gene != None) & \
+				(self.gene != ANNOT.gene):
+			return -1
+		
+		if (ANNOT.rel_start != None) & (self.rel_start != None):
+			val = abs(ANNOT.rel_start - self.rel_start)
+			if val < AA_FUDGE:
+				return val
+			else:
+				return -1
+		else:
+			val = abs(ANNOT.start - self.start)
+			if val < FUDGE_POS:
+				return val
+			else:
+				return -1
 
 class TFSite(Annot):
 	def __init__(self, NAME, START_POS, END_POS, HOM):
@@ -343,8 +396,11 @@ def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
 		for this_line in all_lines[0:-1]:
 			final_output.append(re.match(output_reg_exp,
 											this_line).groups()[1:])
+			
 		convert_fun = lambda x: [int(x[2]), float(x[0]), float(x[1])]
+		
 		final_output = map(convert_fun, final_output)
+		
 		
 	return final_output
 	
