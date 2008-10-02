@@ -292,7 +292,7 @@ class ViralSeq():
 			return
 		
 		
-	def HumanMiRNAsite(self, CALIB_DICT, P_VAL = 0.05, NUM_THREADS = 10):
+	def HumanMiRNAsite(self, CALIB_DICT, P_VAL = 0.05, NUM_THREADS = 10, ONLY_CHECK = None):
 		"""
 		HumanMiRNAsite
 			Annotates the sites where human miRNA could potentially bind.  
@@ -333,7 +333,12 @@ class ViralSeq():
 		worker_seph = threading.Semaphore(WANTED_THREADS)
 		all_threads = []
 		
-		m_rna_frac = CALIB_DICT.keys()
+		if ONLY_CHECK != None:
+			m_rna_frac = ONLY_CHECK
+			logging.debug('Only checking %(num)d miRNAs' % {'num':len(m_rna_frac)})
+		else:
+			m_rna_frac = CALIB_DICT.keys()
+			logging.debug('Checking all %(num)d miRNAs' % {'num':len(m_rna_frac)})
 		
 		for this_mi_rna in m_rna_frac:
 			worker_seph.acquire()
@@ -457,9 +462,12 @@ class ViralSeq():
 		
 		FILE_HANDLE.write(string.join(found_feats, '\t') + '\n')
 		
-		
-		
-		
+	def DetermineResponder(self, METHOD):
+		"""
+		A stub function to provide compatibility with a PatSeq.
+		ALWAYS RETURNS 2!!!!!
+		"""
+		return 2
 		
 	
 	

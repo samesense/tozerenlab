@@ -21,6 +21,7 @@ import string
 from AnnotUtils import *
 from GenomeDiagram import *
 from reportlab.lib import colors
+from operator import attrgetter
 
 ref_source = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 dest_dir = "C:\\local_blast\\PyELMData\\"
@@ -319,7 +320,8 @@ class MappingBase():
 				
 				
 	def MakeMultiDiagram(self, WANTED_REF, WANTED_SUBTYPES, FORCE = False, 
-							ANCHOR_FILT = None, DISPLAY_FILTER = None):
+							ANCHOR_FILT = None, DISPLAY_FILTER = None, 
+							DISPLAY_GROUPING = None):
 		"""
 		Uses GenomeDiagram to create a multi-genome figure.
 		"""
@@ -348,25 +350,31 @@ class MappingBase():
 		logging.debug('Annotating features')
 		all_features = filter(ANCHOR_FILT, this_ref.feature_annot)
 		
-		obj_vals = numpy.zeros((1,len(all_features)), dtype=numpy.uint16)
+		obj_vals = numpy.zeros((1,len(all_features)))
 		
 		logging.debug('Finding alignment features')
 		logging.debug(str(len(all_features)) + ':' + str(len(this_ref.feature_annot)))
-		current_min_val = 5000000
-		current_annot = None
+		
 		pos_fun = lambda x: abs(x[0].start - x[1].start)
 		for this_seq in self.test_names:
 			bkg_seq = self.my_test_shelf[this_seq]
 			logging.debug('Checking Seq:' + this_seq)
 			for i in xrange(len(all_features)):
 				this_annot = all_features[i]
+				#logging.debug('Checking: %(feat)s' % {'feat':str(this_annot)})
 				poss_annot = bkg_seq.FindEqAnnot(this_annot, 300)
 				if poss_annot != None:
 					obj_vals[0,i] += pos_fun((this_annot, poss_annot))
+					#logging.debug('Comparing with: %(feat)s' % {'feat':str(poss_annot)})
 				else:
-					obj_vals[0,i] += 1000
+					obj_vals[0,i] += 10000
+					#logging.debug('Missing: %(feat)s' % {'feat':str(this_annot)})
+			#logging.debug(str(obj_vals.tolist()))
 		
 		best_inds = obj_vals.argsort()
+		
+		logging.critical('Num annots checked:%(num)d' % {'num':len(obj_vals)})
+		
 		anchors = []
 		#for i in xrange(1):
 		
@@ -382,49 +390,27 @@ class MappingBase():
 		del(obj_vals)
 		del(all_features)
 		
-		subtype_dict = {}
+		group_getter = lambda x: DISPLAY_GROUPING(self.my_test_shelf[x])
 		
-		logging.debug('Finding subtypes')
-		for this_name in self.test_names:
-			
-			this_bkg_seq = self.my_test_shelf[this_name]
-			this_subtype = this_bkg_seq.tested_subtype
-			if subtype_dict.has_key(this_subtype):
-				subtype_dict[this_subtype].append(this_name)
-			else:
-				subtype_dict[this_subtype] = [this_name]
-			
-			#save back into the shelve for faster calculation later
-			self.my_test_shelf[this_name] = this_bkg_seq
+		self.test_names.sort(key = group_getter)
 		
-		if WANTED_SUBTYPES != None:
-			sorted_keys = WANTED_SUBTYPES
-		else:
-			sorted_keys = subtype_dict.keys()
 		counter = 0
 		logging.debug('Adding features to figure')
-		for this_key in sorted_keys:
-			for this_name in subtype_dict[this_key]:
+		for this_key, this_group in itertools.groupby(self.test_names, group_getter):
+			for this_name in this_group:
 				this_bkg_seq = self.my_test_shelf[this_name]
-				#this_mapping = self.my_map_shelf[WANTED_REF + this_name]
 				
 				anchor_eq = this_bkg_seq.FindEqAnnot(anchors, 300, IS_LIST = False)
 				
-				#print 'here'
 				if anchor_eq == None:
+					warn_str = '%(name)s missing eq of %(annot)s' % \
+								{'name':this_bkg_seq.seq_name, 'annot':str(anchors)}
+					logging.warning(warn_str)
 					continue
 				
 				this_gene_track = this_gene_figure.new_track(1, scale=0).new_set('feature')
-				#this_prot_track = this_prot_figure.new_track(1, scale=0).new_set('feature')
 				for this_annot in filter(DISPLAY_FILTER, 
 										this_bkg_seq.feature_annot):
-				
-					# start_pos, end_pos = this_mapping.GetMapping(this_annot.start, 
-																	# this_annot.end)
-					# if (start_pos == 0) & (end_pos == 0):
-						# continue
-					# if start_pos == end_pos:
-						# end_pos += 1
 					
 					new_annot = this_annot.MapMeToUS(anchor_eq, anchors)
 					if new_annot != None:
@@ -433,20 +419,10 @@ class MappingBase():
 						if new_annot.start > 9000:
 							logging.warning('bad_mapping seq: %(name)s old: %(old)s : %(new)s' % \
 								{'name':this_bkg_seq.seq_name, 'old': str(this_annot), 'new':str(new_annot)})
-					#print (str(this_annot), str(new_annot))
-					#if this_annot.type == 'ELM':
-					#	this_prot_track.add_feature(this_annot.GetSeqFeature_PROT(),
-					#									colour = this_annot.color)
+					
 				
-				counter += 1
-				#raise KeyError
-				#if counter > 500:
-					#break
-			#create a seperator
-			#raise KeyError
 			this_gene_figure.new_track(1, name = this_key).new_set('feature')
-			this_prot_figure.new_track(1, name = this_key).new_set('feature')
-		return (this_gene_figure, this_prot_figure)
+		return this_gene_figure
 		
 		
 	def AnnotateBase(self, MiRNA_DICT, ELM_DICT, WANT_TF, WANT_HOM, FORCE, 
@@ -468,11 +444,22 @@ class MappingBase():
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('MIRNA', False)):
 				
-				fil_fun = lambda x: x.type != 'MIRNA'
+				fil_fun = lambda x: x.type != 'HumanMiRNA'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
+				
+				fil_fun = lambda x: x.type == 'HumanMiRNA'
+				
+				name_func = attrgetter('name')
+				
+				wanted_mirnas = filter(fil_fun, self.ref_base[REF_INPUT].feature_annot)
+				wanted_mirnas = map(name_func,wanted_mirnas)
+				
+				
+				
 				if MI_DICT != None:
 					logging.debug('miRNAing: ' + SEQ.seq_name)
-					SEQ.HumanMiRNAsite(MI_DICT, NUM_THREADS = 1)
+					SEQ.HumanMiRNAsite(MI_DICT, NUM_THREADS = 1, 
+										ONLY_CHECK = wanted_mirnas)
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TFSite', False)):
 				fil_fun = lambda x: x.type != 'TFSite'
