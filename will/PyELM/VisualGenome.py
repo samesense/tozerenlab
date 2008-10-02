@@ -343,13 +343,10 @@ class VisualController():
 		if self.options.mirna_flag:
 			with open(self.options.hybrid_calib) as handle:
 				calib_dict = pickle.load(handle)
-			for this_calib in calib_dict.keys()[10:]:
-				junk = calib_dict.pop(this_calib)
+			# for this_calib in calib_dict.keys()[30:]:
+				# junk = calib_dict.pop(this_calib)
 		
 		logging.warning('Beginning Annotation')
-		self.mapping_base.AnnotateBase(calib_dict, elm_dict, self.options.tf_flag, 
-									self.options.hom_flag, True, 
-									ref_base.ref_seqs[0].seq_name)
 		
 		if self.options.mirna_flag:
 			ref_base.ref_seqs[0].HumanMiRNAsite(calib_dict)
@@ -359,6 +356,11 @@ class VisualController():
 			ref_base.ref_seqs[0].FindTFSites()
 		if self.options.hom_flag:
 			ref_base.ref_seqs[0].FindHomIslands(ref_base.ref_seqs[0])
+		
+		
+		self.mapping_base.AnnotateBase(calib_dict, elm_dict, self.options.tf_flag, 
+									self.options.hom_flag, True, 
+									ref_base.ref_seqs[0].seq_name)
 		
 		
 		resp_name = self.options.out_direc + self.options.base_name + '_resp.txt'
@@ -399,9 +401,12 @@ class VisualController():
 		#filter_fun = lambda x: x.CheckRange('HumanMiRNA', None)
 		filter_fun = None
 		
-		(gene_fig, prot_fig) = self.mapping_base.MakeMultiDiagram(ref_base.ref_seqs[0].seq_name,
-															self.options.wanted_subs,
-															ANCHOR_FILT = filter_fun)
+		resp_fun = lambda x:x.DetermineResponder('SD')
+		
+		gene_fig = self.mapping_base.MakeMultiDiagram(ref_base.ref_seqs[0].seq_name,
+														self.options.wanted_subs,
+														ANCHOR_FILT = filter_fun,
+														DISPLAY_GROUPING = resp_fun)
 		
 		if self.options.align_fig != None:
 			gene_fig.draw(format = 'linear', fragments = 1)

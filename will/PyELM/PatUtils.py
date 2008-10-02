@@ -211,9 +211,11 @@ class PatSeq(PyVirus.ViralSeq):
 				type(POS.type) == types.StringType
 			except AttributeError:
 				raise TypeError, 'If POS is not a tuple then it must be an ANNOT'
+			
 			new_feat = POS
-			new_feat.start += self.offset
-			new_feat.end += self.offset
+			if POS.type != 'ELM':
+				new_feat.start += self.offset
+				new_feat.end += self.offset
 		elif TYPE == 'Annot':
 			new_feat = Annot(NAME, self.offset + POS[0], 
 								self.offset + POS[1], None)
@@ -234,8 +236,8 @@ class PatSeq(PyVirus.ViralSeq):
 		
 		if new_feat.start > 8000:
 			logging.warning('Bad feat found:%(name)s:%(bad)s' % {'name':self.seq_name, 'bad':str(new_feat)})
-		else:
-			logging.warning('Good feat found:%(name)s:%(bad)s' % {'name':self.seq_name, 'bad':str(new_feat)})
+		#else:
+			#logging.warning('Good feat found:%(name)s:%(bad)s' % {'name':self.seq_name, 'bad':str(new_feat)})
 		bisect.insort(self.feature_annot, new_feat)
 		self.feature_annot_type[new_feat.type] = True
 		
