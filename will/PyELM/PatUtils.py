@@ -64,7 +64,10 @@ class RXRegimine():
 		self.rx_names = RX_NAMES
 		self.time_started = TIME_STARTED
 		self.time_stopped = TIME_STOPPED
-		
+	
+	def __str__(self):
+		out_str = str(self.rx_names) + ':' + str(self.time_started)
+		return out_str
 
 
 
@@ -90,7 +93,7 @@ class PatSeq(PyVirus.ViralSeq):
 	def GenomeToBioPython(self):
 		"""
 		GenomeToBioPython
-				Returns a generic SeqRecord in the biopython format for
+			Returns a generic SeqRecord in the biopython format for
 		the whole genome sequence.
 		"""
 		return SeqRecord(Seq(self.my_sequence, generic_nucleotide),
@@ -146,7 +149,21 @@ class PatSeq(PyVirus.ViralSeq):
 		self.annotation = gene_dict
 		self.SetOffset(REFBASE[WANTED_REF])
 	
-	
+	def DidTakeDrug(self, DRUG_SET):
+		"""
+		A utility function which will return True if the patient took the
+		drug regimine described in DRUG_SET and false otherwise.
+		"""
+		
+		if len(self.rx_time_line) == 0:
+			print 'No drugs logged'
+		
+		for this_event in self.rx_time_line:
+			if this_event.time_started.days == 0:
+				print this_event
+				if DRUG_SET <= this_event.rx_names:
+					return True
+		return False
 	
 	
 	
@@ -441,23 +458,6 @@ class PatBase(collections.defaultdict):
 		self[KEY] = PatSeq(KEY, None, None, None)
 		return self[KEY]
 		
-	
-	def ResponderGen(self, METHOD = 'WND'):
-		"""
-		A generator which returns all of the responders from the PatBase
-		"""
-		for this_pat in self.values():
-			if this_pat.DetermineResponder(METHOD) == True:
-				yield this_pat
-	
-	def NonResponderGen(self, METHOD = 'WND'):
-		"""
-		A generator which returns all of the NON-responders from the PatBase
-		"""
-		for this_pat in self.values():
-			if this_pat.DetermineResponder(METHOD) == False:
-				yield this_pat
-	
 	
 	
 	def ReadDirec(self, DIREC):

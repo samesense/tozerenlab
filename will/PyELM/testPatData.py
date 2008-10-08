@@ -16,6 +16,7 @@ import logging
 import logging.handlers
 import threading
 import numpy
+import string
 
 
 def testPatRecord():
@@ -175,6 +176,7 @@ def testGetClinVal():
 					% {'L':this_check[1], 'M':this_check[2], 'T':test[0]})
 		
 		
+		
 def testClinFig():
 	"""
 	Test Generating the Clinical Scatter Plot figure
@@ -191,10 +193,88 @@ def testClinFig():
 	fig_name = os.environ['PYTHONSCRATCH'] + 'clin_figure.png'
 	
 	test_base.PatTimeCourseFig(fig_name)
+
+def testDidTakeDrug():
+	"""
+	Test the Drug Checking
+	"""
+			
+			
+	
+	PAT_BASE_DIREC = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\stanfordDBs\\'
+	
+	test_base = PatUtils.PatBase()
+	
+	nose.tools.assert_true(test_base != None, 'Could not load PatBase')
+	
+	test_base.ReadDirec(PAT_BASE_DIREC)
+	
+	present_files = os.listdir(PAT_BASE_DIREC)
+	for this_file in present_files:
+		parts = string.split(this_file, '_')
+		study = parts[0]
+		f_type = parts[-1]
 		
 		
+		if  f_type == 'RX.txt':
+			
+			with open(PAT_BASE_DIREC + this_file) as handle:
+				junk_line = handle.next()
+				parts = string.split(junk_line, '\t')
+				DRUG_START = 5
+				START_IND = 4
+				STOP_IND = 5
+				
+				drug_names = parts[DRUG_START:]
+				
+				
+				
+				for this_line in handle:
+					
+					parts = string.split(this_line, '\t')
+					
+					if float(parts[START_IND]) != 0:
+						continue
+					
+					
+					this_id = int(parts[0])
+					for this_part in zip(parts[DRUG_START:], drug_names):
+						super_set = set()
+						counter = 0
+						if this_part[0] == '1':
+							correct = True
+							super_set.add(this_part[1])
+						else:
+							correct = False
+							counter += 1
+							if counter == 10:
+								counter = 0
+							else:
+								continue
+								
+						test_set = set()
+						test_set.add(this_part[1])
+						
+						yield CheckDidTakeDrug, test_base, this_id, test_set, correct
+					while len(super_set) > 2:
+						yield CheckDidTakeDrug, test_base, this_id, super_set, True
+						super_set.pop()
+					
+					
+def CheckDidTakeDrug(PAT_BASE, PAT_ID, DRUG, CORRECT):
+	
+	bad_str = 'The PatID:%(pat_id)d ' % {'pat_id':PAT_ID}
+	if CORRECT:
+		bad_str += 'did not Log %(drug)s ' % {'drug':DRUG}
+	else:
+		bad_str += 'Logged %(drug)s ' % {'drug':DRUG}
 		
-		
+	nose.tools.assert_true(PAT_BASE[PAT_ID].DidTakeDrug(DRUG) == CORRECT,
+							bad_str)
+	
+	
+	
+	
 		
 		
 		
