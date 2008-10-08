@@ -392,6 +392,7 @@ class ViralSeq():
 									this_annot.seq, this_annot.hom, None)
 				spot = string.find(self.my_sequence, this_annot.seq, spot+1)
 		self.feature_annot_type['HomIsland'] = True
+	
 	def FindTFSites(self):
 		"""
 		Makes a call to AnnotUtils.TFChecker to annotate the transcription 
@@ -406,6 +407,19 @@ class ViralSeq():
 				self.LogAnnotation('TF', spot, this_annot[4], 
 									this_annot[3], this_annot[6])
 		self.feature_annot_type['TF'] = True
+	
+	def FindPFAMSites(self, DICT_OBJ, DICT_LOCK):
+		"""
+		Makes a call to AnnotUtils.PFAMChecker to annotate the transcription 
+		factor binding sites.  It will then call LogAnnotation to add the data
+		to the object.
+		"""
+		output = PFAMChecker(self.annotation.values(), DICT_OBJ, DICT_LOCK)
+		
+		if len(output) > 0:
+			for this_annot in output:
+				self.LogAnnotation('PFAM', this_annot, None, None, None)
+		self.feature_annot_type['PFAM'] = True
 	
 	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR, NUM_CHECKS = 3, 
 									CHECK_CUTOFF = 1):

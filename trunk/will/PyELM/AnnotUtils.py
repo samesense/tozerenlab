@@ -8,7 +8,7 @@ import itertools
 import subprocess
 import re
 import os
-import PyMozilla
+import PyMozilla, PyPFAM
 import string
 import copy
 import logging
@@ -267,6 +267,56 @@ class ELM(Annot):
 			else:
 				return -1
 
+class PFAM(Annot):
+	def __init__(self, NAME, START_POS, END_POS, HOM):
+		self.start = START_POS
+		self.hom = HOM
+		self.name = NAME
+		self.end = END_POS
+		self.type = 'PFAM'
+		self.gene = None
+		self.rel_start = None
+		self.rel_stop = None
+		self.color = colors.green
+		
+	def __str__(self):
+		out_str = '%(type)s - %(name)s ' % self.__dict__
+		out_str += '[%(start)d:%(end)d] ' % self.__dict__
+		if (self.gene != None) & (self.rel_start != None) & (self.rel_stop != None):
+			out_str += '%(gene)s - [%(rel_start)d:%(rel_stop)d]' % self.__dict__
+		
+		return out_str
+	
+	def FuzzyEquals(self, ANNOT, FUDGE_POS = 1000, AA_FUDGE = 5):
+		"""
+		Returns True if the provided annotation is of the proper type and 
+		within the fudge region.
+		"""
+		
+		if self.name != ANNOT.name:
+			return -1
+		
+		if self.type != ANNOT.type:
+			return -1
+		
+		if (self.gene != None) & (ANNOT.gene != None) & \
+				(self.gene != ANNOT.gene):
+			return -1
+		
+		if (ANNOT.rel_start != None) & (self.rel_start != None):
+			val = abs(ANNOT.rel_start - self.rel_start)
+			if val < AA_FUDGE:
+				return val
+			else:
+				return -1
+		else:
+			val = abs(ANNOT.start - self.start)
+			if val < FUDGE_POS:
+				return val
+			else:
+				return -1
+				
+				
 class TFSite(Annot):
 	def __init__(self, NAME, START_POS, END_POS, HOM):
 		self.start = START_POS
@@ -453,6 +503,35 @@ def ELMParser(DIRECTORY = None):
 		this_file.close()
 	
 	return all_reg_exps
+	
+def PFAMChecker(GENE_LIST, DICT_OBJ, DICT_LOCK, FORCE_LEVEL = 1):
+	"""
+	A wrapper function for PyPFAM.
+	"""
+	
+	final_out = []
+	
+	for this_gene in GENE_LIST:
+		output = PyPFAM.CheckPFAM(INPUT_SEQ, DICT_OBJ = DICT_OBJ, 
+								DICT_LOCK = DICT_LOCK, 
+								FORCE_LEVEL = FORCE_LEVEL)
+								
+		if output != None:
+			nt_start = this_gene.start
+			for this_rec in output:
+				
+				this_pfam = PFAM(this_rec[0], nt_start + int(this_rec[2])*3, 
+									nt_start + int(this_rec[3])*3, 
+									float(this_rec[5]))
+				this_pfam.GeneAnnot(this_gene.name, int(this_rec[2]), 
+										int(this_rec[3]))
+				final_out.append(this_pfam)
+				
+	return final_out
+	
+	
+	
+	
 	
 	
 def TFChecker(INPUT_SEQ):
