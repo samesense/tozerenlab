@@ -411,8 +411,7 @@ class VisualController():
 		if self.options.align_fig != None:
 			gene_fig.draw(format = 'linear', fragments = 1)
 			gene_fig.write(self.options.align_fig, 'PDF')
-		
-		self.outconfig.set('DEFAULT', 'AlignmentFigure', self.options.align_fig)
+			self.outconfig.set('DEFAULT', 'AlignmentFigure', self.options.align_fig)
 		
 		
 

@@ -356,6 +356,8 @@ def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
 		#function with smaller OVERLAPPING segments and append them together
 		step_fun = lambda x:(max(0,(x)*500-100), (x+1)*500)
 		off_set_fun = lambda x,y: [x[0]+y,x[1]+y,x[2]+y]
+		
+		
 		output_list = []
 		for this_win in itertools.imap(step_fun, itertools.count()):
 			if this_win[1] < len(CHROM_SEQ):
@@ -365,10 +367,23 @@ def HybridSeq(RNA_SEQ, DELTA_THETA, CHROM_SEQ,
 				this_win_seq = CHROM_SEQ[this_win[0]:]
 				break_val = True
 			this_output = HybridSeq(RNA_SEQ, DELTA_THETA, this_win_seq)
+			
 			if len(this_output) > 0:
+				out_str = map(str,this_output)
+				init_string = string.join(out_str,',')
+				dbg_str = 'mirna init: %(out)s' % {'out':init_string}
+				logging.debug(dbg_str)
+			
 				this_output = list(itertools.imap(off_set_fun, 
 												iter(this_output),
 												itertools.repeat(this_win[0])))
+												
+				a_out_str = map(str,this_output)
+				a_init_string = string.join(a_out_str,',')
+				a_dbg_str = 'mirna after: %(out)s' % {'out':a_init_string}
+				logging.debug(a_dbg_str)
+												
+												
 				output_list += this_output
 			if break_val:
 				break
