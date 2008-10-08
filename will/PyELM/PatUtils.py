@@ -230,7 +230,8 @@ class PatSeq(PyVirus.ViralSeq):
 				raise TypeError, 'If POS is not a tuple then it must be an ANNOT'
 			
 			new_feat = POS
-			if POS.type != 'ELM':
+			#pfam and ELMs have already been properly ofset
+			if (POS.type != 'ELM') | (POS.type != 'PFAM'):
 				new_feat.start += self.offset
 				new_feat.end += self.offset
 		elif TYPE == 'Annot':
