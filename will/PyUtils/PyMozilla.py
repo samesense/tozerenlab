@@ -187,7 +187,7 @@ class MozillaEmulator(object):
                     print "MozillaEmulator: urllib2.URLError, retryting ",cnt
 
 
-    def post_multipart(self,url,fields, files, forbid_redirect=True):
+    def post_multipart(self,url,fields, files, forbid_redirect=True, trycount=None):
         """Post fields and files to an http host as multipart/form-data.
         fields is a sequence of (name, value) elements for regular form fields.
         files is a sequence of (name, filename, value) elements for data to be uploaded as files
@@ -197,7 +197,7 @@ class MozillaEmulator(object):
         result = self.download(url,post_data,{
             'Content-Type': content_type,
             'Content-Length': str(len(post_data))
-        },forbid_redirect=forbid_redirect
+        },forbid_redirect=forbid_redirect, trycount=trycount
         )
         return result
 
