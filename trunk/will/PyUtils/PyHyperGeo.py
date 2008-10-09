@@ -33,7 +33,7 @@ class memoized(object):
 
 
 
-def CheckList(SET_1, SET_2, BACKGROUND):
+def CheckList(SET_1, SET_2, BACKGROUND, DETAILED_OUT = False):
 	"""
 	Determines the p-value of list overlaps based on the HyperGeometric 
 	distribution.
@@ -47,6 +47,10 @@ def CheckList(SET_1, SET_2, BACKGROUND):
 	@param:	BACKGROUND		A set() of the elements which COULD HAVE been
 							picked by BOTH methods.
 	
+	@param:	DETAILED_OUT = False
+							If set to True then a more detailed output is 
+							provded.  See Below.
+	
 	@returns:				The p-value of the overlap based on the 
 							hypergeometric distribution.
 	
@@ -57,6 +61,13 @@ def CheckList(SET_1, SET_2, BACKGROUND):
 	
 		returns:			The p-value of finding the overlap between the SAM
 							analysis and the FOXD3 list.
+	
+	Detailed Output:
+		returns 	(p-val, k, N, m, n)
+	k:	Num of genes in list with TF
+	N:	Total num of genes in database
+	m:	Num of genes with TF in database
+	n:	Total Num of genes in list
 	"""
 	
 	if type(SET_1) == types.ListType:
@@ -76,10 +87,12 @@ def CheckList(SET_1, SET_2, BACKGROUND):
 	m = len(SET_2)
 	n = len(SET_1)
 	
-	print (k - 1, N, m, n)
+	val = Decimal(1) - HyperGeoCDF(k - 1, N, m, n)
 	
-	return Decimal(1) - HyperGeoCDF(k - 1, N, m, n)
-	
+	if DETAILED_OUT:
+		return (val, k, N, m, n)
+	else
+		return val
 	
 	
 
