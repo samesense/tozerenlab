@@ -17,7 +17,7 @@ def testSimple():
 
 def testBadInputs():
 	"""
-	Tests for errors with improper inputs
+	Tests for errors with improper inputs with HyperGeoPDF and HyperGeoCDF
 	"""
 	
 	nose.tools.assert_raises(ValueError, PyHyperGeo.nchoosek, 10,100)
@@ -30,7 +30,23 @@ def testBadInputs():
 	nose.tools.assert_raises(ValueError, PyHyperGeo.HyperGeoCDF, 10,100,50,600)
 	nose.tools.assert_raises(ValueError, PyHyperGeo.HyperGeoCDF, 10,100,200,40)
 	
-				
+
+def testBadCheckInputs():
+	"""
+	Tests for errors with improper inputs in CheckList
+	"""
+	
+	back = set(range(100))
+	mark = set(range(50))
+	pick = set(range(105, 150))
+	
+	nose.tools.assert_raises(ValueError, PyHyperGeo.CheckList, pick, mark, back)
+	nose.tools.assert_raises(ValueError, PyHyperGeo.CheckList, pick, mark, back)
+	
+	nose.tools.assert_raises(TypeError, PyHyperGeo.CheckList, range(5),range(5),range(5))
+	
+	
+	
 def CheckPDF(in_val):
 	"""
 	Testing Hard Vals HyperGeoPDF(k, N, m, n)
@@ -98,3 +114,32 @@ def testCheckCDF():
 	for this_check in known_vals:
 		yield CheckCDF, this_check
 
+def testCheckList():
+	"""
+	Test the CheckList Feature
+	"""
+	known_vals = [ (Decimal("1.255920284879654e-052"), 40 , 10700, 3382, 600),
+					(Decimal("8.462746855220796e-045"), 50 , 10700, 3382, 600),
+					(Decimal("6.950599166857216e-032"), 70 , 10700, 3382, 600),
+					(Decimal("7.310526174195645e-022"), 90 , 10700, 3382, 600),
+					(Decimal("9.399289534258735e-018"), 100 , 10700, 3382, 600),
+					]
+	
+	for this_check in known_vals:
+		yield CheckPList, this_check
+		
+def CheckPList(in_val):
+	
+	background = set(range(in_val[2]))
+	marked = set(range(in_val[3]))
+	picked = set(range(in_val[3] - in_val[1] - 1, 
+						in_val[3] - in_val[1] + in_val[4] - 1))
+	
+	val = PyHyperGeo.CheckList(picked, marked, background)
+	print val
+	diff = Decimal(str(abs(math.log(val,10) - math.log(Decimal(1) - in_val[0],10))))
+	print Decimal(1) - in_val[0]
+	for tol in xrange(10):
+		nose.tools.assert_true(diff < Decimal(str(10**(-tol))), 
+				'Did not perform within %(tol)s : %(diff)s' % \
+				{'tol': 10**-tol, 'diff': diff})
