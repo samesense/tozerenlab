@@ -33,7 +33,8 @@ class memoized(object):
 
 
 
-def CheckList(SET_1, SET_2, BACKGROUND, DETAILED_OUT = False):
+def CheckList(SET_1, SET_2, BACKGROUND, DETAILED_OUT = False, 
+				FORCE_PERFORM = False):
 	"""
 	Determines the p-value of list overlaps based on the HyperGeometric 
 	distribution.
@@ -50,6 +51,13 @@ def CheckList(SET_1, SET_2, BACKGROUND, DETAILED_OUT = False):
 	@param:	DETAILED_OUT = False
 							If set to True then a more detailed output is 
 							provded.  See Below.
+	
+	@param:	FORCE_PERFORM = False
+							Shortcut to use if your background is not properly 
+							created and there are items in Set_1 or SET_2 which
+							are not in the BACKGROUND.  This will append the 
+							missing values to the BACKGROUND set and calculate
+							accordingly.
 	
 	@returns:				The p-value of the overlap based on the 
 							hypergeometric distribution.
@@ -78,9 +86,17 @@ def CheckList(SET_1, SET_2, BACKGROUND, DETAILED_OUT = False):
 		raise TypeError, 'BACKGROUND must be a set()'
 	
 	if not(SET_1.issubset(BACKGROUND)):
-		raise ValueError, 'SET_1 must be a subset of BACKGROUND'
+		if not(FORCE_PERFORM):
+			has_extra = SET_1 - BACKGROUND
+			raise ValueError, 'SET_1 must be a subset of BACKGROUND: %(ex)s' % {'ex':str(has_extra)}
+		else:
+			BACKGROUND |= SET_1
 	if not(SET_2.issubset(BACKGROUND)):
-		raise ValueError, 'SET_2 must be a subset of BACKGROUND'
+		if not(FORCE_PERFORM):
+			has_extra = SET_2 - BACKGROUND
+			raise ValueError, 'SET_2 must be a subset of BACKGROUND: %(ex)s' % {'ex':str(has_extra)}
+		else:
+			BACKGROUND |= SET_2
 	
 	N = len(BACKGROUND)
 	k = len(SET_1 & SET_2)
@@ -91,7 +107,7 @@ def CheckList(SET_1, SET_2, BACKGROUND, DETAILED_OUT = False):
 	
 	if DETAILED_OUT:
 		return (val, k, N, m, n)
-	else
+	else:
 		return val
 	
 	
@@ -119,7 +135,7 @@ def nchoosek(n, k):
 	else:  
 		raise ValueError, 'n:%(n)s must be larger than k:%(k)s' %\
 							{'n':n, 'k':k}
-		
+@memoized
 def HyperGeoCDF(k, N, m, n):
 	"""
 	There is a shipment of N objects in which m are defective. HyperGeoCDF 
