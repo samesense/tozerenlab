@@ -162,16 +162,9 @@ def HyperGeoCDF(k, N, m, n):
 	
 	
 	prob = 0
-	const_denom = nchoosek(N,n)
-	n_ch_k_dict = {}
 	
 	for i in xrange(1, k + 1):
-		if not(n_ch_k_dict.has_key((m,i))):
-			n_ch_k_dict[(m,i)] = nchoosek(m,i)
-		if not(n_ch_k_dict.has_key((N-m, n-i))):
-			n_ch_k_dict[(N-m, n-i)] = nchoosek(N-m, n-i)
-		
-		prob += n_ch_k_dict[(m,i)]*n_ch_k_dict[(N-m, n-i)]/const_denom
+		prob += HyperGeoPDF(i, N, m, n)
 	
 	return prob
 
