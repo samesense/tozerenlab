@@ -130,15 +130,11 @@ def CheckPFAM(INPUT_SEQ, DICT_OBJ = None, DICT_LOCK = None,
 				logging.debug('Returning None')
 				return None
 	
-	BASE_URL = 'http://pfam.sanger.ac.uk/search/sequence'
-	
 	moz_emu = PyMozilla.MozillaEmulator(cacher=None)
 	
 	logging.debug('Submitting SEQ to webserver')
-	splash_page = moz_emu.post_multipart(BASE_URL, [('seq', INPUT_SEQ)], (), 
-					trycount = 2)
 	
-	time_out, stat_url, job_id, result_url = ExtractCheckingInfo(splash_page)
+	time_out, stat_url, job_id, result_url = GetCheckingInfo(moz_emu, INPUT_SEQ)
 	
 	while time_out != 0:
 		logging.debug('Sleeping for %(time)d' % {'time':time_out})
@@ -157,37 +153,54 @@ def CheckPFAM(INPUT_SEQ, DICT_OBJ = None, DICT_LOCK = None,
 	
 	
 	
-def ExtractCheckingInfo(SPLASH_PAGE):
+def GetCheckingInfo(MOZ_EMU, INPUT_SEQ, trycount = 3):
 	"""
 	Uses regular expressions to extract the CheckURL, JOB_ID, 
 	ESTIMATED_TIME, and RESULT_URL.
 	
-	@param: SPLASH_PAGE			The page returned from submitting the sequence
-								to the PFAM webserver.
-								
+	@param:	MOZ_EMU				A PyMozilla emulator object.
+	
+	@param:	INPUT_SEQ			The sequence to be submitted to the webserver
+	
 	@returns:
 	EST_TIME					The estimated time (as an int) for completion
 	STAT_URL					The URL to check for the status of the job
 	JOB_ID						The jobId of this submission
 	RESULT_URL					The URL to check when the results are finished.
 	"""
+	BASE_URL = 'http://pfam.sanger.ac.uk/search/sequence'
 	
 	reg_str = '"estimatedTime":(\d*),'
 	reg_str += '"checkURI":"(.*?)",'
 	reg_str += '.*?"jobId":"(.*?)",'
 	reg_str += '.*?,"doneURI":"(.*?)"'
 	
-	output = re.findall(reg_str, SPLASH_PAGE)
-	
+	counter = 0
+	while counter < trycount:
+		counter += 1
+		splash_page = MOZ_EMU.post_multipart(BASE_URL, [('seq', INPUT_SEQ)], (), 
+						trycount = trycount)
+		
+		output = re.findall(reg_str, splash_page)
+		
+		if len(output) != 1:
+			#The SPLASH_PAGE returned to many URLs to check
+			continue
+		
+		if len(output[0]) != 4:
+			#The SPLASH_PAGE did not have all of the information
+			continue
+		
+		break
+		
 	if len(output) != 1:
 		bad_str = 'The SPLASH_PAGE returned to many URLs to check' +str(output)
 		raise IndexError, bad_str
-	
 	if len(output[0]) != 4:
 		bad_str = 'The SPLASH_PAGE did not have all of the information '
 		bad_str += 'required' + str(output)
 		raise IndexError, bad_str
-	
+		
 	est_time = int(output[0][0])
 	stat_url = output[0][1]
 	job_id = output[0][2]
