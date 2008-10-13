@@ -1,6 +1,6 @@
 import nose.tools
 import PyPFAM
-import threading
+import threading, shelve, os
 
 
 
@@ -207,6 +207,54 @@ def testFLEVEL2():
 	
 	nose.tools.assert_true(missing_out[0] == EXAM_RES[0],
 		'With FORCE_LEVEL = 2 CheckPFAM should return the webserver results')
+	
+def testShelve():
+	"""
+	Test storing data in a shelve object.
+	"""
+	
+	SHELVE_FILE = os.environ['PYTHONSCRATCH'] + 'test_shelve.slf'
+	
+	shelve_obj = shelve.open(SHELVE_FILE, writeback = True)
+	dict_lock = threading.Lock()
+	EXAM_SEQ, EXAM_RES = ExampleData()
+	
+	
+	present_out = PyPFAM.CheckPFAM(EXAM_SEQ, DICT_OBJ = shelve_obj, 
+							DICT_LOCK = dict_lock)
+	
+	shelve_obj.close()
+	
+	shelve_obj = shelve.open(SHELVE_FILE, writeback = True)
+	
+	this_out = shelve_obj[EXAM_SEQ]
+	
+	nose.tools.assert_true(this_out == EXAM_RES, 
+			'The shelve did not keep the correct output')
+	
+	shelve_obj.close()
+	
+	
+	os.remove(SHELVE_FILE)
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
+	
 	
 	
 	
