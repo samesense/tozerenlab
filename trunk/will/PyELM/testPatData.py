@@ -273,10 +273,52 @@ def CheckDidTakeDrug(PAT_BASE, PAT_ID, DRUG, CORRECT):
 							bad_str)
 	
 	
+def testOffset():
+	"""
+	Test aligning fragments correctly
+	"""
+	logging.getLogger('').setLevel(logging.CRITICAL)
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
+	
+	ELM_DICT = AnnotUtils.ELMParser()
 	
 	
+	#since we don't want to deal with a time-course manually set the sequence!
+	
+	for ref_seq in ref_base.ref_seqs[0:3]:
+		ref_seq.FindELMs(ELM_DICT)
+		ref_seq.FindTFSites()
+		
+		for this_seq in ref_seq.annotation:
+			this_seq = ref_seq.annotation[this_seq].nt_seq
+			yield CheckOffset, ref_base, ref_seq, this_seq
+			
 		
 		
+	
+def CheckOffset(REF_BASE, INPUT_REF, PARTIAL_SEQ):
+	
+	test_seq = PatUtils.PatSeq(1, None,
+									'test','test_study')
+	test_seq.my_sequence = PARTIAL_SEQ
+	test_seq.TranslateAll(REF_BASE, WANTED_REF = str(INPUT_REF.seq_name))
+	test_seq.FindTFSites()
+	
+	out_array = INPUT_REF.CheckFeatures(test_seq.feature_annot, 10)
+	
+	if not(out_array.all()):
+		missing = []
+		for i in xrange(len(test_seq.feature_annot)):
+			if out_array[i]==0:
+				missing.append(str(test_seq.feature_annot[i]))
+		nose.tools.assert_true(False, 
+		'Found %(found)d of %(tot)d features: %(missing)s' % \
+		{'found': numpy.sum(out_array), 'tot':numpy.size(out_array),
+		'missing': str(missing)})
+	
+	
 		
 		
 		

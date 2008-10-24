@@ -96,6 +96,8 @@ class PatSeq(PyVirus.ViralSeq):
 			Returns a generic SeqRecord in the biopython format for
 		the whole genome sequence.
 		"""
+		if self.my_sequence == None:
+			raise TypeError, 'self.my_sequence was not properly set!'
 		return SeqRecord(Seq(self.my_sequence, generic_nucleotide),
 						 id = str(self.study) + ':' + str(self.pat_id))
 	
@@ -251,6 +253,8 @@ class PatSeq(PyVirus.ViralSeq):
 								self.offset + POS[1], HOM)
 		else:
 			raise KeyError
+		
+		logging.debug('ELM %(elm)s found on %(seq)s' % {'elm':str(new_feat), 'seq':self.seq_name})
 		
 		if new_feat.start > 8000:
 			logging.warning('Bad feat found:%(name)s:%(bad)s' % {'name':self.seq_name, 'bad':str(new_feat)})
