@@ -250,6 +250,7 @@ class ViralSeq():
 		elif TYPE == 'ELM':
 			new_feat = ELM(NAME, POS[0], POS[1], None)
 			self.feature_annot_type['ELM'] = True
+			logging.debug('ELM %(elm)s found on %(seq)s' % {'elm':str(new_feat), 'seq':self.seq_name})
 		elif TYPE == 'TF':
 			new_feat = TFSite(NAME, POS[0], POS[1], HOM)
 		else:
@@ -359,17 +360,17 @@ class ViralSeq():
 		Finds the ELMs in the PROTIEN sequence and then using LogAnnotation 
 		to mark thier locations on the NUCLEOTIDE sequence.
 		"""
-		
 		for this_gene_name in self.annotation:
 			this_gene = self.annotation[this_gene_name]
+			logging.debug('%(seq)s has %(gene)s' % {'seq':self.seq_name, 'gene':this_gene.aa_seq})
 			start_pos = this_gene.start
 			rel_start = this_gene.rel_start
 			for this_ELM in ELM_DICT:
 				spot = ELM_DICT[this_ELM][1].search(this_gene.aa_seq)
 				while spot != None:
+					
 					new_elm = ELM(this_ELM, start_pos + spot.start(), 
 									start_pos + spot.end(), None)
-					
 					new_elm.GeneAnnot(this_gene_name, 
 									spot.start(), spot.end())
 					

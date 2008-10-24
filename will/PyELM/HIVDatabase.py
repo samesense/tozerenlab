@@ -358,23 +358,30 @@ class MappingBase():
 		pos_fun = lambda x: abs(x[0].start - x[1].start)
 		for this_seq in self.test_names:
 			bkg_seq = self.my_test_shelf[this_seq]
-			logging.debug('Checking Seq:' + this_seq)
+			logging.debug('Checking Seq:' + this_seq + ':' + str(len(bkg_seq.feature_annot)))
 			for i in xrange(len(all_features)):
 				this_annot = all_features[i]
 				#logging.debug('Checking: %(feat)s' % {'feat':str(this_annot)})
-				poss_annot = bkg_seq.FindEqAnnot(this_annot, 300)
+				poss_annot = bkg_seq.FindEqAnnot(this_annot, 1000)
+				
 				if poss_annot != None:
 					obj_vals[0,i] += pos_fun((this_annot, poss_annot))
-					#logging.debug('Comparing with: %(feat)s' % {'feat':str(poss_annot)})
+					logging.debug('Comparing with: %(feat)s' % {'feat':str(poss_annot)})
 				else:
 					obj_vals[0,i] += 10000
+				if i == 0:
+					logging.debug(str(this_annot) + ':' + str(poss_annot))
+					logging.debug(str(obj_vals[0,i]))
+				if i == 727:
+					logging.debug(str(this_annot) + ':' + str(poss_annot))
+					logging.debug(str(obj_vals[0,i]))
 					#logging.debug('Missing: %(feat)s' % {'feat':str(this_annot)})
 			#logging.debug(str(obj_vals.tolist()))
 		
-		best_inds = obj_vals.argsort()
+		best_inds = obj_vals.argsort(kind = 'mergesort')
 		
 		logging.critical('Num annots checked:%(num)d' % {'num':len(obj_vals)})
-		
+		logging.critical('best_inds:' + str(best_inds))
 		anchors = []
 		#for i in xrange(1):
 		
@@ -400,7 +407,7 @@ class MappingBase():
 			for this_name in this_group:
 				this_bkg_seq = self.my_test_shelf[this_name]
 				
-				anchor_eq = this_bkg_seq.FindEqAnnot(anchors, 300, IS_LIST = False)
+				anchor_eq = this_bkg_seq.FindEqAnnot(anchors, 1000, IS_LIST = False)
 				
 				if anchor_eq == None:
 					warn_str = '%(name)s missing eq of %(annot)s' % \
