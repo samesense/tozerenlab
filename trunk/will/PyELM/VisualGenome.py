@@ -151,6 +151,11 @@ def ParseOptions(INPUT_STRING):
 							action = 'store_true',
 							default = False,
 							help = 'Toggle Homology Islands')
+	feat_group.add_option('--DRUG',
+							dest = 'drug_flag',
+							action = 'store_true',
+							default = False,
+							help = 'Toggle Drug Interaction Motifs')
 	feat_group.add_option('--KownHom',
 							dest = 'hom_file',
 							type = 'string',
@@ -183,6 +188,11 @@ def ParseOptions(INPUT_STRING):
 									'ELM_RAW_DOWNLOAD'], os.sep) + os.sep,
 						type = 'string',
 						help = 'Location of ELM website Files')
+	dep_group.add_option('--drug_file',
+						dest = 'drug_motif_file',
+						default = None,
+						type = 'string',
+						help = 'Location of Dreg Resistance File')
 	dep_group.add_option('--scratch_dir',
 						dest = 'scratch_dir',
 						default = string.join(['C:', 'new_scratch'], 
@@ -337,14 +347,22 @@ class VisualController():
 		ref_base = self.mapping_base.ref_base
 		calib_dict = None
 		elm_dict = None
+		drug_dict = None
+		input_dict = {}
 		
 		if self.options.elm_flag:
 			elm_dict = AnnotUtils.ELMParser(DIRECTORY = self.options.elm_direc)
+			input_dict['ELM_DICT'] = elm_dict
+		if self.options.drug_flag:
+			drug_dict = AnnotUtils.ResitenceParser(self.options.drug_motif_file)
+			input_dict['DRUG_DICT'] = drug_dict
 		if self.options.mirna_flag:
 			with open(self.options.hybrid_calib) as handle:
 				calib_dict = pickle.load(handle)
+			
 			# for this_calib in calib_dict.keys()[30:]:
 				# junk = calib_dict.pop(this_calib)
+			input_dict['MIRNA_DICT'] = calib_dict
 		
 		logging.warning('Beginning Annotation')
 		
@@ -354,13 +372,16 @@ class VisualController():
 			ref_base.ref_seqs[0].FindELMs(elm_dict)
 		if self.options.tf_flag:
 			ref_base.ref_seqs[0].FindTFSites()
+			input_dict['WANT_TF'] = True
 		if self.options.hom_flag:
 			ref_base.ref_seqs[0].FindHomIslands(ref_base.ref_seqs[0])
+			input_dict['WANT_HOM'] = True
+		if self.options.drug_flag:
+			ref_base.ref_seqs[0].FindResistSites(drug_dict)
 		
-		
-		self.mapping_base.AnnotateBase(calib_dict, elm_dict, self.options.tf_flag, 
-									self.options.hom_flag, True, 
-									ref_base.ref_seqs[0].seq_name)
+		input_dict['WANTED_REF'] = ref_base.ref_seqs[0].seq_name
+		self.mapping_base.AnnotateBase(input_dict, 
+								WANTED_THREADS = self.options.num_threads)
 		
 		
 		resp_name = self.options.out_direc + self.options.base_name + '_resp.txt'
@@ -401,7 +422,7 @@ class VisualController():
 		#filter_fun = lambda x: x.CheckRange('HumanMiRNA', None)
 		filter_fun = None
 		
-		resp_fun = lambda x:x.DetermineResponder('SD')
+		resp_fun = lambda x:x.DetermineResponder('WND')
 		
 		gene_fig = self.mapping_base.MakeMultiDiagram(ref_base.ref_seqs[0].seq_name,
 														self.options.wanted_subs,

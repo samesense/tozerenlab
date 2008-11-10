@@ -253,6 +253,8 @@ class ViralSeq():
 			logging.debug('ELM %(elm)s found on %(seq)s' % {'elm':str(new_feat), 'seq':self.seq_name})
 		elif TYPE == 'TF':
 			new_feat = TFSite(NAME, POS[0], POS[1], HOM)
+		elif TYPE == 'ResistSite':
+			new_feat = ResistSite(NAME, POS[0], POS[1], HOM)
 		else:
 			raise KeyError
 		
@@ -422,6 +424,44 @@ class ViralSeq():
 				self.LogAnnotation('PFAM', this_annot, None, None, None)
 		self.feature_annot_type['PFAM'] = True
 	
+	def FindResistSites(self, RESIST_DICT):
+		"""
+		Finds the Resist Sites in the PROTIEN sequence and then using 
+		LogAnnotation to mark thier locations on the NUCLEOTIDE sequence.
+		"""
+		
+		for this_gene_name in self.annotation:
+			this_gene = self.annotation[this_gene_name]
+			logging.debug('%(seq)s has %(gene)s' % {'seq':self.seq_name, 'gene':this_gene.aa_seq})
+			start_pos = this_gene.start
+			rel_start = this_gene.rel_start
+			for this_resist in RESIST_DICT:
+				# if this_gene_name != this_resist[0]:
+					# continue
+				spot_wt = RESIST_DICT[this_resist][1].search(this_gene.aa_seq)
+				spot_mut = RESIST_DICT[this_resist][2].search(this_gene.aa_seq)
+				if spot_wt != None:
+					new_resist = ResistSite(this_resist, start_pos + spot_wt.start(), 
+									start_pos + spot_wt.end(), True)
+					new_resist.GeneAnnot(this_gene_name, 
+									spot_wt.start(), spot_wt.end())
+					logging.debug('DRUG found WT spot')
+				elif spot_mut != None:
+					new_resist = ResistSite(this_resist, start_pos + spot_mut.start(), 
+									start_pos + spot_mut.end(), False)
+					new_resist.GeneAnnot(this_gene_name, 
+									spot_mut.start(), spot_mut.end())
+					logging.debug('DRUG found MUT spot')
+				else:
+					continue
+				
+				self.LogAnnotation('ResistSite', new_resist, None, None, 
+										this_resist)
+				
+				
+		self.feature_annot_type['ResistSite'] = True
+			
+	
 	def CheckFeatures(self, FEAT_LIST, FUDGE_FACTOR, NUM_CHECKS = 3, 
 									CHECK_CUTOFF = 1):
 		"""
@@ -446,9 +486,17 @@ class ViralSeq():
 				for this_check in xrange(len(check_feat)):
 					val = check_feat[this_check].FuzzyEquals(FEAT_LIST[this_feat],
 													FUDGE_POS = FUDGE_FACTOR)
+					
 					#val == -1 refers to "wrong type or not within "
 					if val != -1:
+						logging.debug('Checking %(selfname)s %(this)s:%(checkname)s %(test)s' \
+							% {'this':str(check_feat[this_check]), 'test':str(FEAT_LIST[this_feat]),
+								'selfname':self.seq_name, 'checkname':'TEST'})
+						logging.debug('MARKED AS CORRECT')
 						poss_items.append((val, this_check))
+					else:
+						pass
+						#logging.debug('DISCARDED')
 				
 				if len(poss_items) > 0:
 					best_ind = min(poss_items, key = min_func)[1]
@@ -610,6 +658,8 @@ class RefBase():
 		return self.GetRefSeq(KEY)
 	
 	def GetRefSeq(self, WANTED_REF):
+		if WANTED_REF == None:
+			return None
 		for this_ref in self.ref_seqs:
 			if this_ref.seq_name == WANTED_REF:
 				return this_ref

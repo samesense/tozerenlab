@@ -432,21 +432,42 @@ class MappingBase():
 		return this_gene_figure
 		
 		
-	def AnnotateBase(self, MiRNA_DICT, ELM_DICT, WANT_TF, WANT_HOM, FORCE, 
-						WANTED_REF, WANTED_THREADS = 10):
+	def AnnotateBase(self, INPUT_DICT, WANTED_THREADS = 10):
 		"""
-		Makes multi-threaded calls to TFChecker.
+		Makes multi-threaded calls to Annotation Functions.
+		
+		INPUT_DICT is a packed set of arguements:
+		
+		INPUT_DICT['ForceLevel']		True/False: Determines whether to 
+										overwrite current annotations.
+		INPUT_DICT['WANTED_REF']		The name of the RefSeq to translate
+										relative too.
+		INPUT_DICT['DRUG_DICT']			A DRUG dict as returned by 
+										AnnotUtils.ResitenceParser()
+		INPUT_DICT['ELM_DICT']			A ELM dict as returned by 
+										AnnotUtils.ELMParser()
+		INPUT_DICT['MIRNA_DICT']		A miRNA dict as returned by 
+										AnnotUtils.CalibrateRNAi()
+		INPUT_DICT['WANT_TF']			True/False: Determines whether to 
+										annotate the TRANSFAC TF sites
+		INPUT_DICT['WANT_HOM']			True/False: Determines whether to 
+										annotate the Homology Islands sites
+		
+		
 		"""
 		
-		def AnnotWorker(SEQ, MI_DICT, E_DICT, WANT_TF, WANT_HOM, 
-						FORCE_INPUT, REF_INPUT):
+		def AnnotWorker(SEQ, INPUT):
 			logging.debug('Translating: ' + SEQ.seq_name)
-			SEQ.TranslateAll(self.ref_base, WANTED_REF = REF_INPUT)
+			SEQ.TranslateAll(self.ref_base, WANTED_REF = INPUT['WANTED_REF'])
 			fil_fun = lambda x: x.type != 'ELM'
 			SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-			if E_DICT != None:
+			if INPUT.has_key('ELM_DICT'):
 				logging.debug('ELMing: ' + SEQ.seq_name)
-				SEQ.FindELMs(E_DICT)
+				SEQ.FindELMs(INPUT['ELM_DICT'])
+			
+			#unpack arguements from the INPUT
+			FORCE_INPUT = INPUT.get('ForceLevel', True)
+			
 			
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('MIRNA', False)):
@@ -458,32 +479,38 @@ class MappingBase():
 				
 				name_func = attrgetter('name')
 				
-				wanted_mirnas = filter(fil_fun, self.ref_base[REF_INPUT].feature_annot)
+				wanted_mirnas = filter(fil_fun, self.ref_base[INPUT['WANTED_REF']].feature_annot)
 				wanted_mirnas = map(name_func,wanted_mirnas)
 				
 				
 				
-				if MI_DICT != None:
+				if INPUT.has_key('MIRNA_DICT'):
 					logging.debug('miRNAing: ' + SEQ.seq_name)
-					SEQ.HumanMiRNAsite(MI_DICT, NUM_THREADS = 1, 
+					SEQ.HumanMiRNAsite(INPUT['MIRNA_DICT'], NUM_THREADS = 1, 
 										ONLY_CHECK = wanted_mirnas)
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('TFSite', False)):
 				fil_fun = lambda x: x.type != 'TFSite'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-				if WANT_TF:
+				if INPUT.get('WANT_TF',False):
 					logging.debug('TFing: ' + SEQ.seq_name)
 					SEQ.FindTFSites()
 			
 			if FORCE_INPUT or not(SEQ.feature_annot_type.get('HomIsland', False)):
 				fil_fun = lambda x: x.type != 'HomIsland'
 				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
-				if WANT_HOM:
+				if INPUT.get('WANT_HOM', False):
 					logging.debug('HomIslanding: ' + SEQ.seq_name)
-					this_ref = self.ref_base.GetRefSeq(WANTED_REF)
+					this_ref = self.ref_base.GetRefSeq(INPUT['WANTED_REF'])
 					SEQ.FindHomIslands(this_ref)
 				
 			
+			if FORCE_INPUT or not(SEQ.feature_annot_type.get('ResistSite', False)):
+				fil_fun = lambda x: x.type != 'ResistSite'
+				SEQ.feature_annot = filter(fil_fun, SEQ.feature_annot)
+				if INPUT.has_key('DRUG_DICT'):
+					logging.debug('Drugging: ' + SEQ.seq_name)
+					SEQ.FindResistSites(INPUT['DRUG_DICT'])
 			
 			SEQ.DetSubtype()
 			
@@ -497,8 +524,6 @@ class MappingBase():
 		worker_seph = threading.Semaphore(WANTED_THREADS)
 		all_threads = []
 		
-		
-		
 		for this_name in self.test_names:
 			worker_seph.acquire()
 			logging.debug('Annotating: ' + this_name)
@@ -507,9 +532,7 @@ class MappingBase():
 				#otherwise significant crap-age will happen
 				this_seq = self.my_test_shelf[this_name]
 			this_thread = threading.Thread(target = AnnotWorker, 
-								args = (this_seq, MiRNA_DICT, ELM_DICT, 
-										WANT_TF, WANT_HOM, FORCE, 
-										WANTED_REF))
+								args = (this_seq, INPUT_DICT))
 			this_thread.start()
 			all_threads.append(this_thread)
 		#make sure all threads have closed before returning
