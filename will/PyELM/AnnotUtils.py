@@ -162,9 +162,18 @@ class Gene(Annot):
 		self.rel_start = None
 		self.rel_stop = None
 		
+		self.score = None
+		self.expect = None
+		
+		self.is_fragment = False
 		
 	def __hash__(self):
 		return hash(self.aa_seq)
+		
+		
+		
+		
+		
 		
 class HumanMiRNA(Annot):
 	def __init__(self, NAME, START_POS, END_POS, P_VAL):
@@ -267,6 +276,63 @@ class ELM(Annot):
 			else:
 				return -1
 
+class ResistSite(Annot):
+	def __init__(self, NAME, START_POS, END_POS, IS_WT):
+		self.start = START_POS
+		self.hom = None
+		self.name = NAME
+		self.end = END_POS
+		self.type = 'ResistSite'
+		self.gene = None
+		self.rel_start = None
+		self.rel_stop = None
+		self.color = colors.green
+		
+		self.is_wt = IS_WT
+		
+	
+	def __str__(self):
+		out_str = '%(type)s - %(name)s ' % self.__dict__
+		out_str += '[%(start)d:%(end)d] ' % self.__dict__
+		if (self.gene != None) & (self.rel_start != None) & (self.rel_stop != None):
+			out_str += '%(gene)s - [%(rel_start)d:%(rel_stop)d]' % self.__dict__
+		
+		return out_str
+	
+	def FuzzyEquals(self, ANNOT, FUDGE_POS = 1000, AA_FUDGE = 5):
+		"""
+		Returns True if the provided annotation is of the proper type and 
+		within the fudge region.
+		"""
+		
+		if self.name != ANNOT.name:
+			return -1
+		
+		if self.type != ANNOT.type:
+			return -1
+		
+		if (self.gene != None) & (ANNOT.gene != None) & \
+				(self.gene != ANNOT.gene):
+			return -1
+		
+		if (ANNOT.rel_start != None) & (self.rel_start != None):
+			val = abs(ANNOT.rel_start - self.rel_start)
+			if val < AA_FUDGE:
+				return val
+			else:
+				return -1
+		else:
+			val = abs(ANNOT.start - self.start)
+			if val < FUDGE_POS:
+				return val
+			else:
+				return -1
+				
+				
+				
+				
+				
+				
 class PFAM(Annot):
 	def __init__(self, NAME, START_POS, END_POS, HOM):
 		self.start = START_POS
@@ -330,6 +396,74 @@ class TFSite(Annot):
 		raise NotImplemented
 	def GeneAnnot(self, GENE, REL_START, REL_STOP):
 		raise NotImplemented
+		
+class GenomeGene():
+	def __init__(self, GENE_NAME, PRODUCT_NAME):
+		self.gene_name = GENE_NAME
+		self.prod_name = PRODUCT_NAME
+		
+		self.aa_seq = None
+		self.nt_mapping = []
+		self.pos_eval = []
+		
+	def AddRegion(self, AA_SEQ, QUERRY_START, SUBJECT_START, E_VAL):
+		pass
+	
+	
+	
+	
+	
+class GenomeAnnotation():
+	
+	def __init__(self, NT_SEQ):
+		
+		self.nt_seq = NT_SEQ
+		self.gene_annotation = []
+	
+	
+	def __getitem__(self, KEY):
+		
+		for this_gene in self.gene_annotation:
+			if (this_gene.gene_name == KEY) | (this_gene.prod_name == KEY):
+				return this_gene
+		raise KeyError, 'Genome did not have Gene %(gene)s' % {'gene':KEY}
+		
+		
+	def AddGene(self, GENE, EXPECT = None, SCORE = None):
+		pass
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		
 		
 		
 		
@@ -497,12 +631,37 @@ def ELMParser(DIRECTORY = None):
 		current_line = this_file.readline()
 		
 		reg_exp = current_line[current_line.find('>') +
-												 1:current_line.find('/') - 2]
+								 1:current_line.find('/') - 2]
 		comp_reg_exp = re.compile(reg_exp)
 		all_reg_exps[elm_name[0]] = (reg_exp, comp_reg_exp)
 		this_file.close()
 	
 	return all_reg_exps
+
+def ResitenceParser(FILE_NAME):
+	"""
+	Parses a resistance feature list and returns a dictionary of regular 
+	expressions.
+	"""
+	
+	reg_exp_dict = {}
+	
+	with open(FILE_NAME) as handle:
+		junk = handle.next()
+		for this_line in handle:
+			parts = this_line.split('\t')
+			name = string.join(parts[2:4])
+			this_dict = {'prec':parts[0], 'mut':parts[4], 'trail':parts[1], 
+							'cons':parts[2]}
+			wt_seq = '[%(prec)s][%(cons)s][%(trail)s]' % this_dict
+			mut_seq = '[%(prec)s][%(mut)s][%(trail)s]' % this_dict
+			logging.debug('Drug Muts: %(mut)s ::: %(wt)s' % {'mut':mut_seq, 'wt':wt_seq})
+			reg_exp_dict[name] = [parts[5], re.compile(wt_seq), 
+				re.compile(mut_seq)]
+	
+	return reg_exp_dict
+	
+	
 	
 def PFAMChecker(GENE_LIST, DICT_OBJ, DICT_LOCK, FORCE_LEVEL = 1):
 	"""

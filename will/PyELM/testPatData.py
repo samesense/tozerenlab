@@ -19,6 +19,14 @@ import numpy
 import string
 
 
+def setUpModule():
+	fmt='%(levelname)s \t %(threadName)s \t %(funcName)s \t %(asctime)s \t %(message)s'
+	log_file = os.environ['PYTHONSCRATCH'] + 'testLog_KEEP.log'
+	logging.basicConfig(level=logging.DEBUG,
+						filename=log_file, 
+						filemode='w',
+						 format = fmt)
+
 def testPatRecord():
 	"""
 	Test the PatRecord Class
@@ -271,13 +279,70 @@ def CheckDidTakeDrug(PAT_BASE, PAT_ID, DRUG, CORRECT):
 		
 	nose.tools.assert_true(PAT_BASE[PAT_ID].DidTakeDrug(DRUG) == CORRECT,
 							bad_str)
+
+							
+def testGuessGene():
+	"""
+	Test whether the correct gene-fragment is translated
+	"""
 	
+	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
+	dest_dir = os.environ['PYTHONSCRATCH']
+	ref_base = PyVirus.RefBase(base_dir, dest_dir)
 	
+	for ref_seq in ref_base.ref_seqs:
+		
+		for this_gene in ref_seq.annotation:
+			this_seq = ref_seq.annotation[this_gene].nt_seq
+			logging.debug('Should be gene:' + this_gene)
+			
+			test_seq = PatUtils.PatSeq(1, None,
+									'test','test_study')
+			test_seq.my_sequence = this_seq
+			test_seq.TranslateAll(ref_base, WANTED_REF = ref_seq.seq_name)
+			
+			found_genes = test_seq.annotation.items()
+			found_genes = map(lambda x:x[0], found_genes)
+			
+			yield CheckCorrectGene, test_seq, found_genes, this_gene
+			yield CheckNonFragment, test_seq, this_gene
+			try:
+				test_seq.annotation.pop(this_gene)
+			except:
+				pass
+			for this_gene_new in test_seq.annotation:
+				yield CheckIsFragment, test_seq, this_gene_new
+			
+			#yield CheckGuessGene, this_seq, ref_base, ref_seq.seq_name, this_gene
+
+def CheckCorrectGene(test_seq, found_genes, CORRECT_GENE):
+	nose.tools.assert_true(test_seq.annotation.has_key(CORRECT_GENE),
+		'TranslateAll found %(found)s : needed %(correct)s' % \
+		{'found': str(found_genes), 'correct':CORRECT_GENE})
+	logging.debug('Found %(cor)s gene correctly' % {'cor':CORRECT_GENE})
+
+def CheckNonFragment(test_seq, CORRECT_GENE):
+	nose.tools.assert_true(test_seq.annotation[CORRECT_GENE].is_fragment == False,
+		'TranslateAll incorrectly marked %(correct)s as a fragment!' % \
+		{'correct':CORRECT_GENE})
+	logging.debug('Found %(cor)s As NonFragment' % {'cor':CORRECT_GENE})
+
+def CheckIsFragment(test_seq, this_gene):
+	nose.tools.assert_true(test_seq.annotation[this_gene].is_fragment,
+		'TranslateAll incorrectly marked %(correct)s as a whole gene!' % \
+		{'correct':this_gene})
+	logging.debug('Found %(cor)s as Fragment' % {'cor':this_gene})
+
+
+
+							
+							
+#@nose.tools.with_setup(log_setup, None)
 def testOffset():
 	"""
 	Test aligning fragments correctly
 	"""
-	logging.getLogger('').setLevel(logging.CRITICAL)
+	#logging.getLogger('').setLevel(logging.CRITICAL)
 	base_dir = os.environ['MYDOCPATH'] + 'hivsnppredsvn\\HIVRefs\\'
 	dest_dir = os.environ['PYTHONSCRATCH']
 	ref_base = PyVirus.RefBase(base_dir, dest_dir)
@@ -288,33 +353,50 @@ def testOffset():
 	#since we don't want to deal with a time-course manually set the sequence!
 	
 	for ref_seq in ref_base.ref_seqs[0:3]:
-		ref_seq.FindELMs(ELM_DICT)
+		#ref_seq.FindELMs(ELM_DICT)
 		ref_seq.FindTFSites()
-		
-		for this_seq in ref_seq.annotation:
-			this_seq = ref_seq.annotation[this_seq].nt_seq
-			yield CheckOffset, ref_base, ref_seq, this_seq
+		temp = map(lambda x: str(x), ref_seq.feature_annot)
+		logging.debug('ref_seq tfs:' + str(temp))
+		for this_gene in ref_seq.annotation:
+			this_seq = ref_seq.annotation[this_gene].nt_seq
+			logging.debug('should be gene:' + this_gene)
+			
+			test_seq = PatUtils.PatSeq(1, None,
+									'test','test_study')
+			test_seq.my_sequence = this_seq
+			test_seq.TranslateAll(ref_base, WANTED_REF = str(ref_seq.seq_name))
+			yield CheckOffset, ref_base, ref_seq, test_seq
 			
 		
 		
 	
-def CheckOffset(REF_BASE, INPUT_REF, PARTIAL_SEQ):
+def CheckOffset(REF_BASE, INPUT_REF, test_seq):
 	
-	test_seq = PatUtils.PatSeq(1, None,
-									'test','test_study')
-	test_seq.my_sequence = PARTIAL_SEQ
-	test_seq.TranslateAll(REF_BASE, WANTED_REF = str(INPUT_REF.seq_name))
+	
+	
 	test_seq.FindTFSites()
 	
-	out_array = INPUT_REF.CheckFeatures(test_seq.feature_annot, 10)
+	
+	if test_seq.offset == 0:
+		logging.debug('BAD offset:' + str(test_seq.my_sequence))
+	
+	out_array = INPUT_REF.CheckFeatures(test_seq.feature_annot, 100)
+	
 	
 	if not(out_array.all()):
+		
+		
+		
 		missing = []
+		correct_pair = []
+		
 		for i in xrange(len(test_seq.feature_annot)):
 			if out_array[i]==0:
 				missing.append(str(test_seq.feature_annot[i]))
+				
+				
 		nose.tools.assert_true(False, 
-		'Found %(found)d of %(tot)d features: %(missing)s' % \
+		'Found %(found)d of %(tot)d features: %(missing)s : %(found)s' % \
 		{'found': numpy.sum(out_array), 'tot':numpy.size(out_array),
 		'missing': str(missing)})
 	

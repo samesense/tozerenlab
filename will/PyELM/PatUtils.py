@@ -112,6 +112,12 @@ class PatSeq(PyVirus.ViralSeq):
 		gene_dict = {}
 		reg = re.compile('.*?\|(.*?):(\w{3}).*')
 		aa_start = 0
+		found_vals = []
+		found_one = False
+		blast_record.alignments.sort(key = lambda x: x.hsps[0].expect, reverse = True)
+		
+		logging.debug('my_seq_len:' + str(len(self.my_sequence)))
+		
 		for this_check in blast_record.alignments:
 			label = reg.match(this_check.title).groups()
 			this_gene = str(label[1])
@@ -119,15 +125,25 @@ class PatSeq(PyVirus.ViralSeq):
 			if (WANTED_REF != None) & (this_ref != WANTED_REF):
 				#make sure we translate "in context" of a reference
 				continue
-			if this_check.hsps[0].score < 900:
+			found_vals.append((this_check.hsps[0].score, this_check))
+			logging.debug('%(gene)s : score: %(score)s:%(bits)s:%(eval)s' % {'gene':this_gene, 'score':str(this_check.hsps[0].score), 
+				'bits': str(this_check.hsps[0].bits), 'eval':str(this_check.hsps[0].expect)})
+			if (this_check.hsps[0].expect > 1.0e-15) & (this_check.hsps[0].score < 900):
 				continue
 			if not(gene_dict.has_key(this_gene)):
+				logging.debug('Using Correct')
+				found_one = True
+				
 				ref_gene = REFBASE[this_ref].annotation[this_gene]
 				
 				aa_seq = str(this_check.hsps[0].query)
 				start_pos = this_check.hsps[0].query_start
 				end_pos = start_pos + this_check.length*3
 				nt_seq = self.my_sequence[start_pos:end_pos]
+				
+				logging.debug('check_len: %(check)d\tquerry_len: %(my)d\tnt_len:%(nt_len)d'\
+				% {'check':this_check.length, 'my':len(aa_seq), 'nt_len':len(nt_seq) })
+				logging.debug(str(this_check.hsps[0].query))
 				
 				whole_genome_start_pos = start_pos + ref_gene.start#ref_gene.start
 				whole_genome_end_pos = whole_genome_start_pos + this_check.length*3
@@ -136,7 +152,19 @@ class PatSeq(PyVirus.ViralSeq):
 				gene = Gene(this_gene, this_gene.upper(),
 							nt_seq, aa_seq, start_pos, 
 							end_pos)
-				gene.GeneAnnot(None, aa_start, aa_start + len(aa_seq))
+				
+				frac_coverage = float(len(self.my_sequence))/float(len(aa_seq)*3)
+				logging.debug('Covering %(gene)s:%(frac)s' % {'gene':this_gene, 'frac':str(frac_coverage)})
+				
+				if frac_coverage < 0.8:
+					gene.is_fragment = False
+				elif frac_coverage > 1.0:
+					gene.is_fragment = False
+				else:
+					gene.is_fragment = True
+							
+							
+				gene.GeneAnnot(None, whole_genome_start_pos, whole_genome_end_pos)
 				
 				aa_start += len(aa_seq)
 				gene_dict[this_gene] = gene
@@ -146,8 +174,30 @@ class PatSeq(PyVirus.ViralSeq):
 								# 'this':aa_seq,'ref':ref_gene.aa_seq}
 				
 				# logging.debug(view_str)
-				
-				
+		#if we couldnt find one then just find the best one!
+		if found_one == False:
+			logging.debug('Falling BACK')
+			this_check = max(found_vals, key = lambda x: x[0])[1]
+			this_gene = str(label[1])
+			ref_gene = REFBASE[this_ref].annotation[this_gene]
+			
+			aa_seq = str(this_check.hsps[0].query)
+			start_pos = this_check.hsps[0].query_start
+			end_pos = start_pos + this_check.length*3
+			nt_seq = self.my_sequence[start_pos:end_pos]
+			
+			whole_genome_start_pos = start_pos + ref_gene.start#ref_gene.start
+			whole_genome_end_pos = whole_genome_start_pos + this_check.length*3
+			
+			
+			gene = Gene(this_gene, this_gene.upper(),
+						nt_seq, aa_seq, start_pos, 
+						end_pos)
+			gene.GeneAnnot(None, aa_start, aa_start + len(aa_seq))
+			
+			aa_start += len(aa_seq)
+			gene_dict[this_gene] = gene
+		
 		self.annotation = gene_dict
 		self.SetOffset(REFBASE[WANTED_REF])
 	
@@ -181,17 +231,13 @@ class PatSeq(PyVirus.ViralSeq):
 		last_gene = None
 		for this_gene in REF_SEQ.annotation:
 			if this_gene in self.annotation:
-				this_offset = REF_SEQ.annotation[this_gene].start - \
-								self.annotation[this_gene].start
+				# this_offset = REF_SEQ.annotation[this_gene].start - \
+								# self.annotation[this_gene].start
+				this_offset = self.annotation[this_gene].rel_start
 				if last_gene == None:
 					last_gene = this_gene
 					offset = this_offset
-				else:
-					warn_str = '%(seq)s:too many genes mapped:%(this)s:%(last)s' \
-						% {'seq':self.seq_name, 'this':this_gene, 'last':last_gene}
-					logging.warning(warn_str)
-					
-					if this_offset < offset:
+				elif this_offset < offset:
 						last_gene = this_gene
 						offset = this_offset
 					
@@ -250,6 +296,9 @@ class PatSeq(PyVirus.ViralSeq):
 							self.offset + POS[1], None)
 		elif TYPE == 'TF':
 			new_feat = TFSite(NAME, self.offset + POS[0], 
+								self.offset + POS[1], HOM)
+		elif TYPE == 'ResistSite':
+			new_feat = ResistSite(NAME,self.offset + POS[0], 
 								self.offset + POS[1], HOM)
 		else:
 			raise KeyError
@@ -436,6 +485,14 @@ class PatSeq(PyVirus.ViralSeq):
 		
 		trans_dict = {True: '1', False: '0'}
 		found_feats = map(lambda x: trans_dict[x], found_feats.tolist())
+		
+		for this_rx in self.rx_time_line:
+			if this_rx.time_started.days == 0:
+				FILE_HANDLE.write(str(this_rx.rx_names))
+		
+		FILE_HANDLE.write(':')
+		
+		
 		
 		for this_feat in xrange(len(FEAT_LIST)):
 			if FEAT_LIST[this_feat].start + FUDGE_FACTOR < self.offset:
