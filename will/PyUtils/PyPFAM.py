@@ -73,7 +73,7 @@ def CheckMultiPFAM(INPUT_SEQ_LIST, NUM_THREADS = 10, DICT_OBJ = None,
 	
 
 def CheckPFAM(INPUT_SEQ, DICT_OBJ = None, DICT_LOCK = None, 
-				FORCE_LEVEL = 1):
+				FORCE_LEVEL = 0):
 	"""
 	Checks the INPUT_SEQ against the PFAM database webserver.
 	returns a list of tuples:
@@ -118,17 +118,20 @@ def CheckPFAM(INPUT_SEQ, DICT_OBJ = None, DICT_LOCK = None,
 						+ 'cannot be None'
 	
 	#check to see whether we've already found this sequence
-	if DICT_OBJ != None:
-		with DICT_LOCK:
-			cached = DICT_OBJ.has_key(INPUT_SEQ)
-		if cached:
-			if FORCE_LEVEL <= 1:
-				logging.debug('Returning cached object')
-				return DICT_OBJ[INPUT_SEQ]
-		else:
-			if FORCE_LEVEL == 0:
-				logging.debug('Returning None')
-				return None
+	try:
+		if DICT_OBJ != None:
+			with DICT_LOCK:
+				cached = DICT_OBJ.has_key(INPUT_SEQ)
+			if cached:
+				if FORCE_LEVEL <= 1:
+					logging.debug('Returning cached object')
+					return DICT_OBJ[INPUT_SEQ]
+			else:
+				if FORCE_LEVEL == 0:
+					logging.debug('Returning None')
+					return []
+	except:
+		logging.debug('Could not .has_key(%(in)s): %(ty)s' % {'in': INPUT_SEQ, 'ty':str(type(INPUT_SEQ))})
 	
 	moz_emu = PyMozilla.MozillaEmulator(cacher=None)
 	
@@ -145,9 +148,13 @@ def CheckPFAM(INPUT_SEQ, DICT_OBJ = None, DICT_LOCK = None,
 	final_output = ExtractINFO(moz_emu, result_url, job_id)
 	
 	if DICT_OBJ != None:
-		logging.debug('Caching results for later use')
+		
 		with DICT_LOCK:
-			DICT_OBJ[INPUT_SEQ] = final_output
+			try:
+				DICT_OBJ[INPUT_SEQ] = final_output
+				logging.debug('Caching results for later use')
+			except:
+				logging.debug('Could Not LOG:' + str(type(INPUT_SEQ)))
 	
 	return final_output
 	
