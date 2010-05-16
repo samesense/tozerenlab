@@ -1,4 +1,5 @@
 #!/bin/sh
+# tweet svn checkins
 
 # Scrub weird characters
 MSG=`echo $@|tr ' ' '+'`
